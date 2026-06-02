@@ -33,7 +33,7 @@ export const fundApi = {
   },
 
   getFundDetail: (code: string) =>
-    fetchApi<any>(`/funds/${code}`),
+    fetchApi<any>(`/funds/${encodeURIComponent(code)}`),
 
   getQDIIFunds: () =>
     fetchApi<any[]>('/funds/qdii'),
@@ -78,4 +78,12 @@ export const fundApi = {
   // 手动触发数据更新
   triggerUpdate: () =>
     fetchApi<any>('/update', { method: 'POST' }),
+
+  // 行业基金深度分析
+  getIndustryAnalysis: (industry: string) =>
+    fetchApi<any>(`/industry-analysis/${encodeURIComponent(industry)}`),
+
+  // 沪深300深度分析
+  getHS300Analysis: () =>
+    fetchApi<any>('/hs300/analysis'),
 };

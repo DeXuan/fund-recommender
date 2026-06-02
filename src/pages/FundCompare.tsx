@@ -1,6 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import { Card, Input, Table, Tag, Button, Space, Spin, AutoComplete, Alert, Row, Col, Tooltip } from 'antd';
+import { SearchOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import ReactECharts from 'echarts-for-react';
 import { fundApi } from '../services/api';
+import { formatReturn, getReturnColor, getValuationText } from '../utils/format';
 
 interface Fund {
   code: string;
@@ -29,18 +33,32 @@ interface Fund {
   pbPercentile: number;
   valuation: string;
   dailyLimit?: number;
+  purchaseFee?: number;
+  purchaseFeeDiscount?: number;
+  redeemFee?: { period: string; rate: number }[];
+  purchaseStatus?: string;
+  riskLevel?: string;
+  fundManager?: string;
+  share?: string;
+  shareChange?: string;
+  suitableFor?: string;
+  investmentAdvice?: string;
+  recommendation?: string;
+  topHoldings?: { name: string; percentage: number }[];
 }
 
 export default function FundCompare() {
   const [searchParams] = useSearchParams();
-  const initialCodes = searchParams.get('codes')?.split(',') || [];
+  const initialCodes = (searchParams.get('codes')?.split(',') || [])
+    .filter(code => /^\d{6}$/.test(code));
 
   const [compareList, setCompareList] = useState<string[]>(initialCodes);
   const [funds, setFunds] = useState<Fund[]>([]);
   const [allFunds, setAllFunds] = useState<Fund[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchCode, setSearchCode] = useState('');
-  const [searchResults, setSearchResults] = useState<Fund[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadAllFunds();
@@ -51,338 +69,407 @@ export default function FundCompare() {
       loadCompareFunds();
     } else {
       setFunds([]);
+      setError(null);
     }
   }, [compareList]);
 
   const loadAllFunds = async () => {
     try {
       const data = await fundApi.getFunds();
-      setAllFunds(data);
+      setAllFunds(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('加载基金列表失败:', error);
+      setAllFunds([]);
     }
   };
 
   const loadCompareFunds = async () => {
     if (compareList.length === 0) return;
     setLoading(true);
+    setError(null);
     try {
       const data = await fundApi.compareFunds(compareList);
-      setFunds(data);
+      setFunds(Array.isArray(data) ? data.filter((f: Fund | null) => f && f.code) : []);
     } catch (error) {
       console.error('加载对比数据失败:', error);
+      setFunds([]);
+      setError('加载对比数据失败，请检查基金代码是否正确');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = (value: string) => {
-    setSearchCode(value);
-    if (value.trim()) {
-      const results = allFunds.filter(f =>
-        f.code.includes(value) || f.name.includes(value)
-      ).slice(0, 10);
-      setSearchResults(results);
-    } else {
-      setSearchResults([]);
-    }
-  };
-
-  const addFund = (code?: string) => {
-    const fundCode = code || searchCode.trim();
+  const addFund = useCallback((code?: string) => {
+    const fundCode = (code || searchCode).trim();
     if (!fundCode) return;
-    if (compareList.includes(fundCode)) {
-      alert('该基金已在对比列表中');
-      return;
-    }
-    if (compareList.length >= 5) {
-      alert('最多支持5只基金对比');
-      return;
-    }
-    setCompareList([...compareList, fundCode]);
+    if (compareList.includes(fundCode)) return;
+    if (compareList.length >= 5) return;
+    // 验证基金代码是否存在
+    const exists = allFunds.some(f => f.code === fundCode);
+    if (!exists) return;
+    setCompareList(prev => [...prev, fundCode]);
     setSearchCode('');
-    setSearchResults([]);
-  };
+  }, [searchCode, compareList, allFunds]);
 
-  const removeFund = (code: string) => {
-    setCompareList(compareList.filter(c => c !== code));
-    setFunds(funds.filter(f => f.code !== code));
-  };
+  const removeFund = useCallback((code: string) => {
+    setCompareList(prev => prev.filter(c => c !== code));
+  }, []);
 
-  const formatReturn = (value: number) => {
-    if (value === undefined || value === null) return '-';
-    const colorClass = value > 0 ? 'rise' : value < 0 ? 'fall' : '';
-    return <span className={colorClass}>{value >= 0 ? '+' : ''}{value.toFixed(2)}%</span>;
-  };
-
-  const getValuationText = (valuation: string) => {
-    switch (valuation) {
-      case 'very_low': return '极低';
-      case 'low': return '偏低';
-      case 'reasonable': return '合理';
-      case 'high': return '偏高';
-      case 'very_high': return '极高';
-      default: return '-';
+  const handleSearchChange = useCallback((value: string) => {
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
     }
-  };
+    debounceTimer.current = setTimeout(() => {
+      setSearchCode(value);
+    }, 150);
+  }, []);
 
-  const getBestValue = (field: keyof Fund, type: 'max' | 'min' = 'max') => {
-    if (funds.length === 0) return null;
-    const values = funds.map(f => f[field] as number).filter(v => v !== undefined && v !== null);
-    if (values.length === 0) return null;
-    return type === 'max' ? Math.max(...values) : Math.min(...values);
-  };
+  // 搜索选项 - 使用 useMemo 缓存，只返回 value 字符串数组避免 JSX 开销
+  const searchOptions = useMemo(() => {
+    const keyword = searchCode.trim();
+    if (!keyword || allFunds.length === 0) return [];
+    return allFunds
+      .filter(f => f.code.includes(keyword) || f.name.includes(keyword))
+      .slice(0, 8)
+      .map(f => ({
+        value: f.code,
+        label: `${f.code} - ${f.name} (${f.industry})`,
+      }));
+  }, [searchCode, allFunds]);
 
-  const highlightCell = (value: number, field: keyof Fund, type: 'max' | 'min' = 'max') => {
-    const best = getBestValue(field, type);
-    if (best === null || value === undefined) return {};
-    if (value === best) {
-      return { background: '#f6ffed', fontWeight: 600 };
-    }
-    return {};
-  };
+  // 图表配置
+  const compareChartOption = useMemo(() => {
+    if (funds.length < 2) return null;
+    return {
+      tooltip: { trigger: 'axis' as const },
+      legend: { data: funds.map(f => f.name) },
+      xAxis: {
+        type: 'category' as const,
+        data: ['近1年', '近6月', '近3月', '近1月', '近1周'],
+      },
+      yAxis: { type: 'value' as const, axisLabel: { formatter: '{value}%' } },
+      series: funds.map((fund, i) => ({
+        name: fund.name,
+        type: 'bar' as const,
+        data: [fund.return1y ?? 0, fund.return6m ?? 0, fund.return3m ?? 0, fund.return1m ?? 0, fund.return1w ?? 0],
+        itemStyle: {
+          color: ['#1677ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1'][i % 5],
+        },
+      })),
+    };
+  }, [funds]);
+
+  // 对比表格数据 - 全量字段
+  const tableData = useMemo(() => {
+    if (funds.length === 0) return [];
+    const safeNum = (f: Fund, key: keyof Fund, decimals = 2) => {
+      const v = f[key];
+      if (v === undefined || v === null) return '-';
+      const n = Number(v);
+      return isNaN(n) ? '-' : n.toFixed(decimals);
+    };
+    const safeStr = (f: Fund, key: keyof Fund) => {
+      const v = f[key];
+      return v !== undefined && v !== null ? v : '-';
+    };
+    const entries = (key: string) => Object.fromEntries(funds.map(f => [f.code, key]));
+
+    return [
+      // === 基本信息 ===
+      { key: '_group_basic', label: '📋 基本信息', ...entries('_group') },
+      { key: 'index', label: '跟踪指数', ...Object.fromEntries(funds.map(f => [f.code, f.index || '-'])) },
+      { key: 'type', label: '基金类型', ...Object.fromEntries(funds.map(f => [f.code, f.type || '-'])) },
+      { key: 'nav', label: '最新净值', ...Object.fromEntries(funds.map(f => [f.code, f.nav?.toFixed(4) ?? '-'])) },
+      { key: 'fundManager', label: '基金经理', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'fundManager')])) },
+      { key: 'company', label: '基金公司', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'company')])) },
+
+      // === 收益指标 ===
+      { key: '_group_return', label: '📈 收益指标', ...entries('_group') },
+      { key: 'return1y', label: '近1年收益', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'return1y')])) },
+      { key: 'return6m', label: '近6月收益', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'return6m')])) },
+      { key: 'return3m', label: '近3月收益', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'return3m')])) },
+      { key: 'return1m', label: '近1月收益', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'return1m')])) },
+      { key: 'return1w', label: '近1周收益', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'return1w')])) },
+
+      // === 费率详情 ===
+      { key: '_group_fee', label: '💰 费率详情', ...entries('_group') },
+      { key: 'managementFee', label: '管理费率/年', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'managementFee')])) },
+      { key: 'custodyFee', label: '托管费率/年', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'custodyFee')])) },
+      { key: 'serviceFee', label: '销售服务费/年', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'serviceFee')])) },
+      { key: 'totalFee', label: '综合费率/年', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'totalFee')])) },
+      { key: 'purchaseFee', label: '申购费率(原)', ...Object.fromEntries(funds.map(f => [f.code, f.purchaseFee ? `${f.purchaseFee}%` : '-'])) },
+      { key: 'purchaseFeeDiscount', label: '申购费率(支付宝1折)', ...Object.fromEntries(funds.map(f => [f.code, f.purchaseFeeDiscount ? `${f.purchaseFeeDiscount}%` : '-'])) },
+      { key: 'redeemFee', label: '赎回费率(≥1年)', ...Object.fromEntries(funds.map(f => [f.code, f.redeemFee?.find(r => r.period.includes('1-2年') || r.period.includes('1年'))?.rate !== undefined ? `${f.redeemFee.find(r => r.period.includes('1-2年') || r.period.includes('1年'))!.rate}%` : '-'])) },
+
+      // === 规模与持有人 ===
+      { key: '_group_holder', label: '📊 规模与持有人', ...entries('_group') },
+      { key: 'scale', label: '基金规模(亿)', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'scale', 1)])) },
+      { key: 'share', label: '份额(亿份)', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'share')])) },
+      { key: 'shareChange', label: '份额变化(%)', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'shareChange')])) },
+      { key: 'institutionHold', label: '机构持有(%)', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'institutionHold')])) },
+      { key: 'individualHold', label: '个人持有(%)', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'individualHold')])) },
+
+      // === 申购与限额 ===
+      { key: '_group_purchase', label: '🔑 申购与限额', ...entries('_group') },
+      { key: 'purchaseStatus', label: '申购状态', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'purchaseStatus')])) },
+      { key: 'dailyLimit', label: '每日限额', ...Object.fromEntries(funds.map(f => [f.code, f.dailyLimit === 0 ? '暂停' : f.dailyLimit ? `${f.dailyLimit}万` : '-'])) },
+
+      // === 估值指标 ===
+      { key: '_group_valuation', label: '📉 估值指标', ...entries('_group') },
+      { key: 'pe', label: 'PE(TTM)', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'pe')])) },
+      { key: 'pb', label: 'PB', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'pb')])) },
+      { key: 'pePercentile', label: 'PE历史分位(%)', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'pePercentile')])) },
+      { key: 'pbPercentile', label: 'PB历史分位(%)', ...Object.fromEntries(funds.map(f => [f.code, safeNum(f, 'pbPercentile')])) },
+      { key: 'valuation', label: '估值判断', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'valuation')])) },
+
+      // === 综合评价 ===
+      { key: '_group_summary', label: '⭐ 综合评价', ...entries('_group') },
+      { key: 'rating', label: '推荐评级', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'rating')])) },
+      { key: 'riskLevel', label: '风险等级', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'riskLevel')])) },
+      { key: 'suitableFor', label: '适合人群', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'suitableFor')])) },
+      { key: 'recommendation', label: '推荐理由', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'recommendation')])) },
+      { key: 'investmentAdvice', label: '投资建议', ...Object.fromEntries(funds.map(f => [f.code, safeStr(f, 'investmentAdvice')])) },
+
+      // === 前十大重仓股 ===
+      { key: '_group_holdings', label: '🏢 前十大重仓股', ...entries('_group') },
+      ...Array.from({ length: 10 }, (_, i) => ({
+        key: `holding_${i}`,
+        label: `重仓${i + 1}`,
+        ...Object.fromEntries(funds.map(f => [f.code, f.topHoldings?.[i] ? `${f.topHoldings[i].name} (${f.topHoldings[i].percentage}%)` : '-'])),
+      })),
+    ];
+  }, [funds]);
+
+  // 对比表格列
+  const tableColumns = useMemo(() => [
+    {
+      title: '指标',
+      dataIndex: 'label',
+      key: 'label',
+      width: 160,
+      fixed: 'left' as const,
+      render: (text: string, record: any) => {
+        if (record.key.startsWith('_group')) {
+          return <span style={{ fontWeight: 700, fontSize: 14, color: '#1677ff' }}>{text}</span>;
+        }
+        return <span style={{ fontWeight: 500 }}>{text}</span>;
+      },
+    },
+    ...funds.map(fund => ({
+      title: <Link to={`/funds/${fund.code}`} style={{ color: '#1677ff' }}>{fund.name}<div style={{ fontSize: 11, color: '#999', fontWeight: 400 }}>{fund.code}</div></Link>,
+      dataIndex: fund.code,
+      key: fund.code,
+      render: (val: any, record: any) => {
+        // 分组行不渲染数据
+        if (record.key.startsWith('_group')) return null;
+        if (val === '-' || val === undefined || val === null) return <span style={{ color: '#ccc' }}>-</span>;
+
+        // 收益率 - 红涨绿跌
+        if (['return1y', 'return6m', 'return3m', 'return1m', 'return1w'].includes(record.key)) {
+          const num = Number(val);
+          return <span style={{ color: getReturnColor(num), fontWeight: 600 }}>{formatReturn(num)}</span>;
+        }
+
+        // 估值判断
+        if (record.key === 'valuation') return getValuationText(val);
+
+        // 评级
+        if (record.key === 'rating') return <span style={{ color: '#faad14' }}>{'★'.repeat(Number(val) || 0)}</span>;
+
+        // 费率 - 高费率标红
+        if (['managementFee', 'custodyFee', 'serviceFee', 'totalFee'].includes(record.key)) {
+          const num = Number(val);
+          if (isNaN(num)) return val;
+          const isHigh = record.key === 'totalFee' && num > 0.8;
+          return <span style={{ fontWeight: isHigh ? 700 : 500, color: isHigh ? '#ff4d4f' : undefined }}>{num.toFixed(2)}%</span>;
+        }
+
+        // PE/PB分位
+        if (['pePercentile', 'pbPercentile'].includes(record.key)) {
+          const num = Number(val);
+          if (isNaN(num)) return val;
+          const color = num < 30 ? '#52c41a' : num > 70 ? '#ff4d4f' : '#1677ff';
+          return <span style={{ color, fontWeight: 600 }}>{num.toFixed(1)}%</span>;
+        }
+
+        // 申购状态
+        if (record.key === 'purchaseStatus') {
+          const statusMap: Record<string, { color: string; text: string }> = {
+            open: { color: 'green', text: '开放申购' },
+            limited: { color: 'orange', text: '限大额' },
+            suspended: { color: 'red', text: '暂停申购' },
+          };
+          const s = statusMap[val] || { color: 'default', text: val };
+          return <Tag color={s.color}>{s.text}</Tag>;
+        }
+
+        // 风险等级
+        if (record.key === 'riskLevel') {
+          const riskMap: Record<string, { color: string; text: string }> = {
+            low: { color: 'green', text: '低风险' },
+            medium: { color: 'blue', text: '中风险' },
+            high: { color: 'red', text: '高风险' },
+          };
+          const r = riskMap[val] || { color: 'default', text: val };
+          return <Tag color={r.color}>{r.text}</Tag>;
+        }
+
+        // 份额变化 - 增长标绿，缩减标红
+        if (record.key === 'shareChange') {
+          const num = Number(val);
+          if (isNaN(num)) return val;
+          return <span style={{ color: num > 0 ? '#52c41a' : '#ff4d4f', fontWeight: 600 }}>{num > 0 ? '+' : ''}{num}%</span>;
+        }
+
+        // 机构持有 - 高比例高亮
+        if (record.key === 'institutionHold') {
+          const num = Number(val);
+          if (isNaN(num)) return val;
+          return <span style={{ fontWeight: num >= 10 ? 700 : 400, color: num >= 10 ? '#faad14' : undefined }}>{num}%</span>;
+        }
+
+        // 每日限额
+        if (record.key === 'dailyLimit') {
+          return <span style={{ fontWeight: 600, color: val === '暂停' ? '#ff4d4f' : '#333' }}>{val}</span>;
+        }
+
+        // 推荐理由/投资建议 - 缩短显示
+        if (['recommendation', 'investmentAdvice'].includes(record.key)) {
+          const text = String(val);
+          return <Tooltip title={text}><span style={{ fontSize: 12 }}>{text.length > 30 ? text.slice(0, 30) + '...' : text}</span></Tooltip>;
+        }
+
+        return val;
+      },
+    })),
+  ], [funds]);
 
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>基金对比</h1>
+      <h1 style={{ marginBottom: 24, fontSize: 24, fontWeight: 600 }}>基金对比</h1>
 
-      {/* 添加基金 */}
-      <div className="card">
-        <h3 className="card-title">添加基金到对比</h3>
-        <div style={{ position: 'relative' }}>
-          <div className="flex">
-            <input
-              type="text"
-              className="input"
-              placeholder="输入基金代码或名称搜索..."
-              value={searchCode}
-              onChange={(e) => handleSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addFund()}
-              style={{ flex: 1 }}
-            />
-            <button className="btn btn-primary" onClick={() => addFund()}>
-              添加
-            </button>
-          </div>
-          {/* 搜索结果下拉 */}
-          {searchResults.length > 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              background: 'white',
-              border: '1px solid #e8e8e8',
-              borderRadius: '0 0 8px 8px',
-              maxHeight: 300,
-              overflowY: 'auto',
-              zIndex: 10,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            }}>
-              {searchResults.map((fund) => (
-                <div
-                  key={fund.code}
-                  onClick={() => addFund(fund.code)}
-                  style={{
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid #f0f0f0',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                >
-                  <div>
-                    <span style={{ fontWeight: 600, color: '#1677ff', marginRight: 8 }}>{fund.code}</span>
-                    <span>{fund.name}</span>
-                  </div>
-                  <span className="tag" style={{ fontSize: 11 }}>{fund.industry}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <Card title="添加基金到对比" style={{ marginBottom: 16 }}>
+        <Space>
+          <AutoComplete
+            value={searchCode}
+            onChange={handleSearchChange}
+            options={searchOptions}
+            onSelect={(value) => {
+              setSearchCode('');
+              addFund(value);
+            }}
+            style={{ width: 400 }}
+            placeholder="输入基金代码或名称搜索..."
+            allowClear
+          />
+          <Button
+            type="primary"
+            icon={<SearchOutlined />}
+            onClick={() => addFund()}
+            disabled={!searchCode.trim() || compareList.length >= 5}
+          >
+            添加
+          </Button>
+        </Space>
         <div style={{ marginTop: 12 }}>
-          <span className="text-muted">已添加 {compareList.length}/5 只基金</span>
+          <span style={{ color: '#666', fontSize: 13 }}>已添加 {compareList.length}/5 只基金</span>
           {compareList.length > 0 && (
-            <div className="flex" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+            <Space size={8} wrap style={{ marginTop: 8 }}>
               {compareList.map((code) => {
                 const fund = allFunds.find(f => f.code === code);
                 return (
-                <span key={code} className="tag" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {fund ? `${fund.name}(${code})` : code}
-                  <button
-                    onClick={() => removeFund(code)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', padding: 0 }}
+                  <Tag
+                    key={code}
+                    closable
+                    onClose={() => removeFund(code)}
+                    color="blue"
                   >
-                    ×
-                  </button>
-                </span>
-              );
+                    {fund ? `${fund.name}(${code})` : code}
+                  </Tag>
+                );
               })}
-            </div>
+            </Space>
           )}
         </div>
-      </div>
+      </Card>
 
-      {/* 对比结果 */}
-      {loading ? (
-        <div className="text-center" style={{ padding: 40 }}>加载中...</div>
-      ) : funds.length === 0 ? (
-        <div className="card text-center" style={{ padding: 40, color: '#999' }}>
-          <p>请添加基金开始对比</p>
-          <p style={{ marginTop: 8, fontSize: 14 }}>支持同时对比最多5只基金</p>
-        </div>
-      ) : (
-        <div className="card">
-          <h3 className="card-title">对比结果</h3>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>指标</th>
-                  {funds.map((fund) => (
-                    <th key={fund.code}>
-                      <Link to={`/funds/${fund.code}`} style={{ color: '#1677ff' }}>
-                        {fund.name}
-                      </Link>
-                      <div style={{ fontSize: 12, color: '#999', fontWeight: 400 }}>{fund.code}</div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>最新净值</td>
-                  {funds.map((fund) => (
-                    <td key={fund.code}>{fund.nav?.toFixed(4)}</td>
-                  ))}
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>近1年收益</td>
-                  {funds.map((fund) => (
-                    <td key={fund.code} style={highlightCell(fund.return1y, 'return1y')}>
-                      {formatReturn(fund.return1y)}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>近6月收益</td>
-                  {funds.map((fund) => (
-                    <td key={fund.code} style={highlightCell(fund.return6m, 'return6m')}>
-                      {formatReturn(fund.return6m)}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>近3月收益</td>
-                  {funds.map((fund) => (
-                    <td key={fund.code} style={highlightCell(fund.return3m, 'return3m')}>
-                      {formatReturn(fund.return3m)}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>近1月收益</td>
-                  {funds.map((fund) => (
-                    <td key={fund.code} style={highlightCell(fund.return1m, 'return1m')}>
-                      {formatReturn(fund.return1m)}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>综合费率</td>
-                  {funds.map((fund) => (
-                    <td key={fund.code} style={highlightCell(fund.totalFee, 'totalFee', 'min')}>
-                      {fund.totalFee?.toFixed(2)}%/年
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>基金规模</td>
-                  {funds.map((fund) => (
-                    <td key={fund.code}>{fund.scale?.toFixed(2)} 亿</td>
-                  ))}
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>机构持有</td>
-                  {funds.map((fund) => (
-                    <td key={fund.code}>{fund.institutionHold?.toFixed(2)}%</td>
-                  ))}
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>推荐评级</td>
-                  {funds.map((fund) => (
-                    <td key={fund.code}>
-                      <span className="rating">{'★'.repeat(fund.rating)}</span>
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>PE历史分位</td>
-                  {funds.map((fund) => (
-                    <td key={fund.code}>{fund.pePercentile?.toFixed(2)}%</td>
-                  ))}
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>估值判断</td>
-                  {funds.map((fund) => (
-                    <td key={fund.code}>{getValuationText(fund.valuation)}</td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* 最优推荐 */}
-          {funds.length >= 2 && (
-            <div style={{ marginTop: 24, padding: 16, background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
-              <h4 style={{ color: '#52c41a', marginBottom: 8 }}>对比结论</h4>
-              <p>
-                {(() => {
-                  const bestReturn = funds.reduce((best, f) => f.return1y > best.return1y ? f : best);
-                  const bestFee = funds.reduce((best, f) => (f.totalFee || 999) < (best.totalFee || 999) ? f : best);
-                  return (
-                    <>
-                      收益最高：<strong>{bestReturn.name}</strong>（近1年 {bestReturn.return1y?.toFixed(2)}%）
-                      {bestReturn.code !== bestFee.code && (
-                        <>，费率最低：<strong>{bestFee.name}</strong>（{bestFee.totalFee?.toFixed(2)}%/年）</>
-                      )}
-                    </>
-                  );
-                })()}
-              </p>
-            </div>
-          )}
-        </div>
+      {error && (
+        <Alert type="error" message={error} style={{ marginBottom: 16 }} closable onClose={() => setError(null)} />
       )}
 
-      {/* 快捷对比 */}
-      <div className="card">
-        <h3 className="card-title">热门对比组合</h3>
-        <div className="grid grid-3">
-          <button
-            className="btn btn-outline"
-            onClick={() => setCompareList(['013349', '008887', '011102'])}
-          >
-            AI + 半导体 + 光伏
-          </button>
-          <button
-            className="btn btn-outline"
-            onClick={() => setCompareList(['040046', '110020', '012831'])}
-          >
-            纳斯达克 + 沪深300 + 新能源
-          </button>
-          <button
-            className="btn btn-outline"
-            onClick={() => setCompareList(['012634', '000248', '013349'])}
-          >
-            医药 + 消费 + AI
-          </button>
-        </div>
-      </div>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
+      ) : funds.length === 0 ? (
+        <Card style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+          <p style={{ fontSize: 16 }}>请添加基金开始对比</p>
+          <p style={{ marginTop: 8, fontSize: 13 }}>支持同时对比最多5只基金</p>
+        </Card>
+      ) : (
+        <>
+          {/* 对比柱状图 */}
+          {compareChartOption && (
+            <Card title="收益对比" style={{ marginBottom: 16 }}>
+              <ReactECharts option={compareChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
+            </Card>
+          )}
+
+          <Card title="对比详情" style={{ marginBottom: 16 }}>
+            <div style={{ overflowX: 'auto' }}>
+              <Table
+                dataSource={tableData}
+                columns={tableColumns}
+                pagination={false}
+                size="small"
+                scroll={{ x: 600 }}
+                rowKey="key"
+                rowClassName={(record) => record.key.startsWith('_group') ? 'compare-group-row' : ''}
+              />
+            </div>
+
+            {funds.length >= 2 && (() => {
+              const validFunds = funds.filter(f => f.return1y !== undefined && f.return1y !== null);
+              if (validFunds.length < 2) return null;
+              const bestReturn = validFunds.reduce((best, f) => f.return1y > best.return1y ? f : best);
+              const validFeeFunds = funds.filter(f => f.totalFee !== undefined && f.totalFee !== null);
+              const bestFee = validFeeFunds.length > 0
+                ? validFeeFunds.reduce((best, f) => (f.totalFee || 999) < (best.totalFee || 999) ? f : best)
+                : null;
+              return (
+                <Alert
+                  type="success"
+                  message="对比结论"
+                  description={
+                    <span>
+                      收益最高：<strong>{bestReturn.name}</strong>（近1年 {bestReturn.return1y?.toFixed(2)}%）
+                      {bestFee && bestReturn.code !== bestFee.code && (
+                        <>，费率最低：<strong>{bestFee.name}</strong>（{bestFee.totalFee?.toFixed(2)}%/年）</>
+                      )}
+                    </span>
+                  }
+                  style={{ marginTop: 16 }}
+                  showIcon
+                />
+              );
+            })()}
+          </Card>
+        </>
+      )}
+
+      <Card title="热门对比组合">
+        <Row gutter={16}>
+          {[
+            { label: 'AI + 半导体 + 光伏', codes: ['013349', '008887', '011102'] },
+            { label: '纳斯达克 + 沪深300 + 新能源', codes: ['040046', '110020', '012831'] },
+            { label: '医药 + 消费 + AI', codes: ['012634', '000248', '013349'] },
+          ].map((combo) => (
+            <Col xs={24} sm={8} key={combo.label}>
+              <Button block onClick={() => setCompareList(combo.codes)} style={{ marginBottom: 8 }}>
+                {combo.label}
+              </Button>
+            </Col>
+          ))}
+        </Row>
+      </Card>
     </div>
   );
 }

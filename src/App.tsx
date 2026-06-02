@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Layout } from 'antd';
 import Navbar from './components/Navbar';
 import DataStatus from './components/DataStatus';
 import Home from './pages/Home';
@@ -9,16 +10,18 @@ import RiskAssessment from './pages/RiskAssessment';
 import DCACalculator from './pages/DCACalculator';
 import MarketAnalysis from './pages/MarketAnalysis';
 import QDIIFunds from './pages/QDIIFunds';
+import IndustryAnalysis from './pages/IndustryAnalysis';
+import HS300Analysis from './pages/HS300Analysis';
 
 function App() {
   return (
-    <Router>
-      <div className="app">
+    <Router basename="/web">
+      <Layout style={{ minHeight: '100vh' }}>
         <Navbar />
         <div style={{ position: 'sticky', top: 60, zIndex: 99, padding: '8px 24px' }}>
           <DataStatus />
         </div>
-        <main className="main-content">
+        <Layout.Content style={{ maxWidth: 1800, margin: '0 auto', padding: '20px', width: '100%' }}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/funds" element={<FundList />} />
@@ -28,9 +31,11 @@ function App() {
             <Route path="/risk-assessment" element={<RiskAssessment />} />
             <Route path="/dca-calculator" element={<DCACalculator />} />
             <Route path="/market" element={<MarketAnalysis />} />
+            <Route path="/industry" element={<IndustryAnalysis />} />
+            <Route path="/hs300" element={<HS300Analysis />} />
           </Routes>
-        </main>
-      </div>
+        </Layout.Content>
+      </Layout>
     </Router>
   );
 }

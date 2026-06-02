@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Card, Input, Select, Table, Tag, Button, Space, Spin } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 import { fundApi } from '../services/api';
+import { formatReturn, getReturnColor } from '../utils/format';
 
 interface Fund {
   code: string;
@@ -22,8 +25,6 @@ export default function FundList() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState('全部');
-  const [sortField, setSortField] = useState('return1m');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [industries, setIndustries] = useState<string[]>([]);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export default function FundList() {
 
   useEffect(() => {
     loadFunds();
-  }, [industry, sortField, sortOrder, search]);
+  }, [industry, search]);
 
   const loadIndustries = async () => {
     try {
@@ -49,8 +50,6 @@ export default function FundList() {
     try {
       const data = await fundApi.getFunds({
         industry: industry !== '全部' ? industry : undefined,
-        sort: sortField,
-        order: sortOrder,
         search: search || undefined,
       });
       setFunds(data);
@@ -61,154 +60,132 @@ export default function FundList() {
     }
   };
 
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('desc');
-    }
-  };
+  const renderReturn = (val: number) => (
+    <span style={{ color: getReturnColor(val), fontWeight: 600 }}>
+      {formatReturn(val)}
+    </span>
+  );
 
-  const getSortIcon = (field: string) => {
-    if (sortField !== field) return '↕';
-    return sortOrder === 'asc' ? '↑' : '↓';
-  };
-
-  const formatReturn = (value: number) => {
-    if (value === undefined || value === null) return '-';
-    const colorClass = value > 0 ? 'rise' : value < 0 ? 'fall' : '';
-    return <span className={colorClass}>{value >= 0 ? '+' : ''}{value.toFixed(2)}%</span>;
-  };
+  const columns = [
+    {
+      title: '基金代码',
+      dataIndex: 'code',
+      key: 'code',
+      width: 100,
+      render: (code: string) => <Link to={`/funds/${code}`} style={{ color: '#1677ff' }}>{code}</Link>,
+    },
+    {
+      title: '基金名称',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name: string, record: Fund) => (
+        <Space>
+          <Link to={`/funds/${record.code}`} style={{ color: '#333', fontWeight: 500 }}>{name}</Link>
+          {record.isGoldSelected && <Tag color="gold" style={{ fontSize: 11 }}>金选</Tag>}
+        </Space>
+      ),
+    },
+    {
+      title: '行业',
+      dataIndex: 'industry',
+      key: 'industry',
+      width: 100,
+      render: (text: string) => <Tag>{text}</Tag>,
+    },
+    {
+      title: '最新净值',
+      dataIndex: 'nav',
+      key: 'nav',
+      width: 100,
+      render: (nav: number) => nav?.toFixed(4) || '-',
+    },
+    {
+      title: '近1年',
+      dataIndex: 'return1y',
+      key: 'return1y',
+      width: 100,
+      sorter: (a: Fund, b: Fund) => a.return1y - b.return1y,
+      render: renderReturn,
+    },
+    {
+      title: '近6月',
+      dataIndex: 'return6m',
+      key: 'return6m',
+      width: 100,
+      sorter: (a: Fund, b: Fund) => a.return6m - b.return6m,
+      render: renderReturn,
+    },
+    {
+      title: '近3月',
+      dataIndex: 'return3m',
+      key: 'return3m',
+      width: 100,
+      sorter: (a: Fund, b: Fund) => a.return3m - b.return3m,
+      render: renderReturn,
+    },
+    {
+      title: '近1月',
+      dataIndex: 'return1m',
+      key: 'return1m',
+      width: 100,
+      sorter: (a: Fund, b: Fund) => a.return1m - b.return1m,
+      defaultSortOrder: 'descend' as const,
+      render: renderReturn,
+    },
+    {
+      title: '规模(亿)',
+      dataIndex: 'scale',
+      key: 'scale',
+      width: 100,
+      sorter: (a: Fund, b: Fund) => a.scale - b.scale,
+      render: (val: number) => val?.toFixed(2) || '-',
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 80,
+      render: (_: any, record: Fund) => (
+        <Link to={`/funds/${record.code}`}>
+          <Button type="link" size="small">详情</Button>
+        </Link>
+      ),
+    },
+  ];
 
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>基金列表</h1>
+      <h1 style={{ marginBottom: 24, fontSize: 24, fontWeight: 600 }}>基金列表</h1>
 
-      {/* 搜索和筛选 */}
-      <div className="card">
-        <div className="flex" style={{ flexWrap: 'wrap', gap: 16 }}>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <input
-              type="text"
-              className="input"
-              placeholder="搜索基金名称或代码..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div style={{ minWidth: 150 }}>
-            <select
-              className="select"
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-            >
-              {industries.map((ind) => (
-                <option key={ind} value={ind}>{ind}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+      <Card style={{ marginBottom: 16 }}>
+        <Space size={16} wrap>
+          <Input.Search
+            placeholder="搜索基金名称或代码..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: 300 }}
+            allowClear
+            prefix={<SearchOutlined />}
+          />
+          <Select
+            value={industry}
+            onChange={setIndustry}
+            style={{ width: 160 }}
+            options={industries.map((ind) => ({ label: ind, value: ind }))}
+          />
+        </Space>
+      </Card>
 
-      {/* 基金列表 */}
-      <div className="card">
-        {loading ? (
-          <div className="text-center" style={{ padding: 40 }}>加载中...</div>
-        ) : funds.length === 0 ? (
-          <div className="text-center" style={{ padding: 40, color: '#999' }}>
-            没有找到匹配的基金
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>基金代码</th>
-                  <th>基金名称</th>
-                  <th>行业</th>
-                  <th>最新净值</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('return1y')}>
-                    近1年 {getSortIcon('return1y')}
-                  </th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('return6m')}>
-                    近6月 {getSortIcon('return6m')}
-                  </th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('return3m')}>
-                    近3月 {getSortIcon('return3m')}
-                  </th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('return1m')}>
-                    近1月 {getSortIcon('return1m')}
-                  </th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('scale')}>
-                    规模(亿) {getSortIcon('scale')}
-                  </th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {funds.map((fund) => (
-                  <tr key={fund.code}>
-                    <td>
-                      <Link to={`/funds/${fund.code}`} style={{ color: '#1677ff' }}>
-                        {fund.code}
-                      </Link>
-                    </td>
-                    <td>
-                      <Link to={`/funds/${fund.code}`} style={{ textDecoration: 'none', color: '#333' }}>
-                        {fund.name}
-                      </Link>
-                      {fund.isGoldSelected && (
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: 20,
-                          height: 20,
-                          marginLeft: 6,
-                          background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
-                          borderRadius: '50%',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: '#fff',
-                          verticalAlign: 'middle',
-                          boxShadow: '0 1px 2px rgba(255,165,0,0.3)',
-                        }}>
-                          金
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <span className="tag">{fund.industry}</span>
-                    </td>
-                    <td>{fund.nav?.toFixed(4) || '-'}</td>
-                    <td>{formatReturn(fund.return1y)}</td>
-                    <td>{formatReturn(fund.return6m)}</td>
-                    <td>{formatReturn(fund.return3m)}</td>
-                    <td>{formatReturn(fund.return1m)}</td>
-                    <td>{fund.scale?.toFixed(2) || '-'}</td>
-                    <td>
-                      <Link to={`/funds/${fund.code}`} className="btn btn-outline" style={{ padding: '4px 12px', fontSize: 12 }}>
-                        详情
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* 统计信息 */}
-      <div className="card">
-        <div className="flex-between">
-          <span className="text-muted">共 {funds.length} 只基金</span>
-          <span className="text-muted">
-            数据来源：东方财富
-          </span>
-        </div>
-      </div>
+      <Card>
+        <Table
+          columns={columns}
+          dataSource={funds}
+          rowKey="code"
+          loading={loading}
+          size="middle"
+          scroll={{ x: 1000 }}
+          pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (total) => `共 ${total} 只基金` }}
+        />
+      </Card>
     </div>
   );
 }

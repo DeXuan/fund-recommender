@@ -1,5 +1,8 @@
 import { useState } from 'react';
+import { Card, InputNumber, Button, Table, Space, Statistic, Row, Col, Tag, Alert } from 'antd';
+import ReactECharts from 'echarts-for-react';
 import { fundApi } from '../services/api';
+import { formatCurrency } from '../utils/format';
 
 interface DCAResult {
   totalInvestment: number;
@@ -25,11 +28,7 @@ export default function DCACalculator() {
   const handleCalculate = async () => {
     setLoading(true);
     try {
-      const data = await fundApi.calculateDCA({
-        monthlyAmount,
-        period,
-        expectedReturn,
-      });
+      const data = await fundApi.calculateDCA({ monthlyAmount, period, expectedReturn });
       setResult(data);
     } catch (error) {
       console.error('计算失败:', error);
@@ -38,231 +37,176 @@ export default function DCACalculator() {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('zh-CN', {
-      style: 'currency',
-      currency: 'CNY',
-    }).format(value);
-  };
+  const chartOption = result ? {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any) => {
+        let s = `${params[0].axisValue}<br/>`;
+        params.forEach((p: any) => { s += `${p.seriesName}: ¥${p.value.toLocaleString()}<br/>`; });
+        return s;
+      },
+    },
+    legend: { data: ['累计投入', '资产市值'] },
+    xAxis: { type: 'category', data: result.monthlyDetails.map(d => `第${d.month}月`) },
+    yAxis: { type: 'value', axisLabel: { formatter: (v: number) => `¥${(v / 10000).toFixed(1)}万` } },
+    series: [
+      {
+        name: '累计投入',
+        type: 'line',
+        data: result.monthlyDetails.map(d => d.cumulativeInvestment),
+        lineStyle: { color: '#1677ff', width: 2 },
+        itemStyle: { color: '#1677ff' },
+        areaStyle: { color: 'rgba(22,119,255,0.1)' },
+      },
+      {
+        name: '资产市值',
+        type: 'line',
+        data: result.monthlyDetails.map(d => d.value),
+        lineStyle: { color: '#52c41a', width: 2 },
+        itemStyle: { color: '#52c41a' },
+        areaStyle: { color: 'rgba(82,196,26,0.1)' },
+      },
+    ],
+    grid: { top: 40, right: 20, bottom: 30, left: 80 },
+  } : null;
+
+  const columns = [
+    { title: '月份', dataIndex: 'month', key: 'month', render: (v: number) => `第 ${v} 个月` },
+    { title: '当月投入', dataIndex: 'investment', key: 'investment', render: (v: number) => formatCurrency(v) },
+    { title: '累计投入', dataIndex: 'cumulativeInvestment', key: 'cumulativeInvestment', render: (v: number) => formatCurrency(v) },
+    { title: '资产市值', dataIndex: 'value', key: 'value', render: (v: number) => formatCurrency(v) },
+    {
+      title: '收益率',
+      dataIndex: 'return',
+      key: 'return',
+      render: (v: number) => <span style={{ color: v >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 600 }}>{v >= 0 ? '+' : ''}{v.toFixed(2)}%</span>,
+    },
+  ];
 
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>定投计算器</h1>
+      <h1 style={{ marginBottom: 24, fontSize: 24, fontWeight: 600 }}>定投计算器</h1>
 
-      {/* 输入参数 */}
-      <div className="card">
-        <h3 className="card-title">定投参数</h3>
-        <div className="grid grid-3">
-          <div className="form-group">
-            <label>每月定投金额（元）</label>
-            <input
-              type="number"
-              className="input"
-              value={monthlyAmount}
-              onChange={(e) => setMonthlyAmount(Number(e.target.value))}
-              min={100}
-              step={100}
-            />
-          </div>
-          <div className="form-group">
-            <label>定投期限（月）</label>
-            <input
-              type="number"
-              className="input"
-              value={period}
-              onChange={(e) => setPeriod(Number(e.target.value))}
-              min={1}
-              max={120}
-            />
-          </div>
-          <div className="form-group">
-            <label>预期年化收益率（%）</label>
-            <input
-              type="number"
-              className="input"
-              value={expectedReturn}
-              onChange={(e) => setExpectedReturn(Number(e.target.value))}
-              min={0}
-              max={50}
-              step={0.5}
-            />
-          </div>
-        </div>
+      <Card title="定投参数" style={{ marginBottom: 16 }}>
+        <Row gutter={16}>
+          <Col xs={24} sm={8}>
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>每月定投金额（元）</div>
+            <InputNumber value={monthlyAmount} onChange={(v) => setMonthlyAmount(v || 1000)} min={100} step={100} style={{ width: '100%' }} />
+          </Col>
+          <Col xs={24} sm={8}>
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>定投期限（月）</div>
+            <InputNumber value={period} onChange={(v) => setPeriod(v || 36)} min={1} max={120} style={{ width: '100%' }} />
+          </Col>
+          <Col xs={24} sm={8}>
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>预期年化收益率（%）</div>
+            <InputNumber value={expectedReturn} onChange={(v) => setExpectedReturn(v || 10)} min={0} max={50} step={0.5} style={{ width: '100%' }} />
+          </Col>
+        </Row>
 
-        {/* 快捷设置 */}
         <div style={{ marginTop: 16 }}>
-          <span className="text-muted" style={{ marginRight: 12 }}>快捷设置：</span>
-          <button
-            className="tag"
-            onClick={() => { setMonthlyAmount(500); setPeriod(12); setExpectedReturn(8); }}
-          >
-            保守型
-          </button>
-          <button
-            className="tag"
-            onClick={() => { setMonthlyAmount(1000); setPeriod(36); setExpectedReturn(10); }}
-          >
-            稳健型
-          </button>
-          <button
-            className="tag"
-            onClick={() => { setMonthlyAmount(2000); setPeriod(60); setExpectedReturn(15); }}
-          >
-            激进型
-          </button>
+          <span style={{ color: '#666', marginRight: 12 }}>快捷设置：</span>
+          <Space>
+            <Tag style={{ cursor: 'pointer' }} onClick={() => { setMonthlyAmount(500); setPeriod(12); setExpectedReturn(8); }}>保守型</Tag>
+            <Tag style={{ cursor: 'pointer' }} onClick={() => { setMonthlyAmount(1000); setPeriod(36); setExpectedReturn(10); }}>稳健型</Tag>
+            <Tag style={{ cursor: 'pointer' }} onClick={() => { setMonthlyAmount(2000); setPeriod(60); setExpectedReturn(15); }}>激进型</Tag>
+          </Space>
         </div>
 
-        <div style={{ marginTop: 20 }}>
-          <button className="btn btn-primary" onClick={handleCalculate} disabled={loading}>
-            {loading ? '计算中...' : '开始计算'}
-          </button>
-        </div>
-      </div>
+        <Button type="primary" onClick={handleCalculate} loading={loading} style={{ marginTop: 16 }} size="large">
+          开始计算
+        </Button>
+      </Card>
 
-      {/* 计算结果 */}
       {result && (
         <>
-          <div className="card">
-            <h3 className="card-title">计算结果</h3>
-            <div className="stat-grid">
-              <div className="stat-item">
-                <div className="stat-label">总投入</div>
-                <div className="stat-value">{formatCurrency(result.totalInvestment)}</div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label">总资产</div>
-                <div className="stat-value">{formatCurrency(result.totalValue)}</div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label">总收益</div>
-                <div className="stat-value" style={{ color: result.totalReturn >= 0 ? '#52c41a' : '#ff4d4f' }}>
-                  {formatCurrency(result.totalValue - result.totalInvestment)}
-                </div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label">总收益率</div>
-                <div className="stat-value" style={{ color: result.totalReturn >= 0 ? '#52c41a' : '#ff4d4f' }}>
-                  {result.totalReturn >= 0 ? '+' : ''}{result.totalReturn.toFixed(2)}%
-                </div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label">年化收益率</div>
-                <div className="stat-value" style={{ color: result.annualizedReturn >= 0 ? '#52c41a' : '#ff4d4f' }}>
-                  {result.annualizedReturn >= 0 ? '+' : ''}{result.annualizedReturn.toFixed(2)}%
-                </div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label">定投期数</div>
-                <div className="stat-value">{period} 个月</div>
-              </div>
-            </div>
-          </div>
+          <Card title="计算结果" style={{ marginBottom: 16 }}>
+            <Row gutter={16}>
+              <Col xs={12} sm={8}>
+                <Statistic title="总投入" value={result.totalInvestment} precision={2} prefix="¥" />
+              </Col>
+              <Col xs={12} sm={8}>
+                <Statistic title="总资产" value={result.totalValue} precision={2} prefix="¥" valueStyle={{ color: '#1677ff' }} />
+              </Col>
+              <Col xs={12} sm={8}>
+                <Statistic title="总收益" value={result.totalValue - result.totalInvestment} precision={2} prefix="¥" valueStyle={{ color: '#52c41a' }} />
+              </Col>
+              <Col xs={12} sm={8}>
+                <Statistic title="总收益率" value={result.totalReturn} precision={2} suffix="%" valueStyle={{ color: '#52c41a' }} />
+              </Col>
+              <Col xs={12} sm={8}>
+                <Statistic title="年化收益率" value={result.annualizedReturn} precision={2} suffix="%" valueStyle={{ color: '#52c41a' }} />
+              </Col>
+              <Col xs={12} sm={8}>
+                <Statistic title="定投期数" value={period} suffix="个月" />
+              </Col>
+            </Row>
+          </Card>
 
-          {/* 收益曲线说明 */}
-          <div className="card">
-            <h3 className="card-title">定投说明</h3>
-            <div style={{ fontSize: 14, lineHeight: 1.8 }}>
-              <p>假设每月投入 <strong>{formatCurrency(monthlyAmount)}</strong>，持续 <strong>{period}</strong> 个月：</p>
-              <ul style={{ marginTop: 8, paddingLeft: 20 }}>
-                <li>总投入本金：{formatCurrency(result.totalInvestment)}</li>
-                <li>预期总资产：{formatCurrency(result.totalValue)}</li>
-                <li>预期总收益：{formatCurrency(result.totalValue - result.totalInvestment)}</li>
-                <li>年化收益率：{result.annualizedReturn.toFixed(2)}%</li>
-              </ul>
-            </div>
-          </div>
+          {chartOption && (
+            <Card title="收益曲线" style={{ marginBottom: 16 }}>
+              <ReactECharts option={chartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
+            </Card>
+          )}
 
-          {/* 月度明细 */}
-          <div className="card">
-            <h3 className="card-title">月度明细</h3>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>月份</th>
-                    <th>当月投入</th>
-                    <th>累计投入</th>
-                    <th>资产市值</th>
-                    <th>收益率</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.monthlyDetails.slice(0, 12).map((month) => (
-                    <tr key={month.month}>
-                      <td>第 {month.month} 个月</td>
-                      <td>{formatCurrency(month.investment)}</td>
-                      <td>{formatCurrency(month.cumulativeInvestment)}</td>
-                      <td>{formatCurrency(month.value)}</td>
-                      <td style={{ color: month.return >= 0 ? '#52c41a' : '#ff4d4f' }}>
-                        {month.return >= 0 ? '+' : ''}{month.return.toFixed(2)}%
-                      </td>
-                    </tr>
-                  ))}
-                  {result.monthlyDetails.length > 12 && (
-                    <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', color: '#999' }}>
-                        ... 共 {result.monthlyDetails.length} 个月
-                      </td>
-                    </tr>
-                  )}
-                  <tr style={{ fontWeight: 600, background: '#f5f5f5' }}>
-                    <td>最终</td>
-                    <td>{formatCurrency(result.totalInvestment)}</td>
-                    <td>{formatCurrency(result.totalInvestment)}</td>
-                    <td>{formatCurrency(result.totalValue)}</td>
-                    <td style={{ color: result.totalReturn >= 0 ? '#52c41a' : '#ff4d4f' }}>
+          <Card title="月度明细" style={{ marginBottom: 16 }}>
+            <Table
+              columns={columns}
+              dataSource={result.monthlyDetails}
+              rowKey="month"
+              pagination={{ pageSize: 12 }}
+              size="small"
+              summary={() => (
+                <Table.Summary.Row style={{ fontWeight: 600, background: '#f5f5f5' }}>
+                  <Table.Summary.Cell index={0}>最终</Table.Summary.Cell>
+                  <Table.Summary.Cell index={1}>{formatCurrency(result.totalInvestment)}</Table.Summary.Cell>
+                  <Table.Summary.Cell index={2}>{formatCurrency(result.totalInvestment)}</Table.Summary.Cell>
+                  <Table.Summary.Cell index={3}>{formatCurrency(result.totalValue)}</Table.Summary.Cell>
+                  <Table.Summary.Cell index={4}>
+                    <span style={{ color: result.totalReturn >= 0 ? '#52c41a' : '#ff4d4f' }}>
                       {result.totalReturn >= 0 ? '+' : ''}{result.totalReturn.toFixed(2)}%
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+                    </span>
+                  </Table.Summary.Cell>
+                </Table.Summary.Row>
+              )}
+            />
+          </Card>
 
-          {/* 投资建议 */}
-          <div className="card">
-            <h3 className="card-title">定投建议</h3>
-            <div style={{ fontSize: 14, lineHeight: 1.8 }}>
-              <h4 style={{ marginBottom: 8 }}>适合定投的基金类型</h4>
-              <ul style={{ paddingLeft: 20, marginBottom: 16 }}>
-                <li><strong>指数基金</strong>：沪深300、中证500等宽基指数，费率低、透明度高</li>
-                <li><strong>行业ETF</strong>：看好长期趋势的行业，如AI、半导体、医药等</li>
-                <li><strong>QDII基金</strong>：分散地域风险，如纳斯达克100、标普500</li>
-              </ul>
-
-              <h4 style={{ marginBottom: 8 }}>定投技巧</h4>
-              <ul style={{ paddingLeft: 20 }}>
+          <Alert
+            type="info"
+            message="定投建议"
+            description={
+              <ul style={{ margin: 0, paddingLeft: 16, lineHeight: 2 }}>
                 <li>坚持长期投资，至少3年以上</li>
                 <li>市场下跌时不要停止定投，反而是低成本买入的机会</li>
                 <li>设置止盈点，达到目标收益后可分批止盈</li>
                 <li>选择C类基金适合短期持有，A类基金适合长期持有</li>
               </ul>
-            </div>
-          </div>
+            }
+          />
         </>
       )}
 
-      {/* 预设方案 */}
-      <div className="card">
-        <h3 className="card-title">热门定投方案</h3>
-        <div className="grid grid-3">
-          <div className="stat-item" style={{ cursor: 'pointer' }} onClick={() => { setMonthlyAmount(500); setPeriod(60); setExpectedReturn(8); handleCalculate(); }}>
-            <div className="stat-label">沪深300定投</div>
-            <div style={{ fontSize: 14, marginTop: 8 }}>每月500元 × 5年</div>
-            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>预期年化8%</div>
-          </div>
-          <div className="stat-item" style={{ cursor: 'pointer' }} onClick={() => { setMonthlyAmount(1000); setPeriod(36); setExpectedReturn(12); handleCalculate(); }}>
-            <div className="stat-label">科技主题定投</div>
-            <div style={{ fontSize: 14, marginTop: 8 }}>每月1000元 × 3年</div>
-            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>预期年化12%</div>
-          </div>
-          <div className="stat-item" style={{ cursor: 'pointer' }} onClick={() => { setMonthlyAmount(2000); setPeriod(24); setExpectedReturn(15); handleCalculate(); }}>
-            <div className="stat-label">成长股定投</div>
-            <div style={{ fontSize: 14, marginTop: 8 }}>每月2000元 × 2年</div>
-            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>预期年化15%</div>
-          </div>
-        </div>
-      </div>
+      <Card title="热门定投方案" style={{ marginTop: 16 }}>
+        <Row gutter={16}>
+          {[
+            { label: '沪深300定投', desc: '每月500元 × 5年，预期年化8%', amount: 500, p: 60, r: 8 },
+            { label: '科技主题定投', desc: '每月1000元 × 3年，预期年化12%', amount: 1000, p: 36, r: 12 },
+            { label: '成长股定投', desc: '每月2000元 × 2年，预期年化15%', amount: 2000, p: 24, r: 15 },
+          ].map((plan) => (
+            <Col xs={24} sm={8} key={plan.label}>
+              <Card
+                hoverable
+                size="small"
+                style={{ textAlign: 'center', cursor: 'pointer' }}
+                onClick={() => { setMonthlyAmount(plan.amount); setPeriod(plan.p); setExpectedReturn(plan.r); }}
+              >
+                <strong>{plan.label}</strong>
+                <div style={{ fontSize: 13, color: '#666', marginTop: 8 }}>{plan.desc}</div>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      </Card>
     </div>
   );
 }

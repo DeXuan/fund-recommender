@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Tag, Button, Space, Tooltip } from 'antd';
+import { SyncOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { fundApi } from '../services/api';
 
 export default function DataStatus() {
@@ -8,7 +10,7 @@ export default function DataStatus() {
 
   useEffect(() => {
     loadStatus();
-    const interval = setInterval(loadStatus, 60000); // 每分钟检查状态
+    const interval = setInterval(loadStatus, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -24,7 +26,7 @@ export default function DataStatus() {
         } else {
           const minutes = Math.floor(diff / 60000);
           const seconds = Math.floor((diff % 60000) / 1000);
-          setCountdown(`${minutes}分${seconds.toString().padStart(2, '0')}秒后更新`);
+          setCountdown(`${minutes}分${seconds.toString().padStart(2, '0')}秒`);
         }
       }, 1000);
 
@@ -45,7 +47,6 @@ export default function DataStatus() {
     setLoading(true);
     try {
       await fundApi.triggerUpdate();
-      // 等待一下再刷新状态
       setTimeout(() => {
         loadStatus();
         setLoading(false);
@@ -56,30 +57,15 @@ export default function DataStatus() {
     }
   };
 
-  const formatTime = (isoString: string) => {
-    if (!isoString) return '--';
-    const date = new Date(isoString);
-    return date.toLocaleString('zh-CN', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  };
-
   const getTimeAgo = (isoString: string) => {
     if (!isoString) return '';
     const now = new Date().getTime();
     const past = new Date(isoString).getTime();
     const diff = now - past;
-
     const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-
     if (minutes < 1) return '刚刚';
     if (minutes < 60) return `${minutes}分钟前`;
-    return `${hours}小时前`;
+    return `${Math.floor(diff / 3600000)}小时前`;
   };
 
   return (
@@ -87,59 +73,42 @@ export default function DataStatus() {
       display: 'flex',
       alignItems: 'center',
       gap: 12,
-      padding: '8px 16px',
-      background: '#f5f5f5',
+      padding: '6px 16px',
+      background: '#fafafa',
       borderRadius: 8,
       fontSize: 12,
-      color: '#666',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          background: status?.isUpdating ? '#faad14' : '#52c41a',
-          animation: status?.isUpdating ? 'pulse 1s infinite' : 'none',
-        }}></span>
-        <span>数据状态:</span>
-      </div>
+      <Space size={12}>
+        {status?.isUpdating ? (
+          <Tag icon={<SyncOutlined spin />} color="processing">数据更新中</Tag>
+        ) : (
+          <Tag icon={<CheckCircleOutlined />} color="success">数据正常</Tag>
+        )}
 
-      {status?.lastUpdateTime && (
-        <span>
-          更新于 {formatTime(status.lastUpdateTime)} ({getTimeAgo(status.lastUpdateTime)})
-        </span>
-      )}
+        {status?.lastUpdateTime && (
+          <Tooltip title={new Date(status.lastUpdateTime).toLocaleString('zh-CN')}>
+            <span style={{ color: '#666' }}>
+              更新于 {getTimeAgo(status.lastUpdateTime)}
+            </span>
+          </Tooltip>
+        )}
 
-      {countdown && (
-        <span style={{ color: '#1677ff' }}>
-          {countdown}
-        </span>
-      )}
+        {countdown && (
+          <span style={{ color: '#1677ff' }}>
+            下次更新: {countdown}
+          </span>
+        )}
+      </Space>
 
-      <button
+      <Button
+        size="small"
+        icon={<SyncOutlined />}
+        loading={loading || status?.isUpdating}
         onClick={handleRefresh}
-        disabled={loading || status?.isUpdating}
-        style={{
-          marginLeft: 'auto',
-          padding: '4px 12px',
-          background: 'white',
-          border: '1px solid #d9d9d9',
-          borderRadius: 4,
-          cursor: loading || status?.isUpdating ? 'not-allowed' : 'pointer',
-          fontSize: 12,
-          opacity: loading || status?.isUpdating ? 0.5 : 1,
-        }}
+        style={{ marginLeft: 'auto' }}
       >
-        {loading || status?.isUpdating ? '更新中...' : '立即刷新'}
-      </button>
-
-      <style>{`
-        @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.5; }
-          100% { opacity: 1; }
-        }
-      `}</style>
+        刷新
+      </Button>
     </div>
   );
 }
