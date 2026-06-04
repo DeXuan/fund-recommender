@@ -60,6 +60,7 @@ export default function FundDetail() {
   const { code } = useParams<{ code: string }>();
   const [fund, setFund] = useState<FundDetailType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadFundDetail();
@@ -68,11 +69,13 @@ export default function FundDetail() {
   const loadFundDetail = async () => {
     if (!code) return;
     setLoading(true);
+    setError(null);
     try {
       const data = await fundApi.getFundDetail(code);
       setFund(data);
-    } catch (error) {
-      console.error('加载基金详情失败:', error);
+    } catch (err: any) {
+      console.error('加载基金详情失败:', err);
+      setError(err?.message || '加载失败，请重试');
     } finally {
       setLoading(false);
     }
@@ -95,8 +98,11 @@ export default function FundDetail() {
   if (!fund) {
     return (
       <div style={{ textAlign: 'center', padding: 80 }}>
-        <Alert type="error" message="基金不存在" showIcon style={{ marginBottom: 16 }} />
-        <Link to="/funds"><Button type="primary">返回基金列表</Button></Link>
+        <Alert type="error" message={error || '基金不存在'} showIcon style={{ marginBottom: 16 }} />
+        <Space>
+          {error && <Button onClick={loadFundDetail}>重试</Button>}
+          <Link to="/funds"><Button type="primary">返回基金列表</Button></Link>
+        </Space>
       </div>
     );
   }

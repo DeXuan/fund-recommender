@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Row, Col, Table, Tag, Progress, Statistic, Spin, Space, Badge, Modal } from 'antd';
+import { Card, Row, Col, Table, Tag, Progress, Statistic, Spin, Space, Badge, Modal, message } from 'antd';
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
@@ -67,6 +67,7 @@ export default function Home() {
       setCapitalFlow(flowData);
     } catch (error) {
       console.error('加载数据失败:', error);
+      message.error('加载市场数据失败');
     } finally {
       setLoading(false);
     }

@@ -102,7 +102,8 @@ router.post('/records', async (req, res) => {
 router.put('/records/:id', async (req, res) => {
   try {
     const pool = getPool();
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id <= 0) return res.status(400).json({ error: '无效的ID' });
 
     const existing = await pool.query('SELECT * FROM fund_records WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     if (existing.rows.length === 0) {
@@ -154,7 +155,8 @@ router.put('/records/:id', async (req, res) => {
 router.delete('/records/:id', async (req, res) => {
   try {
     const pool = getPool();
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id <= 0) return res.status(400).json({ error: '无效的ID' });
     const existing = await pool.query('SELECT id FROM fund_records WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: '记录不存在' });
@@ -375,7 +377,8 @@ router.post('/dca-plans', async (req, res) => {
 router.put('/dca-plans/:id', async (req, res) => {
   try {
     const pool = getPool();
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id <= 0) return res.status(400).json({ error: '无效的ID' });
 
     const existing = await pool.query('SELECT * FROM dca_plans WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     if (existing.rows.length === 0) {
@@ -407,7 +410,8 @@ router.put('/dca-plans/:id', async (req, res) => {
 router.delete('/dca-plans/:id', async (req, res) => {
   try {
     const pool = getPool();
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id <= 0) return res.status(400).json({ error: '无效的ID' });
     const existing = await pool.query('SELECT id FROM dca_plans WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: '定投计划不存在' });

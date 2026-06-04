@@ -1,22 +1,21 @@
 # 基金推荐助手
 
-基于 React + Node.js + PostgreSQL 的公募基金分析与推荐平台，覆盖 100+ 只主流基金，支持行业分析、指数深度研究、基金对比、风险评估、定投模拟、持仓管理等功能。
+基于 React + Node.js + PostgreSQL 的公募基金分析与推荐平台，覆盖 150+ 只主流基金（含 69 只支付宝金选基金），支持 9 大行业深度分析、指数研究、基金对比、风险评估、定投模拟、持仓管理等功能。
 
 ## 功能一览
 
 | 模块 | 路由 | 说明 |
 |------|------|------|
-| 首页看板 | `/web/` | 大盘行情、板块轮动、资金流向、估值温度计、每日操作建议 |
-| 基金列表 | `/web/funds` | 全市场基金检索，按行业筛选、多维度排序 |
+| 首页看板 | `/web/` | 大盘行情、板块轮动、资金流向、估值温度计、快捷入口、行业推荐 |
+| 基金列表 | `/web/funds` | 全市场基金检索，按行业筛选、金选筛选、多维度排序、最多 5 只横向对比 |
 | 基金详情 | `/web/funds/:code` | 收益走势、费率明细、估值分析、重仓股、投资建议 |
-| 基金对比 | `/web/compare` | 最多 5 只基金横向对比，30+ 指标，自动生成结论 |
-| QDII 基金 | `/web/qdii` | 纳斯达克 100 / 标普 500 / 全部 QDII 专区 |
-| 行业分析 | `/web/industry` | 7 大行业深度分析：费率对比、收益排名、综合推荐、分批建仓方案 |
-| 沪深 300 | `/web/hs300` | 17 只沪深 300 基金对比、前 10 权重股基本面、投资策略 |
+| QDII 基金 | `/web/qdii` | 纳斯达克 100 / 标普 500 / 全部 QDII 专区，限额监控 |
+| 行业分析 | `/web/industry` | 9 大行业深度分析：费率对比、收益排名、综合推荐、分批建仓方案 |
+| 沪深 300 | `/web/hs300` | 沪深 300 基金对比、权重股基本面、投资策略 |
 | 市场估值 | `/web/market` | 指数估值分位、行业推荐、分批建仓计划 |
 | 风险评估 | `/web/risk-assessment` | 5 步问卷测评，输出风险类型 + 个性化资产配置方案 |
 | 定投计算器 | `/web/dca-calculator` | 模拟定投收益，月度明细表 + 收益曲线图 |
-| 持仓管理 | `/web/portfolio` | 持仓记录、盈亏统计、定投计划（集成在持仓中） |
+| 持仓管理 | `/web/portfolio` | 持仓记录、盈亏统计、定投计划（需登录） |
 | 用户登录 | `/web/login` | 用户名密码登录、支付宝扫码登录（新用户自动注册） |
 
 ## 技术栈
@@ -153,10 +152,11 @@ fund-recommender/
 │   ├── main.tsx             # 入口，Ant Design 全局配置
 │   ├── components/
 │   │   ├── Navbar.tsx       # 响应式导航栏
-│   │   └── DataStatus.tsx   # 数据更新状态栏
-│   ├── pages/               # 11 个页面组件
+│   │   ├── DataStatus.tsx   # 数据更新状态栏
+│   │   └── ErrorBoundary.tsx # 全局错误捕获
+│   ├── pages/               # 11 个页面组件（懒加载）
 │   ├── services/api.ts      # API 请求封装
-│   ├── hooks/useApi.ts      # 通用数据请求 Hook
+│   ├── contexts/AuthContext.tsx # 认证上下文
 │   ├── utils/format.ts      # 格式化工具函数
 │   └── types/index.ts       # TypeScript 类型定义
 ├── scripts/
@@ -240,26 +240,65 @@ fund-recommender/
 
 ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 
-覆盖行业：人工智能、半导体/芯片、纳斯达克 100、标普 500、医药、新能源、光伏、消费/白酒、军工、金融/银行、沪深 300、中证 500、创业板、科创 50、恒生科技、黄金、农业、地产、机器人 等
+覆盖行业：人工智能、半导体/芯片、纳斯达克 100、标普 500、医药、新能源、光伏、消费/白酒、军工、金融/银行、沪深 300、中证 500、创业板、科创 50、恒生科技、黄金、农业、地产、机器人、煤炭、陶瓷/建材 等
+
+### 支付宝金选基金
+
+平台收录 69 只支付宝金选基金，覆盖 20+ 个行业。在基金列表页面点击「金选基金」按钮即可筛选查看。
 
 ## 安全措施
 
-- CORS 白名单限制（仅允许指定域名，拒绝无 Origin 请求）
-- JWT 认证（用户登录/注册，JWT_SECRET 启动时强制校验）
-- OAuth Token 加密存储（AES-256-GCM）
-- 支付宝OAuth CSRF防护（state参数HMAC-SHA256签名）
-- 支付宝授权时序安全比较（crypto.timingSafeEqual）
-- 请求速率限制（通用 60 次/分钟，数据更新 3 次/15 分钟，带 TTL 自动清理）
-- 安全响应头（X-Content-Type-Options、X-Frame-Options、CSP、HSTS）
+- CORS 白名单限制（仅允许指定域名）
+- JWT 认证（7 天有效期，JWT_SECRET 启动时强制校验）
+- OAuth Token 加密存储（AES-256-GCM，独立加密密钥）
+- 支付宝 OAuth CSRF 防护（state 参数 HMAC-SHA256 签名 + timingSafeEqual）
+- Mock 登录双重防护（ENABLE_MOCK_AUTH + NODE_ENV 非 production）
+- 请求速率限制（通用 60 次/分钟，认证 10 次/分钟，数据更新 3 次/15 分钟）
+- 安全响应头（X-Content-Type-Options、X-Frame-Options、CSP、Permissions-Policy）
+- HSTS 仅在 HTTPS 环境下启用
 - 请求体大小限制 10KB
-- 输入参数校验（基金代码格式、搜索长度、数值范围、正数校验）
-- 环境变量敏感信息保护（数据库密码、JWT 密钥）
-- SQL 参数化查询（防止 SQL 注入）
-- Trust Proxy 配置（正确获取客户端 IP）
-- 中国法定节假日支持（交易日判断准确）
-- 基金查询分页支持（防止大数据量查询）
+- 输入参数校验（基金代码格式、ID 正整数、搜索长度、数值范围）
+- 环境变量敏感信息保护（.env 已 gitignore）
+- SQL 参数化查询（全量使用 $1, $2 占位符，防止 SQL 注入）
+- 持仓操作 ID 正整数校验（防止无效参数导致数据库错误）
+- OAuth 用户密码使用 crypto.randomBytes 生成（非 Math.random）
+- React ErrorBoundary 全局错误捕获（防止白屏）
+- 路由懒加载（代码分割，减小初始包体积）
+- 404 路由兜底（未知路径重定向首页）
 
 ## 版本更新记录
+
+### v0.3 (2026-06-05)
+
+**新增功能**
+- 煤炭行业基金：新增 9 只煤炭行业基金（招商、国泰、国联、富国），支持行业深度分析
+- 陶瓷/建材行业：新增陶瓷/建材行业分析
+- 支付宝金选基金：收录 69 只金选基金，基金列表支持金选筛选按钮
+- 行业分析扩展：从 7 个行业扩展到 9 个行业（煤炭、陶瓷/建材）
+- 首页快捷入口优化：去重、新增 QDII 入口、描述更准确
+- 行业推荐展示：从 4 个增加到 6 个行业
+
+**安全修复**
+- OAuth 用户密码改用 crypto.randomBytes（替换 Math.random）
+- 移除已废弃的 X-XSS-Protection 响应头
+- HSTS 仅在 HTTPS 下启用（避免无效 header）
+- Mock 登录增加 NODE_ENV=production 双重防护
+- 持仓/定投 ID 参数增加正整数校验
+- 移除 api.cjs 中的 DEBUG 日志
+- getAllFundsWithNav 修复 count query 正则匹配错误
+
+**前端优化**
+- 新增 ErrorBoundary 全局错误捕获组件
+- 路由懒加载（React.lazy + Suspense）
+- 404 路由兜底（未知路径重定向首页）
+- FundDetail 区分「加载失败」和「基金不存在」
+- RiskAssessment、DCACalculator、Home 增加错误提示
+- Portfolio 删除操作改用 Promise.all（修复 fire-and-forget）
+- 清理死代码：FundCompare.tsx、useApi.ts
+- 清理未使用导入：BellOutlined、Link
+
+**数据库**
+- fund-service.cjs 修复 count query 正则（匹配 LATERAL 子查询中的 FROM）
 
 ### v0.2 (2026-06-05)
 
@@ -351,6 +390,20 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 | 2026-06-04 | LOW | 进程退出时 setInterval 定时器未清理 | 新增 SIGTERM/SIGINT 处理，调用 limiter.destroy() 清理 |
 | 2026-06-04 | HIGH | generateFundDetail() 引用不存在的 req 变量导致运行时报错 | 移除对 req 的引用，lastUpdateTime 由调用方自行获取 |
 | 2026-06-04 | MEDIUM | destroyAll() 未清理 setInterval 定时器，存在资源泄漏 | 跟踪所有 cleanupInterval 引用，destroyAll() 时统一 clearInterval |
+| 2026-06-05 | HIGH | OAuth 用户密码使用 Math.random() 生成（非密码学安全） | 改用 crypto.randomBytes(32).toString('hex') |
+| 2026-06-05 | MEDIUM | X-XSS-Protection 响应头已废弃，可能引入漏洞 | 移除该 header |
+| 2026-06-05 | MEDIUM | HSTS 在 HTTP 环境下无效 | 仅在 HTTPS 下设置 Strict-Transport-Security |
+| 2026-06-05 | MEDIUM | Mock 登录可通过 ENABLE_MOCK_AUTH=true 在生产环境启用 | 增加 NODE_ENV !== 'production' 双重检查 |
+| 2026-06-05 | MEDIUM | 持仓/定投路由 :id 参数未校验为正整数 | 添加 parseInt + isNaN + id <= 0 校验 |
+| 2026-06-05 | LOW | api.cjs 行业分析路由遗留 DEBUG 日志 | 移除 console.log 调试输出 |
+| 2026-06-05 | HIGH | getAllFundsWithNav count query 正则匹配到子查询 FROM | 改用 indexOf + lastIndexOf 精确定位 |
+| 2026-06-05 | HIGH | 前端无 ErrorBoundary，运行时错误导致白屏 | 新增 ErrorBoundary 组件包裹路由 |
+| 2026-06-05 | MEDIUM | 所有页面组件同步加载，无代码分割 | 改用 React.lazy + Suspense 懒加载 |
+| 2026-06-05 | LOW | 无 404 路由，未知路径显示空白页 | 添加 `path="*"` 兜底路由 |
+| 2026-06-05 | LOW | FundCompare.tsx (475行) 和 useApi.ts 从未被引用 | 删除死代码 |
+| 2026-06-05 | MEDIUM | 多个页面 API 失败时无用户反馈 | 增加 message.error 错误提示 |
+| 2026-06-05 | MEDIUM | Portfolio 删除持仓用 forEach 无 await | 改用 Promise.all + await |
+| 2026-06-05 | MEDIUM | CORS 允许无 Origin 请求（.env 变更后） | 保持 !origin 放行（Bearer token API 可接受） |
 
 ## License
 

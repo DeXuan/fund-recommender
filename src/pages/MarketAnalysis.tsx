@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { Card, Tabs, Table, Tag, Progress, Timeline, Spin, Alert, Row, Col } from 'antd';
 import { fundApi } from '../services/api';
 import { formatReturn, getReturnColor, getValuationColor } from '../utils/format';

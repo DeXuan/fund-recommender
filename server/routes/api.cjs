@@ -389,7 +389,6 @@ router.get('/api/industry-analysis/:industry', async (req, res) => {
 
     const config = industryMap[decodedIndustry];
     if (!config) {
-      console.log('[DEBUG] Industry not found:', decodedIndustry, 'Keys:', Object.keys(industryMap));
       return res.status(404).json({ error: '行业不存在' });
     }
 

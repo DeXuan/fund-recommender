@@ -205,7 +205,7 @@ router.get('/alipay/qrcode', (req, res) => {
 
 // POST /api/auth/alipay/mock-login — 模拟支付宝登录（仅开发环境，需显式启用）
 router.post('/alipay/mock-login', strictLimit, async (req, res) => {
-  if (process.env.ENABLE_MOCK_AUTH !== 'true') {
+  if (process.env.ENABLE_MOCK_AUTH !== 'true' || process.env.NODE_ENV === 'production') {
     return res.status(404).json({ error: 'Not found' });
   }
   try {
@@ -226,7 +226,8 @@ router.post('/alipay/mock-login', strictLimit, async (req, res) => {
       username = existing.rows[0].username;
     } else {
       username = 'alipay_demo_user';
-      const passwordHash = await bcrypt.hash(Math.random().toString(36), 10);
+      const crypto = require('crypto');
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
       const userResult = await pool.query(
         'INSERT INTO users (username, password_hash, nickname, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id',
         [username, passwordHash, nickname, avatarUrl]
@@ -324,7 +325,8 @@ router.get('/alipay/callback', async (req, res) => {
       }
 
       username = `alipay_${user_id}`;
-      const passwordHash = await bcrypt.hash(Math.random().toString(36), 10);
+      const crypto = require('crypto');
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
       const userResult = await pool.query(
         'INSERT INTO users (username, password_hash, nickname, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id',
         [username, passwordHash, nickname, avatarUrl]

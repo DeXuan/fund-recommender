@@ -14,7 +14,6 @@ import {
   UserOutlined,
   LogoutOutlined,
   AccountBookOutlined,
-  BellOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 

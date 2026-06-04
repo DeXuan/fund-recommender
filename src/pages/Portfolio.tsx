@@ -326,10 +326,14 @@ export default function Portfolio() {
           >
             编辑
           </Button>
-          <Popconfirm title="确认删除此基金的所有持仓记录？" onConfirm={() => {
-            holding.records.forEach(r => portfolioApi.deleteRecord(r.id));
-            message.success('删除成功');
-            setTimeout(loadData, 300);
+          <Popconfirm title="确认删除此基金的所有持仓记录？" onConfirm={async () => {
+            try {
+              await Promise.all(holding.records.map(r => portfolioApi.deleteRecord(r.id)));
+              message.success('删除成功');
+              loadData();
+            } catch {
+              message.error('删除失败');
+            }
           }}>
             <Button type="link" size="small" danger icon={<DeleteOutlined />}>删除</Button>
           </Popconfirm>

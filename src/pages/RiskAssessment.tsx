@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Steps, Radio, Button, Progress, Space, Spin, Row, Col, Statistic, Alert } from 'antd';
+import { Card, Steps, Radio, Button, Progress, Space, Spin, Row, Col, Statistic, Alert, message } from 'antd';
 import { fundApi } from '../services/api';
 
 interface RiskProfile {
@@ -34,6 +34,7 @@ export default function RiskAssessment() {
       setStep(4);
     } catch (error) {
       console.error('风险评估失败:', error);
+      message.error('风险评估失败，请重试');
     } finally {
       setLoading(false);
     }

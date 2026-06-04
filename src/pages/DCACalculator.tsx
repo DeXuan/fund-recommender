@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, InputNumber, Button, Table, Space, Statistic, Row, Col, Tag, Alert } from 'antd';
+import { Card, InputNumber, Button, Table, Space, Statistic, Row, Col, Tag, Alert, message } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import { fundApi } from '../services/api';
 import { formatCurrency } from '../utils/format';
@@ -32,6 +32,7 @@ export default function DCACalculator() {
       setResult(data);
     } catch (error) {
       console.error('计算失败:', error);
+      message.error('计算失败，请重试');
     } finally {
       setLoading(false);
     }
