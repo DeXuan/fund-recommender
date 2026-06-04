@@ -7,6 +7,9 @@ dist/
 .env.*
 !.env.example
 
+# 数据库
+server/data/
+
 # 日志
 *.log
 

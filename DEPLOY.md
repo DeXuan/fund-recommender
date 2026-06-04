@@ -29,6 +29,7 @@
 | ---------- | ----------------------- | ----- |
 | 前端       | React + Vite + Ant Design | Nginx 8688 |
 | 后端       | Express 5 + Node.js     | 3003  |
+| 数据库     | PostgreSQL 14+          | 5432  |
 | 进程管理   | PM2                     | -     |
 | Web 服务器 | Nginx                   | 8688  |
 
@@ -43,7 +44,12 @@
 │       └── index-*.css
 ├── server/               # 后端代码
 │   ├── index.cjs         # Express 服务入口
-│   └── fund-data.cjs     # 基金数据模块
+│   ├── db.cjs            # PostgreSQL 数据库初始化
+│   ├── fund-service.cjs  # 基金数据服务层
+│   ├── fund-data.cjs     # 基金种子数据
+│   ├── auth.cjs          # 认证模块
+│   └── portfolio.cjs     # 持仓管理模块
+├── .env                  # 环境变量（不上传到仓库）
 ├── package.json
 └── node_modules/
 ```
@@ -65,6 +71,7 @@
 - **内存**: ≥ 1GB
 - **磁盘**: ≥ 2GB 可用空间
 - **端口**: 8688 需开放（阿里云安全组需放行）
+- **数据库**: PostgreSQL 14+
 
 ### 本地环境
 - Node.js ≥ 18
@@ -81,6 +88,69 @@ ssh root@47.116.77.67 "echo ok"
 # 2. 执行部署脚本
 chmod +x deploy.sh
 ./deploy.sh
+```
+
+## 数据库配置
+
+**重要：数据库和服务器在同一台机器上，PG_HOST 必须使用 localhost！**
+
+### 安装 PostgreSQL
+
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+
+# 启动服务
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+```
+
+### 创建数据库和用户
+
+```bash
+# 切换到 postgres 用户
+sudo -u postgres psql
+
+# 在 PostgreSQL 命令行中执行：
+CREATE DATABASE soulquad;
+CREATE USER soulquad_user WITH PASSWORD 'SoulQuad2024!';
+GRANT ALL PRIVILEGES ON DATABASE soulquad TO soulquad_user;
+\q
+```
+
+### 配置环境变量
+
+在服务器上创建 `/var/www/jijin/.env` 文件：
+
+```env
+# JWT 密钥
+JWT_SECRET=b0AolGYvplzI5XMC2CknFUVegst41_6ViXmPdhQY-QM9_dzZmEpdmOajc_Sk7dwb
+ENABLE_MOCK_AUTH=false
+
+# 支付宝配置
+ALIPAY_APP_ID=2021006159645339
+ALIPAY_PRIVATE_KEY=keys/alipay_private_key.pem
+ALIPAY_PUBLIC_KEY=keys/alipay_public_key_from_alipay.pem
+ALIPAY_RETURN_URL=http://47.116.77.67:8688/api/auth/alipay/callback
+
+# PostgreSQL 数据库（数据库和服务器在同一台机器，必须使用localhost）
+PG_HOST=localhost
+PG_PORT=5432
+PG_DATABASE=soulquad
+PG_USER=soulquad_user
+PG_PASSWORD=SoulQuad2024!
+```
+
+**重要：** 数据库和服务器在同一台机器上，`PG_HOST` 必须使用 `localhost`，不能使用IP地址！
+
+### 数据库初始化
+
+数据库表会在服务器首次启动时自动创建。如需手动初始化：
+
+```bash
+cd /var/www/jijin
+node -e "require('./server/db.cjs').initDatabase().then(() => console.log('Done'))"
 ```
 
 ## 部署流程详解
@@ -220,12 +290,54 @@ ssh root@47.116.77.67 "cd /var/www/jijin && pm2 restart fund-server"
    - 端口: 8688
    - 来源: 0.0.0.0/0
 
+## 安全加固
+
+### 环境变量安全
+
+- **JWT_SECRET**: 必须使用强随机字符串（≥32字符），可通过 `openssl rand -hex 32` 生成
+- **ENABLE_MOCK_AUTH**: 生产环境必须设为 `false` 或不设置，防止匿名登录
+- **数据库密码**: 使用强密码，不要使用默认值
+- **.env 文件**: 确保权限为 600（仅 owner 可读写）
+
+```bash
+chmod 600 /var/www/jijin/.env
+```
+
+### Nginx 安全头
+
+部署脚本已自动配置以下安全头：
+- `X-Content-Type-Options: nosniff` — 防止 MIME 类型嗅探
+- `X-Frame-Options: DENY` — 防止点击劫持
+- `Content-Security-Policy` — 限制资源加载来源
+- `Strict-Transport-Security` — 强制 HTTPS（需配合 SSL 证书）
+
+### 网络安全
+
+- 仅开放必要端口（8688）
+- 数据库端口（5432）不对外暴露
+- 定期更新系统和依赖包
+
+### 监控告警
+
+```bash
+# 检查后端进程是否正常
+pm2 status
+
+# 检查异常登录尝试
+grep "登录失败" /var/log/pm2/fund-server-error.log
+
+# 检查数据库连接
+sudo -u postgres psql -c "SELECT count(*) FROM pg_stat_activity;"
+```
+
 ## 故障排查
 
 | 问题                 | 排查命令                                            |
 | -------------------- | --------------------------------------------------- |
 | 网站打不开           | `curl -I http://47.116.77.67:8688/web/`             |
 | API 返回 502         | `pm2 logs fund-server` 检查后端是否运行             |
+| 数据库连接失败       | 确保 `PG_HOST=localhost`，测试: `psql -h localhost -U soulquad_user -d soulquad` |
+| 页面没有数据         | `curl http://localhost:3003/api/funds` 检查API返回  |
 | Nginx 配置错误       | `nginx -t` 查看语法错误                             |
 | 端口被占用           | `lsof -i :8688` 或 `lsof -i :3003`                 |
 | 磁盘空间不足         | `df -h` 查看磁盘使用                                |

@@ -1,6 +1,6 @@
 # 基金推荐助手
 
-基于 React + Node.js 的公募基金分析与推荐平台，覆盖 100+ 只主流基金，支持行业分析、指数深度研究、基金对比、风险评估、定投模拟等功能。
+基于 React + Node.js + PostgreSQL 的公募基金分析与推荐平台，覆盖 100+ 只主流基金，支持行业分析、指数深度研究、基金对比、风险评估、定投模拟、持仓管理等功能。
 
 ## 功能一览
 
@@ -16,6 +16,8 @@
 | 市场估值 | `/web/market` | 指数估值分位、行业推荐、分批建仓计划 |
 | 风险评估 | `/web/risk-assessment` | 5 步问卷测评，输出风险类型 + 个性化资产配置方案 |
 | 定投计算器 | `/web/dca-calculator` | 模拟定投收益，月度明细表 + 收益曲线图 |
+| 持仓管理 | `/web/portfolio` | 持仓记录、盈亏统计、定投计划（集成在持仓中） |
+| 用户登录 | `/web/login` | 用户名密码登录、支付宝扫码登录（新用户自动注册） |
 
 ## 技术栈
 
@@ -28,14 +30,28 @@
 
 **后端**
 - Express 5（端口 3003）
+- PostgreSQL 数据库（基金数据持久化）
 - 东方财富 API 实时获取基金净值（每 15 分钟自动更新）
-- 内置 100+ 只基金静态数据
+- 新浪财经 API 获取市场指数和板块数据
+
+**数据库**
+- `funds` - 基金基本信息表
+- `fund_nav` - 基金净值历史表
+- `market_indices` - 市场指数表
+- `sector_data` - 板块轮动表
+- `users` - 用户表
+- `fund_records` - 持仓记录表（含定投功能）
+- `dca_plans` - 定投计划表（兼容旧数据）
 
 ## 快速开始
 
 ```bash
 # 安装依赖
 npm install
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，填写数据库连接信息
 
 # 启动后端（端口 3003）
 npm run server
@@ -46,6 +62,33 @@ npm run dev
 
 访问 http://localhost:5174/web
 
+## 环境变量
+
+创建 `.env` 文件，配置以下变量：
+
+```env
+# JWT 密钥
+JWT_SECRET=your_jwt_secret_here_at_least_32_chars
+
+# 模拟登录（生产环境设为false）
+ENABLE_MOCK_AUTH=false
+
+# 支付宝配置（可选）
+ALIPAY_APP_ID=your_app_id
+ALIPAY_PRIVATE_KEY=keys/alipay_private_key.pem
+ALIPAY_PUBLIC_KEY=keys/alipay_public_key_from_alipay.pem
+ALIPAY_RETURN_URL=http://your-domain:8688/api/auth/alipay/callback
+
+# PostgreSQL 数据库（数据库和服务器在同一台机器，使用localhost）
+PG_HOST=localhost
+PG_PORT=5432
+PG_DATABASE=your_database
+PG_USER=your_user
+PG_PASSWORD=your_password
+```
+
+**重要：** 如果数据库和服务器在同一台机器上，`PG_HOST` 必须使用 `localhost`！
+
 ## 生产构建
 
 ```bash
@@ -55,64 +98,143 @@ npm run preview      # 本地预览构建产物
 
 ## 部署
 
-项目支持一键部署到 Linux 服务器，详见 [DEPLOY.md](./DEPLOY.md)。
+项目支持一键部署到 Linux 服务器，详见 [DEPLOY.md](./DEPLOY.md) 和 [UPDATE_GUIDE.md](./UPDATE_GUIDE.md)。
 
+### 访问地址
+**http://47.116.77.67:8688/web**
+
+### 全新部署
 ```bash
-# 配置服务器信息（创建 .env.deploy）
-echo 'DEPLOY_SERVER_IP=你的服务器IP' > .env.deploy
-
-# 执行部署
-chmod +x deploy.sh
-./deploy.sh
+# 1. 打包项目为 fund-recommender.zip
+# 2. 上传到服务器 /tmp/ 目录
+# 3. SSH登录服务器运行
+bash /tmp/deploy-full.sh
 ```
 
-部署后访问：`http://服务器IP:8688/web`
+### 一键更新
+```bash
+# 1. 打包项目为 fund-recommender.zip
+# 2. 上传到服务器 /var/www/ 目录
+# 3. SSH登录服务器运行
+bash /var/www/update.sh
+```
+
+### 修复脚本
+```bash
+# 修复服务器问题
+bash /var/www/fix-server.sh
+
+# 修复403权限错误
+bash /var/www/fix-permission.sh
+```
 
 ## 项目结构
 
 ```
 fund-recommender/
 ├── server/
-│   ├── index.cjs            # Express 后端，API 路由 + 定时更新
-│   └── fund-data.cjs        # 基金静态数据（100+ 只）
+│   ├── index.cjs            # Express 入口（~200行），启动 + 中间件 + 调度
+│   ├── db.cjs               # PostgreSQL 数据库初始化
+│   ├── fund-service.cjs     # 基金数据服务层（含分页）
+│   ├── fund-data.cjs        # 基金种子数据（100+ 只）
+│   ├── auth.cjs             # 认证模块（JWT + 支付宝 OAuth，token 加密存储）
+│   ├── portfolio.cjs        # 持仓管理模块
+│   ├── data-fetcher.cjs     # 数据抓取模块（腾讯/新浪/东方财富 API）
+│   ├── routes/
+│   │   └── api.cjs          # API 路由（基金、市场、工具、行业分析）
+│   └── utils/
+│       ├── rate-limiter.cjs # 共享速率限制器（带 TTL 自动清理）
+│       ├── scheduler.cjs    # 共享调度器（每日任务、交易时间任务）
+│       ├── trading-hours.cjs # 交易时间判断（含中国法定节假日）
+│       ├── crypto.cjs       # 加密工具（AES-256-GCM）
+│       └── alipay.cjs       # 支付宝SDK封装
 ├── src/
 │   ├── App.tsx              # 路由配置
 │   ├── main.tsx             # 入口，Ant Design 全局配置
 │   ├── components/
 │   │   ├── Navbar.tsx       # 响应式导航栏
 │   │   └── DataStatus.tsx   # 数据更新状态栏
-│   ├── pages/               # 10 个页面组件
+│   ├── pages/               # 11 个页面组件
 │   ├── services/api.ts      # API 请求封装
 │   ├── hooks/useApi.ts      # 通用数据请求 Hook
 │   ├── utils/format.ts      # 格式化工具函数
 │   └── types/index.ts       # TypeScript 类型定义
-├── deploy.sh                # 一键部署脚本
+├── scripts/
+│   ├── generate-alipay-keys.cjs  # 支付宝密钥生成脚本
+│   └── test-alipay.cjs           # 支付宝配置测试脚本
+├── keys/                    # 支付宝密钥目录（不上传到仓库）
+├── deploy-full.sh           # 全新部署脚本
+├── update.sh                # 一键更新脚本
+├── fix-server.sh            # 服务器修复脚本
+├── fix-permission.sh        # 权限修复脚本
 ├── DEPLOY.md                # 部署文档
+├── UPDATE_GUIDE.md          # 更新指南
 ├── vite.config.ts           # Vite 配置
 └── package.json
 ```
 
 ## API 接口
 
-后端运行在 3002 端口，前端通过 `/api` 代理访问。
+后端运行在 3003 端口，前端通过 `/api` 代理访问。
 
+### 基金数据
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/funds` | 基金列表（支持 industry/type/sort/order/search 参数） |
 | GET | `/api/funds/:code` | 基金详情（6 位基金代码） |
 | GET | `/api/funds/qdii` | QDII 基金列表 |
 | GET | `/api/funds/hs300` | 沪深 300 基金列表 |
+
+### 市场数据
+| 方法 | 路径 | 说明 |
+|------|------|------|
 | GET | `/api/market/indices` | 市场指数估值 |
+| GET | `/api/market/sectors` | 板块轮动数据 |
+| GET | `/api/market/capital-flow` | 资金流向数据 |
+
+### 分析推荐
+| 方法 | 路径 | 说明 |
+|------|------|------|
 | GET | `/api/recommendations/industry` | 行业推荐 |
 | GET | `/api/recommendations/batch-plans` | 分批建仓方案 |
 | GET | `/api/industries` | 行业列表 |
 | GET | `/api/industry-analysis/:industry` | 行业深度分析 |
 | GET | `/api/hs300/analysis` | 沪深 300 深度分析 |
+
+### 工具
+| 方法 | 路径 | 说明 |
+|------|------|------|
 | POST | `/api/risk/profile` | 风险评估 |
 | POST | `/api/tools/dca` | 定投计算器 |
 | POST | `/api/tools/compare` | 基金对比 |
+
+### 用户认证
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/auth/register` | 用户注册 |
+| POST | `/api/auth/login` | 用户登录 |
+| GET | `/api/auth/me` | 获取当前用户信息 |
+| GET | `/api/auth/alipay/qrcode` | 获取支付宝授权URL |
+| GET | `/api/auth/alipay/callback` | 支付宝回调处理 |
+| GET | `/api/auth/alipay/check` | 检查支付宝授权状态 |
+| POST | `/api/auth/alipay/mock-login` | 模拟支付宝登录（仅开发） |
+
+### 持仓管理（需要认证）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/portfolio/records` | 获取持仓记录 |
+| POST | `/api/portfolio/records` | 添加持仓记录（支持定投设置） |
+| PUT | `/api/portfolio/records/:id` | 更新持仓记录 |
+| DELETE | `/api/portfolio/records/:id` | 删除持仓记录 |
+| GET | `/api/portfolio/summary` | 获取持仓汇总 |
+| POST | `/api/portfolio/import` | CSV 导入持仓 |
+
+### 系统
+| 方法 | 路径 | 说明 |
+|------|------|------|
 | GET | `/api/status` | 数据更新状态 |
 | POST | `/api/update` | 手动触发数据更新 |
+| GET | `/health` | 健康检查 |
 
 ## 覆盖基金类型
 
@@ -122,11 +244,113 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 
 ## 安全措施
 
-- CORS 白名单限制
-- 请求速率限制（通用 60 次/分钟，数据更新 3 次/15 分钟）
-- 安全响应头（X-Content-Type-Options、X-Frame-Options、X-XSS-Protection）
+- CORS 白名单限制（仅允许指定域名，拒绝无 Origin 请求）
+- JWT 认证（用户登录/注册，JWT_SECRET 启动时强制校验）
+- OAuth Token 加密存储（AES-256-GCM）
+- 支付宝OAuth CSRF防护（state参数HMAC-SHA256签名）
+- 支付宝授权时序安全比较（crypto.timingSafeEqual）
+- 请求速率限制（通用 60 次/分钟，数据更新 3 次/15 分钟，带 TTL 自动清理）
+- 安全响应头（X-Content-Type-Options、X-Frame-Options、CSP、HSTS）
 - 请求体大小限制 10KB
-- 输入参数校验（基金代码格式、搜索长度、数值范围）
+- 输入参数校验（基金代码格式、搜索长度、数值范围、正数校验）
+- 环境变量敏感信息保护（数据库密码、JWT 密钥）
+- SQL 参数化查询（防止 SQL 注入）
+- Trust Proxy 配置（正确获取客户端 IP）
+- 中国法定节假日支持（交易日判断准确）
+- 基金查询分页支持（防止大数据量查询）
+
+## 版本更新记录
+
+### v0.2 (2026-06-05)
+
+**新增功能**
+- 支付宝扫码登录：用户可通过支付宝APP扫码完成登录注册
+- 新用户自动注册：首次使用支付宝登录的用户自动创建账户
+- 老用户直接登录：已绑定支付宝的用户直接登录
+- 支付宝SDK集成：使用alipay-sdk处理RSA2签名和API调用
+- 密钥生成工具：`npm run generate-alipay-keys` 生成RSA密钥对
+- 配置测试工具：`npm run test-alipay` 测试支付宝配置
+
+**部署优化**
+- 一键部署脚本：`deploy-full.sh` 全新部署
+- 一键更新脚本：`update.sh` 更新已有部署
+- 服务器修复脚本：`fix-server.sh` 修复常见问题
+- 权限修复脚本：`fix-permission.sh` 修复403错误
+- 自动备份：更新时自动备份当前版本到 `/var/www/backups/`
+
+**安全增强**
+- 支付宝OAuth CSRF防护（state参数HMAC-SHA256签名）
+- 支付宝授权时序安全比较（crypto.timingSafeEqual）
+- OAuth Token加密存储（AES-256-GCM）
+
+**文档完善**
+- 部署文档：`DEPLOY.md`
+- 更新指南：`UPDATE_GUIDE.md`
+- 支付宝配置：`docs/ALIPAY_SETUP.md`
+- 登录功能说明：`docs/ALIPAY_SCAN_LOGIN.md`
+
+### v0.1 (2026-06-04)
+
+**核心功能**
+- 基金列表：全市场基金检索，按行业筛选、多维度排序
+- 基金详情：收益走势、费率明细、估值分析、重仓股、投资建议
+- 基金对比：最多5只基金横向对比，30+指标
+- QDII基金：纳斯达克100/标普500专区
+- 行业分析：7大行业深度分析
+- 沪深300：17只基金对比、权重股分析
+- 市场估值：指数估值分位、行业推荐
+- 风险评估：5步问卷测评
+- 定投计算器：模拟定投收益
+- 持仓管理：持仓记录、盈亏统计
+
+**技术架构**
+- 前端：React 19 + TypeScript + Vite 8 + Ant Design 6
+- 后端：Express 5 + Node.js
+- 数据库：PostgreSQL
+- 数据源：东方财富API、新浪财经API
+
+**安全措施**
+- JWT认证
+- CORS白名单限制
+- 请求速率限制
+- 安全响应头
+- SQL参数化查询
+- 输入参数校验
+
+---
+
+## 安全漏洞修复记录
+
+| 日期 | 严重性 | 问题 | 修复方案 |
+|------|--------|------|----------|
+| 2026-06-04 | CRITICAL | JWT Secret 使用硬编码默认值 | 强制从环境变量读取，缺失时启动失败 |
+| 2026-06-04 | CRITICAL | 数据库密码硬编码在代码中 | 移除硬编码默认值，强制使用环境变量 |
+| 2026-06-04 | CRITICAL | Mock 登录端点在 NODE_ENV 未设置时可访问 | 改用 ENABLE_MOCK_AUTH 环境变量控制，默认关闭 |
+| 2026-06-04 | CRITICAL | OAuth 回调将 JWT 放入 URL 查询参数 | 改用 Fragment (#) 传递，防止日志和 Referer 泄露 |
+| 2026-06-04 | CRITICAL | CORS 允许无 Origin 请求通过 | 移除 `!origin` 放行，仅允许白名单域名 |
+| 2026-06-04 | CRITICAL | OAuth state 签名截断导致回调验证失败 | 使用完整 256-bit HMAC 签名 + timingSafeEqual 比较 |
+| 2026-06-04 | HIGH | /api/update 端点无需认证即可触发 | 添加 authMiddleware 认证保护 |
+| 2026-06-04 | HIGH | OAuth state 使用 Math.random() 生成 | 改用 crypto.randomBytes() 密码学安全随机数 |
+| 2026-06-04 | HIGH | PUT 持仓记录端点缺少输入验证 | 添加 shares > 0 和 cost_price > 0 校验 |
+| 2026-06-04 | HIGH | 前端密码最小长度 6 与后端 8 不一致 | 前端统一为 min: 8 |
+| 2026-06-04 | HIGH | 基金排序字段映射错误导致 SQL 报错 | 建立 camelCase → 数据库列名映射表 |
+| 2026-06-04 | HIGH | 未配置 trust proxy 导致速率限制失效 | 添加 `app.set('trust proxy', 1)` |
+| 2026-06-04 | MEDIUM | CSP 允许 unsafe-eval | 移除 unsafe-eval，保留 unsafe-inline |
+| 2026-06-04 | MEDIUM | CSV 导入缺少数值和日期验证 | 添加正数校验和 YYYY-MM-DD 格式验证 |
+| 2026-06-04 | MEDIUM | OAuth state 签名使用时间不安全比较 | 改用 crypto.timingSafeEqual 防止时序攻击 |
+| 2026-06-04 | - | iconv-lite 未在 package.json 中声明 | 添加为显式依赖 |
+| 2026-06-04 | - | 风险评估前后端选项不匹配 | 统一前后端选项映射 |
+| 2026-06-04 | - | 持仓计算使用静态种子数据 | 改用数据库实时净值 |
+| 2026-06-04 | - | 基金详情使用 Math.random() 生成伪数据 | 改用确定性算法，保证数据一致性 |
+| 2026-06-04 | HIGH | index.cjs 单体文件 1907 行，职责混乱 | 拆分为 data-fetcher.cjs + routes/api.cjs + utils/，入口精简至 ~200 行 |
+| 2026-06-04 | MEDIUM | 速率限制器在 auth.cjs 和 index.cjs 中重复实现 | 提取为 server/utils/rate-limiter.cjs 共享模块 |
+| 2026-06-04 | MEDIUM | 调度器逻辑（跳过周末、9:30 执行）重复 3 次 | 提取为 server/utils/scheduler.cjs 共享模块 |
+| 2026-06-04 | MEDIUM | OAuth access_token 明文存储在数据库 | 使用 AES-256-GCM 加密存储（server/utils/crypto.cjs） |
+| 2026-06-04 | MEDIUM | isTradingDay 仅判断周末，忽略法定节假日 | 新增 server/utils/trading-hours.cjs，内置 2025-2026 休市日历 + 调休工作日 |
+| 2026-06-04 | MEDIUM | 基金查询无分页，数据量增长后有性能风险 | getAllFundsWithNav 新增 page/pageSize 参数，返回分页元数据 |
+| 2026-06-04 | LOW | 进程退出时 setInterval 定时器未清理 | 新增 SIGTERM/SIGINT 处理，调用 limiter.destroy() 清理 |
+| 2026-06-04 | HIGH | generateFundDetail() 引用不存在的 req 变量导致运行时报错 | 移除对 req 的引用，lastUpdateTime 由调用方自行获取 |
+| 2026-06-04 | MEDIUM | destroyAll() 未清理 setInterval 定时器，存在资源泄漏 | 跟踪所有 cleanupInterval 引用，destroyAll() 时统一 clearInterval |
 
 ## License
 

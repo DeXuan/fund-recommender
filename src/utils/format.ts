@@ -32,7 +32,8 @@ export function getValuationText(valuation: string): string {
   return map[valuation] || valuation;
 }
 
-export function getValuationColor(valuation: string): string {
+export function getValuationColor(valuation: string | null | undefined): string {
+  if (!valuation) return '#1677ff';
   if (valuation === 'very_low' || valuation === 'low' || valuation.includes('低')) return '#52c41a';
   if (valuation === 'high' || valuation === 'very_high' || valuation.includes('高')) return '#ff4d4f';
   return '#1677ff';

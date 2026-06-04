@@ -8,10 +8,13 @@ import ReactECharts from 'echarts-for-react';
 interface MarketIndex {
   name: string;
   code: string;
-  pe: string;
-  pb: string;
-  pePercentile: string;
-  pbPercentile: string;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
+  pe: string | null;
+  pb: string | null;
+  pePercentile: string | null;
+  pbPercentile: string | null;
   valuation: string;
   suggestion: string;
 }
@@ -50,6 +53,8 @@ export default function MarketAnalysis() {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(loadData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
@@ -82,7 +87,7 @@ export default function MarketAnalysis() {
       {
         name: 'PE分位',
         type: 'bar',
-        data: indices.map(i => ({ value: Number(i.pePercentile), itemStyle: { color: getValuationColor(i.valuation) } })),
+        data: indices.map(i => ({ value: Number(i.pePercentile) || 0, itemStyle: { color: getValuationColor(i.valuation) } })),
         label: { show: true, position: 'top', formatter: '{c}%' },
       },
     ],
@@ -91,27 +96,44 @@ export default function MarketAnalysis() {
 
   const indexColumns = [
     { title: '指数', dataIndex: 'name', key: 'name', render: (text: string) => <strong>{text}</strong> },
-    { title: 'PE(TTM)', dataIndex: 'pe', key: 'pe' },
+    {
+      title: '最新价',
+      dataIndex: 'price',
+      key: 'price',
+      render: (val: number | null) => val != null ? val.toFixed(2) : '-',
+    },
+    {
+      title: '涨跌幅',
+      dataIndex: 'changePercent',
+      key: 'changePercent',
+      render: (val: number | null) => {
+        if (val == null) return '-';
+        const color = val >= 0 ? '#cf1322' : '#3f8600';
+        const sign = val >= 0 ? '+' : '';
+        return <span style={{ color, fontWeight: 600 }}>{sign}{val.toFixed(2)}%</span>;
+      },
+    },
+    { title: 'PE(TTM)', dataIndex: 'pe', key: 'pe', render: (val: string | null) => val ?? '--' },
     {
       title: 'PE历史分位',
       dataIndex: 'pePercentile',
       key: 'pePercentile',
-      render: (val: string, record: MarketIndex) => (
+      render: (val: string | null, record: MarketIndex) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>{val}%</span>
-          <Progress percent={Number(val)} showInfo={false} size="small" strokeColor={getValuationColor(record.valuation)} style={{ flex: 1 }} />
+          <span>{val != null ? `${val}%` : '--'}</span>
+          {val != null && <Progress percent={Number(val)} showInfo={false} size="small" strokeColor={getValuationColor(record.valuation)} style={{ flex: 1 }} />}
         </div>
       ),
     },
-    { title: 'PB', dataIndex: 'pb', key: 'pb' },
+    { title: 'PB', dataIndex: 'pb', key: 'pb', render: (val: string | null) => val ?? '--' },
     {
       title: 'PB历史分位',
       dataIndex: 'pbPercentile',
       key: 'pbPercentile',
-      render: (val: string, record: MarketIndex) => (
+      render: (val: string | null, record: MarketIndex) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>{val}%</span>
-          <Progress percent={Number(val)} showInfo={false} size="small" strokeColor={getValuationColor(record.valuation)} style={{ flex: 1 }} />
+          <span>{val != null ? `${val}%` : '--'}</span>
+          {val != null && <Progress percent={Number(val)} showInfo={false} size="small" strokeColor={getValuationColor(record.valuation)} style={{ flex: 1 }} />}
         </div>
       ),
     },
@@ -125,24 +147,18 @@ export default function MarketAnalysis() {
   ];
 
   const recColumns = [
-    { title: '排名', dataIndex: 'rank', key: 'rank', width: 60, render: (v: number) => <strong>{v}</strong> },
-    { title: '行业', dataIndex: 'industry', key: 'industry', render: (text: string) => <Tag color="blue">{text}</Tag> },
-    { title: '推荐基金', dataIndex: 'fundName', key: 'fundName', render: (text: string, record: IndustryRecommendation) => <Link to={`/funds/${record.fundCode}`} style={{ color: '#1677ff' }}>{text}</Link> },
-    { title: '跟踪指数', dataIndex: 'index', key: 'index', render: (text: string) => <span style={{ fontSize: 12 }}>{text}</span> },
-    { title: '评级', dataIndex: 'rating', key: 'rating', render: (v: number) => <span style={{ color: '#faad14' }}>{'★'.repeat(v)}</span> },
-    { title: '近1年', dataIndex: 'return1y', key: 'return1y', render: (v: number) => <span style={{ color: getReturnColor(v), fontWeight: 600 }}>{formatReturn(v)}</span> },
-    { title: '近3月', dataIndex: 'return3m', key: 'return3m', render: (v: number) => <span style={{ color: getReturnColor(v), fontWeight: 600 }}>{formatReturn(v)}</span> },
-    { title: '走势', dataIndex: 'trend', key: 'trend' },
-    { title: '估值', dataIndex: 'valuation', key: 'valuation', render: (val: string) => <span style={{ color: getValuationColor(val) }}>{val}</span> },
+    { title: '行业', dataIndex: 'industry', key: 'industry', render: (text: string) => <Tag color="blue">{text || '--'}</Tag> },
+    { title: '走势', dataIndex: 'trend', key: 'trend', render: (text: string) => text || '--' },
+    { title: '估值', dataIndex: 'valuation', key: 'valuation', render: (val: string) => <span style={{ color: getValuationColor(val) }}>{val || '--'}</span> },
     {
       title: '买入建议',
       dataIndex: 'buySuggestion',
       key: 'buySuggestion',
       render: (text: string) => (
-        <Tag color={text === '优先配置' ? 'green' : text === '逢低布局' ? 'orange' : 'default'}>{text}</Tag>
+        <Tag color={text === '优先配置' ? 'green' : text === '逢低布局' ? 'orange' : 'default'}>{text || '--'}</Tag>
       ),
     },
-    { title: '仓位', dataIndex: 'positionSuggestion', key: 'positionSuggestion', render: (text: string) => <strong>{text}</strong> },
+    { title: '推荐逻辑', dataIndex: 'logic', key: 'logic', ellipsis: true, render: (text: string) => <span style={{ fontSize: 13, color: '#666' }}>{text || '--'}</span> },
   ];
 
   const tabItems = [
@@ -178,11 +194,11 @@ export default function MarketAnalysis() {
           <Table columns={recColumns} dataSource={recommendations} rowKey="rank" pagination={false} size="small" scroll={{ x: 1000 }} />
           <Card title="推荐逻辑" style={{ marginTop: 16 }}>
             <Row gutter={16}>
-              {recommendations.slice(0, 3).map((rec) => (
-                <Col xs={24} sm={8} key={rec.rank}>
+              {recommendations.slice(0, 4).map((rec, i) => (
+                <Col xs={24} sm={12} md={6} key={rec.industry || i}>
                   <Card size="small" style={{ background: '#f5f5f5' }}>
-                    <strong>{rec.industry}</strong>
-                    <p style={{ fontSize: 13, color: '#666', margin: '8px 0 0' }}>{rec.logic}</p>
+                    <strong>{rec.industry || '--'}</strong>
+                    <p style={{ fontSize: 13, color: '#666', margin: '8px 0 0' }}>{rec.logic || '--'}</p>
                   </Card>
                 </Col>
               ))}
@@ -198,16 +214,16 @@ export default function MarketAnalysis() {
         <div>
           <Card title="分批建仓方案" extra={<span style={{ fontSize: 12, color: '#666' }}>核心策略：高低切换 + 分批建仓 + 估值优先</span>}>
             <Timeline
-              items={batchPlans.map((plan) => ({
+              items={batchPlans.map((plan: any) => ({
                 color: 'blue',
                 children: (
                   <Card size="small" style={{ marginBottom: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                       <strong>第 {plan.batch} 批</strong>
-                      <Tag color="green">{plan.percentage}%</Tag>
+                      <Tag color="green">{plan.ratio || plan.percentage}%</Tag>
                     </div>
                     <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}><strong>时间：</strong>{plan.time}</div>
-                    <div style={{ fontSize: 13, marginBottom: 4 }}><strong>买入标的：</strong>{plan.targets}</div>
+                    <div style={{ fontSize: 13, marginBottom: 4 }}><strong>买入标的：</strong>{Array.isArray(plan.funds) ? plan.funds.join('、') : plan.targets}</div>
                     <div style={{ fontSize: 13, marginBottom: 4 }}><strong>操作方式：</strong>{plan.method}</div>
                     <div style={{ fontSize: 13, color: '#666' }}><strong>理由：</strong>{plan.reason}</div>
                   </Card>

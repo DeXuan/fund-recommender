@@ -458,7 +458,7 @@ export default function FundDetail() {
       <Card style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
           <Link to="/funds"><Button>返回列表</Button></Link>
-          <Link to={`/compare?codes=${fund.code}`}><Button>加入对比</Button></Link>
+          <Link to={`/funds?codes=${fund.code}`}><Button>加入对比</Button></Link>
           <a href={`https://fund.eastmoney.com/${fund.code}.html`} target="_blank" rel="noopener noreferrer">
             <Button type="primary" icon={<LinkOutlined />}>在东方财富查看</Button>
           </a>

@@ -60,10 +60,13 @@ export interface PerformanceRecord {
 export interface MarketIndex {
   name: string;
   code: string;
-  pe: number;
-  pb: number;
-  pePercentile: number;
-  pbPercentile: number;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
+  pe: number | null;
+  pb: number | null;
+  pePercentile: number | null;
+  pbPercentile: number | null;
   valuation: string;
   suggestion: string;
 }
@@ -242,4 +245,48 @@ export interface HS300Analysis {
       reason: string;
     }[];
   };
+}
+
+// 用户认证
+export interface User {
+  id: number;
+  username: string;
+  nickname: string;
+  avatar_url?: string;
+}
+
+// 理财记账
+export interface FundRecord {
+  id: number;
+  user_id: number;
+  fund_code: string;
+  fund_name: string;
+  shares: number;
+  cost_price: number;
+  buy_date: string;
+  buy_fee: number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PortfolioHolding {
+  fund_code: string;
+  fund_name: string;
+  total_shares: number;
+  avg_cost_price: number;
+  total_cost: number;
+  current_nav: number;
+  market_value: number;
+  pnl: number;
+  pnl_percent: number;
+  records: FundRecord[];
+}
+
+export interface PortfolioSummary {
+  holdings: PortfolioHolding[];
+  totalCost: number;
+  totalValue: number;
+  totalPnl: number;
+  totalReturn: number;
 }

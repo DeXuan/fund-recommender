@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Row, Col, Table, Tag, Progress, Statistic, Spin, Space, Badge } from 'antd';
+import { Card, Row, Col, Table, Tag, Progress, Statistic, Spin, Space, Badge, Modal } from 'antd';
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
   FundOutlined,
-  GlobalOutlined,
   SwapOutlined,
   SafetyOutlined,
   CalculatorOutlined,
   LineChartOutlined,
   BarChartOutlined,
   StockOutlined,
+  BankOutlined,
+  PieChartOutlined,
+  TrophyOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { fundApi } from '../services/api';
@@ -20,9 +22,12 @@ import { formatReturn, getReturnColor } from '../utils/format';
 interface MarketIndex {
   name: string;
   code: string;
-  pe: number;
-  pb: number;
-  pePercentile: number;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
+  pe: number | null;
+  pb: number | null;
+  pePercentile: number | null;
   valuation: string;
   suggestion: string;
 }
@@ -34,47 +39,32 @@ interface SectorData {
   leadingStock: string;
 }
 
-interface FundFlow {
-  name: string;
-  inflow: number;
-  outflow: number;
-  net: number;
-}
-
 export default function Home() {
   const [indices, setIndices] = useState<MarketIndex[]>([]);
+  const [sectors, setSectors] = useState<SectorData[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [capitalFlow, setCapitalFlow] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-
-  const sectorRotation: SectorData[] = [
-    { name: '人工智能', change: 3.85, volume: '856亿', leadingStock: '科大讯飞' },
-    { name: '半导体', change: 2.92, volume: '623亿', leadingStock: '北方华创' },
-    { name: '新能源', change: 1.56, volume: '445亿', leadingStock: '宁德时代' },
-    { name: '医药', change: -0.85, volume: '312亿', leadingStock: '恒瑞医药' },
-    { name: '消费', change: -1.23, volume: '278亿', leadingStock: '贵州茅台' },
-    { name: '军工', change: 0.68, volume: '198亿', leadingStock: '中航沈飞' },
-    { name: '金融', change: -0.45, volume: '425亿', leadingStock: '招商银行' },
-    { name: '地产', change: -2.15, volume: '156亿', leadingStock: '万科A' },
-  ];
-
-  const fundFlows: FundFlow[] = [
-    { name: '北向资金', inflow: 85.6, outflow: 62.3, net: 23.3 },
-    { name: '主力资金', inflow: 1256, outflow: 1189, net: 67 },
-    { name: '散户资金', inflow: 856, outflow: 923, net: -67 },
-  ];
+  const [showAllSectors, setShowAllSectors] = useState(false);
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(loadData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
     try {
-      const [indicesData, recsData] = await Promise.all([
+      const [indicesData, sectorsData, recsData, flowData] = await Promise.all([
         fundApi.getMarketIndices(),
+        fundApi.getSectors().catch(() => []),
         fundApi.getIndustryRecommendations(),
+        fundApi.getCapitalFlow().catch(() => null),
       ]);
       setIndices(indicesData);
+      setSectors(sectorsData);
       setRecommendations(recsData);
+      setCapitalFlow(flowData);
     } catch (error) {
       console.error('加载数据失败:', error);
     } finally {
@@ -83,11 +73,39 @@ export default function Home() {
   };
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <Spin size="large" tip="加载市场数据中..." />
+      </div>
+    );
   }
 
-  const marketPrices = [3856.42, 5823.15, 2156.78, 1023.45];
-  const marketChanges = [1.25, -0.68, 2.15, -1.32];
+  // 使用API返回的真实数据
+  const marketPrices = indices.slice(0, 4).map(i => i.price ?? null);
+  const marketChanges = indices.slice(0, 4).map(i => i.changePercent ?? null);
+
+  const trophyColors = ['#f5a623', '#b0b0b0', '#cd7f32'];
+
+  const TrophyIcon = ({ index }: { index: number }) => (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26 }}>
+      <TrophyOutlined style={{
+        fontSize: 24,
+        color: trophyColors[index],
+        filter: `drop-shadow(0 1px 3px ${trophyColors[index]}88)`,
+      }} />
+      <span style={{
+        position: 'absolute',
+        top: '50%', left: '50%',
+        transform: 'translate(-50%, -50%)',
+        fontSize: 12, fontWeight: 900,
+        color: '#3a2a00',
+        textShadow: `0 0 4px rgba(255,255,255,0.8)`,
+        lineHeight: 1,
+      }}>
+        {index + 1}
+      </span>
+    </span>
+  );
 
   const sectorColumns = [
     {
@@ -95,10 +113,16 @@ export default function Home() {
       key: 'rank',
       width: 60,
       render: (_: any, __: any, index: number) => (
-        <Badge count={index + 1} style={{ backgroundColor: index < 3 ? '#ff4d4f' : '#d9d9d9' }} overflowCount={99} />
+        index < 3 ? (
+          <TrophyIcon index={index} />
+        ) : (
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: '#f0f0f0', color: '#8c8c8c', fontSize: 11, fontWeight: 500 }}>
+            {index + 1}
+          </span>
+        )
       ),
     },
-    { title: '板块', dataIndex: 'name', key: 'name', render: (text: string) => <strong>{text}</strong> },
+    { title: '板块', dataIndex: 'name', key: 'name', render: (text: string, _: any, index: number) => <strong style={index < 3 ? { color: trophyColors[index] } : {}}>{text}</strong> },
     {
       title: '涨跌幅',
       dataIndex: 'change',
@@ -111,21 +135,21 @@ export default function Home() {
         </span>
       ),
     },
-    { title: '成交额', dataIndex: 'volume', key: 'volume', align: 'right' as const },
+    { title: '成交额', dataIndex: 'volume', key: 'volume', align: 'right' as const, defaultSortOrder: 'descend' as const, sorter: (a: SectorData, b: SectorData) => parseFloat(a.volume) - parseFloat(b.volume) },
     { title: '领涨股', dataIndex: 'leadingStock', key: 'leadingStock', align: 'right' as const, render: (text: string) => <span style={{ color: '#1677ff' }}>{text}</span> },
   ];
 
-  const sortedSectors = [...sectorRotation].sort((a, b) => b.change - a.change);
+  const sortedSectors = [...sectors].sort((a, b) => parseFloat(b.volume) - parseFloat(a.volume));
 
   const quickEntries = [
-    { to: '/funds', icon: <FundOutlined />, label: '基金列表', desc: '查看全部基金', color: '#667eea' },
-    { to: '/industry', icon: <BarChartOutlined />, label: '行业分析', desc: '行业深度研究', color: '#f093fb' },
-    { to: '/qdii', icon: <GlobalOutlined />, label: 'QDII基金', desc: '投资海外市场', color: '#f5576c' },
-    { to: '/compare', icon: <SwapOutlined />, label: '基金对比', desc: '对比选择最优', color: '#4facfe' },
-    { to: '/risk-assessment', icon: <SafetyOutlined />, label: '风险评估', desc: '了解风险偏好', color: '#43e97b' },
-    { to: '/dca-calculator', icon: <CalculatorOutlined />, label: '定投计算器', desc: '智能定投规划', color: '#fa709a' },
-    { to: '/market', icon: <LineChartOutlined />, label: '市场分析', desc: '指数估值分析', color: '#a18cd1' },
-    { to: '/hs300', icon: <StockOutlined />, label: '沪深300', desc: '核心宽基指数', color: '#fbc2eb' },
+    { to: '/funds', icon: <FundOutlined />, label: '基金列表', desc: '全市场基金筛选与对比', color: '#667eea' },
+    { to: '/industry', icon: <BarChartOutlined />, label: '行业分析', desc: '九大行业深度研究', color: '#f093fb' },
+    { to: '/market', icon: <LineChartOutlined />, label: '市场估值', desc: '指数PE/PB估值仪表盘', color: '#a18cd1' },
+    { to: '/hs300', icon: <StockOutlined />, label: '沪深300', desc: '核心宽基指数深度分析', color: '#fbc2eb' },
+    { to: '/qdii', icon: <SwapOutlined />, label: 'QDII基金', desc: '海外指数基金限额监控', color: '#4facfe' },
+    { to: '/portfolio', icon: <PieChartOutlined />, label: '我的持仓', desc: '投资组合与盈亏管理', color: '#36cfc9' },
+    { to: '/dca-calculator', icon: <CalculatorOutlined />, label: '定投计算器', desc: '智能定投收益测算', color: '#fa709a' },
+    { to: '/risk-assessment', icon: <SafetyOutlined />, label: '风险评估', desc: '了解你的风险偏好', color: '#43e97b' },
   ];
 
   const getGaugeOption = (name: string, percentile: number, valuation: string) => ({
@@ -167,26 +191,32 @@ export default function Home() {
     <div>
       {/* 市场概览 */}
       <Card
-        style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)', marginBottom: 16, border: 'none' }}
-        styles={{ body: { padding: 24 } }}
+        style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', marginBottom: 20, border: 'none', borderRadius: 16, overflow: 'hidden', position: 'relative' }}
+        styles={{ body: { padding: 28 } }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ color: 'white', margin: 0, fontSize: 20 }}>市场概览</h2>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>数据每15分钟更新</span>
+        <div style={{ position: 'absolute', top: 0, right: 0, width: 300, height: 300, background: 'radial-gradient(circle, rgba(22, 119, 255, 0.15) 0%, transparent 70%)', borderRadius: '50%', transform: 'translate(30%, -30%)' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, position: 'relative' }}>
+          <div>
+            <h2 style={{ color: 'white', margin: 0, fontSize: 22, fontWeight: 700 }}>市场概览</h2>
+            <p style={{ color: 'rgba(255,255,255,0.6)', margin: '4px 0 0', fontSize: 13 }}>实时追踪主要指数行情</p>
+          </div>
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', padding: '4px 10px', background: 'rgba(255,255,255,0.1)', borderRadius: 8 }}>数据每15分钟更新</span>
         </div>
-        <Row gutter={16}>
+        <Row gutter={[16, 16]}>
           {indices.slice(0, 4).map((index, i) => (
             <Col xs={12} sm={6} key={index.code}>
-              <Card size="small" style={{ background: 'rgba(255,255,255,0.1)', border: 'none' }}>
+              <Card size="small" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, backdropFilter: 'blur(10px)' }} styles={{ body: { padding: 16 } }}>
                 <Statistic
-                  title={<span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>{index.name}</span>}
-                  value={marketPrices[i]}
-                  precision={2}
-                  valueStyle={{ color: '#fff', fontSize: 22, fontWeight: 600 }}
+                  title={<span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 500 }}>{index.name}</span>}
+                  value={marketPrices[i] ?? '--'}
+                  precision={marketPrices[i] != null ? 2 : undefined}
+                  valueStyle={{ color: '#fff', fontSize: 24, fontWeight: 700 }}
                   suffix={
-                    <span style={{ fontSize: 14, color: marketChanges[i] > 0 ? '#ff4d4f' : '#52c41a' }}>
-                      {marketChanges[i] > 0 ? '+' : ''}{marketChanges[i]}%
-                    </span>
+                    marketChanges[i] != null ? (
+                      <span style={{ fontSize: 14, color: marketChanges[i]! > 0 ? '#ff4d4f' : '#52c41a' }}>
+                        {marketChanges[i]! > 0 ? '+' : ''}{marketChanges[i]}%
+                      </span>
+                    ) : undefined
                   }
                 />
               </Card>
@@ -195,78 +225,199 @@ export default function Home() {
         </Row>
       </Card>
 
-      {/* 板块轮动 */}
-      <Card title="今日板块轮动" extra={<span style={{ fontSize: 12, color: '#666' }}>按涨跌幅排序</span>} style={{ marginBottom: 16 }}>
-        <Table
-          columns={sectorColumns}
-          dataSource={sortedSectors}
-          rowKey="name"
-          pagination={false}
-          size="small"
-        />
-      </Card>
+      {/* 板块轮动 + 资金流向 */}
+      <Row gutter={20} style={{ marginBottom: 20 }}>
+        {/* 左侧：板块轮动 TOP13 */}
+        <Col xs={24} lg={10}>
+          <Card
+            title={<span style={{ fontWeight: 600 }}>今日板块轮动</span>}
+            extra={<span style={{ fontSize: 12, color: '#8c8c8c' }}>TOP13</span>}
+            style={{ borderRadius: 12 }}
+            styles={{ body: { padding: 0 } }}
+          >
+            <Table
+              columns={sectorColumns}
+              dataSource={sortedSectors.slice(0, 13)}
+              rowKey="name"
+              pagination={false}
+              size="small"
+            />
+            {sectors.length > 13 && (
+              <div style={{ textAlign: 'center', padding: '8px 0', borderTop: '1px solid #f0f0f0' }}>
+                <a onClick={() => setShowAllSectors(true)} style={{ color: '#1677ff', cursor: 'pointer', fontSize: 13 }}>
+                  查看全部 {sectors.length} 个板块 →
+                </a>
+              </div>
+            )}
+          </Card>
+          <Modal
+            title="全部板块轮动"
+            open={showAllSectors}
+            onCancel={() => setShowAllSectors(false)}
+            footer={null}
+            width={800}
+          >
+            <Table
+              columns={[
+                { title: '排名', key: 'rank', width: 60, render: (_: any, __: any, index: number) => index < 3 ? <TrophyIcon index={index} /> : <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: '#f0f0f0', color: '#8c8c8c', fontSize: 11 }}>{index + 1}</span> },
+                { title: '板块', dataIndex: 'name', key: 'name', render: (text: string, _: any, index: number) => <strong style={index < 3 ? { color: trophyColors[index] } : {}}>{text}</strong> },
+                { title: '涨跌幅', dataIndex: 'change', key: 'change', align: 'right' as const, sorter: (a: SectorData, b: SectorData) => a.change - b.change, render: (val: number) => <span style={{ color: getReturnColor(val), fontWeight: 600 }}>{formatReturn(val)}</span> },
+                { title: '成交额', dataIndex: 'volume', key: 'volume', align: 'right' as const },
+                { title: '领涨股', dataIndex: 'leadingStock', key: 'leadingStock', align: 'right' as const, render: (text: string) => <span style={{ color: '#1677ff' }}>{text}</span> },
+              ]}
+              dataSource={sortedSectors}
+              rowKey="name"
+              pagination={false}
+              size="small"
+            />
+          </Modal>
+        </Col>
 
-      {/* 资金流向 */}
-      <Card title="大盘资金流向" style={{ marginBottom: 16 }}>
-        <Row gutter={16}>
-          {fundFlows.map((flow) => (
-            <Col xs={24} sm={8} key={flow.name}>
-              <Card size="small" style={{ background: flow.net > 0 ? '#fff1f0' : '#f6ffed', border: `1px solid ${flow.net > 0 ? '#ffa39e' : '#b7eb8f'}` }}>
-                <div style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>{flow.name}</div>
-                <Statistic
-                  value={flow.net}
-                  precision={1}
-                  prefix={flow.net > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
-                  suffix="亿"
-                  valueStyle={{ color: flow.net > 0 ? '#ff4d4f' : '#52c41a', fontSize: 28, fontWeight: 700 }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 12 }}>
-                  <span style={{ color: '#ff4d4f' }}>流入 {flow.inflow}亿</span>
-                  <span style={{ color: '#52c41a' }}>流出 {flow.outflow}亿</span>
-                </div>
-                <Progress
-                  percent={Math.round((flow.inflow / (flow.inflow + flow.outflow)) * 100)}
-                  showInfo={false}
-                  strokeColor={{ from: '#ff4d4f', to: '#ff7875' }}
+        {/* 右侧：北向资金 + 主力资金 */}
+        <Col xs={24} lg={14}>
+          <Row gutter={[0, 20]}>
+            {/* 北向资金 */}
+            {capitalFlow && (
+              <Col span={24}>
+                <Card
+                  title={<span style={{ fontWeight: 600 }}><BankOutlined style={{ marginRight: 8, color: '#1677ff' }} />北向资金（沪深港通）</span>}
                   size="small"
-                  style={{ marginTop: 8 }}
-                />
-              </Card>
-            </Col>
-          ))}
-        </Row>
-
-        <div style={{ marginTop: 16 }}>
-          <h4 style={{ marginBottom: 12, fontSize: 14, color: '#333' }}>行业资金净流入TOP5</h4>
-          <Row gutter={8}>
-            {sortedSectors.slice(0, 5).map((sector) => (
-              <Col xs={12} sm={8} md={4} key={sector.name} style={{ marginBottom: 8 }}>
-                <Card size="small" style={{ textAlign: 'center', background: '#f5f5f5' }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>{sector.name}</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#ff4d4f' }}>
-                    +{(Math.random() * 50 + 10).toFixed(1)}亿
-                  </div>
+                  style={{ borderRadius: 12 }}
+                >
+                  <Row gutter={16} style={{ marginBottom: 16 }}>
+                    <Col span={8}>
+                      <Statistic
+                        title="今日净流入"
+                        value={capitalFlow.northbound?.total || 0}
+                        precision={2}
+                        suffix="亿"
+                        valueStyle={{ color: parseFloat(capitalFlow.northbound?.total || 0) >= 0 ? '#cf1322' : '#3f8600' }}
+                        prefix={parseFloat(capitalFlow.northbound?.total || 0) >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
+                      />
+                    </Col>
+                    <Col span={8}>
+                      <Statistic
+                        title="沪股通"
+                        value={capitalFlow.northbound?.sh || 0}
+                        precision={2}
+                        suffix="亿"
+                        valueStyle={{ color: parseFloat(capitalFlow.northbound?.sh || 0) >= 0 ? '#cf1322' : '#3f8600', fontSize: 16 }}
+                      />
+                    </Col>
+                    <Col span={8}>
+                      <Statistic
+                        title="深股通"
+                        value={capitalFlow.northbound?.sz || 0}
+                        precision={2}
+                        suffix="亿"
+                        valueStyle={{ color: parseFloat(capitalFlow.northbound?.sz || 0) >= 0 ? '#cf1322' : '#3f8600', fontSize: 16 }}
+                      />
+                    </Col>
+                  </Row>
+                  {capitalFlow.northbound?.trend?.length > 0 && (
+                    <ReactECharts
+                      option={{
+                        tooltip: { trigger: 'axis', formatter: (params: any) => `${params[0]?.axisValue}<br/>${params.map((p: any) => `${p.seriesName}: ${p.value}亿`).join('<br/>')}` },
+                        legend: { data: ['沪股通', '深股通', '合计'], bottom: 0 },
+                        grid: { top: 10, bottom: 40, left: 50, right: 10 },
+                        xAxis: { type: 'category', data: capitalFlow.northbound.trend.map((t: any) => t.time), axisLabel: { fontSize: 10, interval: Math.floor(capitalFlow.northbound.trend.length / 6) } },
+                        yAxis: { type: 'value', name: '亿元', axisLabel: { fontSize: 10 } },
+                        series: [
+                          { name: '沪股通', type: 'line', data: capitalFlow.northbound.trend.map((t: any) => t.sh), lineStyle: { width: 1.5 }, itemStyle: { color: '#1677ff' }, showSymbol: false },
+                          { name: '深股通', type: 'line', data: capitalFlow.northbound.trend.map((t: any) => t.sz), lineStyle: { width: 1.5 }, itemStyle: { color: '#52c41a' }, showSymbol: false },
+                          { name: '合计', type: 'line', data: capitalFlow.northbound.trend.map((t: any) => t.total), lineStyle: { width: 2 }, itemStyle: { color: '#ff4d4f' }, showSymbol: false },
+                        ],
+                      }}
+                      style={{ height: 200 }}
+                      opts={{ renderer: 'svg' }}
+                    />
+                  )}
                 </Card>
               </Col>
-            ))}
+            )}
+
+            {/* 主力资金行业流向 */}
+            {capitalFlow && (
+              <Col span={24}>
+                <Card
+                  title={<span style={{ fontWeight: 600 }}><BarChartOutlined style={{ marginRight: 8, color: '#faad14' }} />主力资金行业净流入</span>}
+                  size="small"
+                  style={{ borderRadius: 12 }}
+                >
+                  {capitalFlow.mainFlow?.length > 0 ? (
+                    <>
+                      <ReactECharts
+                        option={{
+                          tooltip: {
+                            trigger: 'axis',
+                            formatter: (params: any) => {
+                              const name = params[0]?.name || '';
+                              const lines = params.map((p: any) => `${p.seriesName}: ${p.value}亿`);
+                              return `${name}<br/>${lines.join('<br/>')}`;
+                            },
+                          },
+                          legend: { data: ['主力流入', '主力流出'], bottom: 0, textStyle: { fontSize: 11 } },
+                          grid: { top: 10, bottom: 30, left: 80, right: 20 },
+                          xAxis: { type: 'value', name: '亿元', axisLabel: { fontSize: 10 } },
+                          yAxis: {
+                            type: 'category',
+                            data: capitalFlow.mainFlow.slice(0, 8).map((f: any) => f.name).reverse(),
+                            axisLabel: { fontSize: 11 },
+                          },
+                          series: [
+                            {
+                              name: '主力流入',
+                              type: 'bar',
+                              stack: 'flow',
+                              data: capitalFlow.mainFlow.slice(0, 8).map((f: any) => {
+                                const net = parseFloat(f.mainNetInflow);
+                                return { value: net >= 0 ? net : 0, itemStyle: { color: '#cf1322' } };
+                              }).reverse(),
+                              barWidth: 16,
+                            },
+                            {
+                              name: '主力流出',
+                              type: 'bar',
+                              stack: 'flow',
+                              data: capitalFlow.mainFlow.slice(0, 8).map((f: any) => {
+                                const net = parseFloat(f.mainNetInflow);
+                                return { value: net < 0 ? Math.abs(net) : 0, itemStyle: { color: '#3f8600' } };
+                              }).reverse(),
+                              barWidth: 16,
+                            },
+                          ],
+                        }}
+                        style={{ height: 200 }}
+                        opts={{ renderer: 'svg' }}
+                      />
+                      <div style={{ textAlign: 'center', fontSize: 11, color: '#8c8c8c', marginTop: 4 }}>
+                        红色=净流入 | 绿色=净流出（基于涨跌幅估算）
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 40, color: '#8c8c8c' }}>暂无主力资金数据</div>
+                  )}
+                </Card>
+              </Col>
+            )}
           </Row>
-        </div>
-      </Card>
+        </Col>
+      </Row>
 
       {/* 快捷入口 */}
-      <Card title="快捷入口" style={{ marginBottom: 16 }}>
+      <Card title={<span style={{ fontWeight: 600 }}>快捷入口</span>} style={{ marginBottom: 20, borderRadius: 12 }}>
         <Row gutter={[16, 16]}>
           {quickEntries.map((entry) => (
             <Col xs={12} sm={8} md={6} key={entry.to}>
               <Link to={entry.to} style={{ textDecoration: 'none' }}>
                 <Card
                   hoverable
-                  style={{ background: `linear-gradient(135deg, ${entry.color} 0%, ${entry.color}99 100%)`, border: 'none', textAlign: 'center' }}
-                  styles={{ body: { padding: 20 } }}
+                  style={{ background: `linear-gradient(135deg, ${entry.color} 0%, ${entry.color}99 100%)`, border: 'none', textAlign: 'center', borderRadius: 12, overflow: 'hidden' }}
+                  styles={{ body: { padding: 24 } }}
                 >
-                  <div style={{ fontSize: 28, marginBottom: 8, color: 'white' }}>{entry.icon}</div>
-                  <div style={{ fontWeight: 600, color: 'white', fontSize: 15 }}>{entry.label}</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>{entry.desc}</div>
+                  <div style={{ fontSize: 32, marginBottom: 12, color: 'white', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>{entry.icon}</div>
+                  <div style={{ fontWeight: 700, color: 'white', fontSize: 16, marginBottom: 4 }}>{entry.label}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>{entry.desc}</div>
                 </Card>
               </Link>
             </Col>
@@ -276,21 +427,21 @@ export default function Home() {
 
       {/* 行业推荐 */}
       <Card
-        title="热门行业推荐"
+        title={<span style={{ fontWeight: 600 }}>热门行业推荐</span>}
         extra={<Link to="/funds" style={{ color: '#1677ff', fontSize: 13 }}>查看更多 →</Link>}
-        style={{ marginBottom: 16 }}
+        style={{ marginBottom: 20, borderRadius: 12 }}
       >
-        <Row gutter={16}>
-          {recommendations.slice(0, 4).map((rec) => (
+        <Row gutter={[16, 16]}>
+          {recommendations.slice(0, 6).map((rec) => (
             <Col xs={24} sm={12} key={rec.industry}>
-              <Card size="small" style={{ marginBottom: 12 }}>
+              <Card size="small" style={{ marginBottom: 0, borderRadius: 10, border: '1px solid #f0f0f0' }} hoverable>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <strong style={{ fontSize: 15 }}>{rec.industry}</strong>
-                  <Tag color={rec.buySuggestion === '优先配置' ? 'red' : rec.buySuggestion === '限大额配置' ? 'orange' : 'green'}>
+                  <strong style={{ fontSize: 16, color: '#1f1f1f' }}>{rec.industry}</strong>
+                  <Tag color={rec.buySuggestion === '优先配置' ? 'red' : rec.buySuggestion === '限大额配置' ? 'orange' : 'green'} style={{ borderRadius: 6, fontWeight: 500 }}>
                     {rec.buySuggestion}
                   </Tag>
                 </div>
-                <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>{rec.logic}</div>
+                <div style={{ fontSize: 13, color: '#595959', marginBottom: 12, lineHeight: 1.6 }}>{rec.logic}</div>
                 <Space size={8} wrap>
                   {rec.funds?.slice(0, 2).map((fund: any) => (
                     <Link
@@ -309,24 +460,24 @@ export default function Home() {
       </Card>
 
       {/* 估值温度计 */}
-      <Card title="市场估值温度计" style={{ marginBottom: 16 }}>
-        <Row gutter={16}>
+      <Card title={<span style={{ fontWeight: 600 }}>市场估值温度计</span>} style={{ marginBottom: 20, borderRadius: 12 }}>
+        <Row gutter={[16, 16]}>
           {indices.map((index) => (
             <Col xs={24} sm={12} key={index.code}>
-              <Card size="small" style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <strong>{index.name}</strong>
-                  <Tag color={index.valuation.includes('低') ? 'green' : index.valuation.includes('高') ? 'red' : 'blue'}>
+              <Card size="small" style={{ marginBottom: 0, borderRadius: 10, border: '1px solid #f0f0f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <strong style={{ fontSize: 15, color: '#1f1f1f' }}>{index.name}</strong>
+                  <Tag color={index.valuation.includes('低') ? 'green' : index.valuation.includes('高') ? 'red' : 'blue'} style={{ borderRadius: 6, fontWeight: 500 }}>
                     {index.valuation}
                   </Tag>
                 </div>
                 <ReactECharts
-                  option={getGaugeOption(index.name, index.pePercentile, index.valuation)}
-                  style={{ height: 200 }}
+                  option={getGaugeOption(index.name, index.pePercentile ?? 50, index.valuation)}
+                  style={{ height: 180 }}
                   opts={{ renderer: 'svg' }}
                 />
-                <div style={{ textAlign: 'center', fontSize: 12, color: '#666' }}>
-                  PE分位: {index.pePercentile}% | {index.suggestion}
+                <div style={{ textAlign: 'center', fontSize: 12, color: '#595959', marginTop: 4 }}>
+                  PE分位: <span style={{ fontWeight: 600, color: '#1677ff' }}>{index.pePercentile}%</span> | {index.suggestion}
                 </div>
               </Card>
             </Col>
@@ -335,11 +486,11 @@ export default function Home() {
       </Card>
 
       {/* 今日操作建议 */}
-      <Card title="今日操作建议">
-        <Row gutter={16}>
+      <Card title={<span style={{ fontWeight: 600 }}>今日操作建议</span>} style={{ marginBottom: 20, borderRadius: 12 }}>
+        <Row gutter={[16, 16]}>
           <Col xs={24} sm={8}>
-            <Card size="small" style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
-              <h4 style={{ color: '#52c41a', marginBottom: 8, fontSize: 14 }}>适合买入</h4>
+            <Card size="small" style={{ background: 'linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%)', border: '1px solid #b7eb8f', borderRadius: 10 }}>
+              <h4 style={{ color: '#52c41a', marginBottom: 8, fontSize: 15 }}>适合买入</h4>
               <ul style={{ fontSize: 13, lineHeight: 2, margin: 0, paddingLeft: 16 }}>
                 <li>医药指数基金（估值极低）</li>
                 <li>新能源基金（底部反弹）</li>
@@ -348,8 +499,8 @@ export default function Home() {
             </Card>
           </Col>
           <Col xs={24} sm={8}>
-            <Card size="small" style={{ background: '#fffbe6', border: '1px solid #ffe58f' }}>
-              <h4 style={{ color: '#faad14', marginBottom: 8, fontSize: 14 }}>观望等待</h4>
+            <Card size="small" style={{ background: 'linear-gradient(135deg, #fffbe6 0%, #fff1b8 100%)', border: '1px solid #ffe58f', borderRadius: 10 }}>
+              <h4 style={{ color: '#faad14', marginBottom: 8, fontSize: 15 }}>观望等待</h4>
               <ul style={{ fontSize: 13, lineHeight: 2, margin: 0, paddingLeft: 16 }}>
                 <li>AI/人工智能（估值偏高）</li>
                 <li>半导体（等待回调）</li>
@@ -358,8 +509,8 @@ export default function Home() {
             </Card>
           </Col>
           <Col xs={24} sm={8}>
-            <Card size="small" style={{ background: '#fff1f0', border: '1px solid #ffa39e' }}>
-              <h4 style={{ color: '#ff4d4f', marginBottom: 8, fontSize: 14 }}>谨慎持有</h4>
+            <Card size="small" style={{ background: 'linear-gradient(135deg, #fff1f0 0%, #ffccc7 100%)', border: '1px solid #ffa39e', borderRadius: 10 }}>
+              <h4 style={{ color: '#ff4d4f', marginBottom: 8, fontSize: 15 }}>谨慎持有</h4>
               <ul style={{ fontSize: 13, lineHeight: 2, margin: 0, paddingLeft: 16 }}>
                 <li>地产基金（政策风险）</li>
                 <li>白酒（估值偏高）</li>

@@ -36,16 +36,15 @@ export default function QDIIFunds() {
 
   useEffect(() => {
     loadQDIIFunds();
+    const interval = setInterval(loadQDIIFunds, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadQDIIFunds = async () => {
     setLoading(true);
     try {
-      const data = await fundApi.getFunds();
-      const qdiiFunds = data.filter((f: Fund) =>
-        f.industry === '纳斯达克100' || f.industry === '标普500' || f.type === 'QDII'
-      );
-      setFunds(qdiiFunds);
+      const data = await fundApi.getQDIIFunds();
+      setFunds(data);
     } catch (error) {
       console.error('加载QDII基金失败:', error);
     } finally {
@@ -87,6 +86,7 @@ export default function QDIIFunds() {
       title: '每日限额',
       dataIndex: 'dailyLimit',
       key: 'dailyLimit',
+      defaultSortOrder: 'descend' as const,
       sorter: (a: Fund, b: Fund) => (a.dailyLimit ?? 0) - (b.dailyLimit ?? 0),
       render: (v: number) => (
         <span style={{ fontWeight: 600, color: v === 0 ? '#999' : v <= 10 ? '#ff4d4f' : '#faad14' }}>

@@ -13,6 +13,8 @@ export default function HS300Analysis() {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(loadData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {

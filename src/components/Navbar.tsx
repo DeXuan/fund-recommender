@@ -1,18 +1,22 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Layout, Menu, Button, Drawer, Grid } from 'antd';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Layout, Menu, Button, Drawer, Grid, Dropdown, Avatar, Space, Badge } from 'antd';
 import {
   HomeOutlined,
   FundOutlined,
   GlobalOutlined,
-  SwapOutlined,
   SafetyOutlined,
   CalculatorOutlined,
   LineChartOutlined,
   MenuOutlined,
   StockOutlined,
   BarChartOutlined,
+  UserOutlined,
+  LogoutOutlined,
+  AccountBookOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
+import { useAuth } from '../contexts/AuthContext';
 
 const { useBreakpoint } = Grid;
 
@@ -20,81 +24,172 @@ const navItems = [
   { key: '/', label: '首页', icon: <HomeOutlined /> },
   { key: '/funds', label: '基金列表', icon: <FundOutlined /> },
   { key: '/industry', label: '行业分析', icon: <BarChartOutlined /> },
+  { key: '/market', label: '市场分析', icon: <LineChartOutlined /> },
   { key: '/hs300', label: '沪深300', icon: <StockOutlined /> },
   { key: '/qdii', label: 'QDII基金', icon: <GlobalOutlined /> },
-  { key: '/compare', label: '基金对比', icon: <SwapOutlined /> },
   { key: '/risk-assessment', label: '风险评估', icon: <SafetyOutlined /> },
   { key: '/dca-calculator', label: '定投计算器', icon: <CalculatorOutlined /> },
-  { key: '/market', label: '市场分析', icon: <LineChartOutlined /> },
 ];
 
 export default function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const screens = useBreakpoint();
   const isMobile = !screens.md;
+  const { user, logout } = useAuth();
 
-  const menuItems = navItems.map((item) => ({
+  const allNavItems = [
+    ...navItems,
+    ...(user ? [{ key: '/portfolio', label: '理财记账', icon: <AccountBookOutlined /> }] : []),
+  ];
+
+  const menuItems = allNavItems.map((item) => ({
     ...item,
     label: <Link to={item.key}>{item.label}</Link>,
   }));
 
-  const selectedKey = navItems.find(
+  const selectedKey = allNavItems.find(
     (item) => item.key === '/' ? location.pathname === '/' : location.pathname.startsWith(item.key)
   )?.key || '/';
 
   return (
     <Layout.Header
       style={{
-        background: '#fff',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        background: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(10px)',
+        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02)',
         position: 'sticky',
         top: 0,
-        zIndex: 100,
-        padding: '0 20px',
-        height: 60,
-        lineHeight: '60px',
+        zIndex: 1000,
+        padding: '0 24px',
+        height: 64,
+        lineHeight: '64px',
+        borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
       }}
     >
       <div style={{ maxWidth: 1800, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%' }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-          <StockOutlined style={{ fontSize: 24, color: '#1677ff' }} />
-          <span style={{ fontWeight: 600, fontSize: 18, color: '#1677ff', whiteSpace: 'nowrap' }}>基金推荐助手</span>
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+          <div style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(22, 119, 255, 0.3)',
+          }}>
+            <StockOutlined style={{ fontSize: 20, color: '#fff' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontWeight: 700, fontSize: 17, color: '#1677ff', lineHeight: 1.2, whiteSpace: 'nowrap' }}>基金推荐助手</span>
+            <span style={{ fontSize: 11, color: '#8c8c8c', lineHeight: 1.2 }}>智能投资分析平台</span>
+          </div>
         </Link>
 
         {isMobile ? (
-          <Button
-            type="text"
-            icon={<MenuOutlined />}
-            onClick={() => setDrawerOpen(true)}
-            style={{ fontSize: 18 }}
-          />
+          <Space size={12}>
+            {user ? (
+              <Dropdown menu={{
+                items: [
+                  { key: 'portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
+                  { type: 'divider' as const },
+                  { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
+                ],
+                onClick: ({ key }) => {
+                  if (key === 'logout') { logout(); navigate('/'); }
+                  if (key === 'portfolio') navigate('/portfolio');
+                },
+              }}>
+                <Avatar size="small" icon={<UserOutlined />} src={user.avatar_url} style={{ cursor: 'pointer', background: '#1677ff' }} />
+              </Dropdown>
+            ) : (
+              <Link to="/login"><Button type="primary" size="small" icon={<UserOutlined />}>登录</Button></Link>
+            )}
+            <Button
+              type="text"
+              icon={<MenuOutlined />}
+              onClick={() => setDrawerOpen(true)}
+              style={{ fontSize: 18, color: '#595959' }}
+            />
+          </Space>
         ) : (
-          <Menu
-            mode="horizontal"
-            selectedKeys={[selectedKey]}
-            items={menuItems}
-            style={{ border: 'none', flex: 1, justifyContent: 'flex-end' }}
-          />
+          <>
+            <Menu
+              mode="horizontal"
+              selectedKeys={[selectedKey]}
+              items={menuItems}
+              style={{
+                border: 'none',
+                flex: 1,
+                justifyContent: 'flex-end',
+                background: 'transparent',
+                fontSize: 14,
+              }}
+            />
+            <Space size={16} style={{ marginLeft: 16 }}>
+              {user ? (
+                <Dropdown menu={{
+                  items: [
+                    { key: 'portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
+                    { type: 'divider' as const },
+                    { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
+                  ],
+                  onClick: ({ key }) => {
+                    if (key === 'logout') { logout(); navigate('/'); }
+                    if (key === 'portfolio') navigate('/portfolio');
+                  },
+                }}>
+                  <Space style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 8, transition: 'background 0.2s' }}>
+                    <Avatar size="small" icon={<UserOutlined />} src={user.avatar_url} style={{ background: '#1677ff' }} />
+                    <span style={{ color: '#1f1f1f', fontWeight: 500, fontSize: 14 }}>{user.nickname || user.username}</span>
+                  </Space>
+                </Dropdown>
+              ) : (
+                <Link to="/login">
+                  <Button type="primary" icon={<UserOutlined />} style={{ borderRadius: 8 }}>
+                    登录
+                  </Button>
+                </Link>
+              )}
+            </Space>
+          </>
         )}
       </div>
 
       <Drawer
-        title="导航"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <StockOutlined style={{ color: '#1677ff' }} />
+            <span>导航菜单</span>
+          </div>
+        }
         placement="right"
         onClose={() => setDrawerOpen(false)}
         open={drawerOpen}
-        width={240}
+        width={280}
+        styles={{
+          header: { borderBottom: '1px solid #f0f0f0' },
+          body: { padding: 0 },
+        }}
       >
         <Menu
           mode="inline"
           selectedKeys={[selectedKey]}
-          items={navItems.map((item) => ({
+          items={allNavItems.map((item) => ({
             ...item,
             label: <Link to={item.key} onClick={() => setDrawerOpen(false)}>{item.label}</Link>,
           }))}
           style={{ border: 'none' }}
         />
+        {user && (
+          <div style={{ padding: '16px 24px', borderTop: '1px solid #f0f0f0' }}>
+            <Button block icon={<LogoutOutlined />} onClick={() => { logout(); navigate('/'); setDrawerOpen(false); }} danger>
+              退出登录
+            </Button>
+          </div>
+        )}
       </Drawer>
     </Layout.Header>
   );

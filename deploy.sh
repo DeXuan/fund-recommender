@@ -58,7 +58,9 @@ rsync -avz --delete dist/ ${REMOTE_DIR}/dist/
 
 # 上传后端代码
 info "  上传 server/..."
-rsync -avz server/index.cjs server/fund-data.cjs ${REMOTE_DIR}/server/
+rsync -avz server/index.cjs server/db.cjs server/fund-service.cjs server/fund-data.cjs server/auth.cjs server/portfolio.cjs server/data-fetcher.cjs ${REMOTE_DIR}/server/
+rsync -avz server/utils/ ${REMOTE_DIR}/server/utils/
+rsync -avz server/routes/ ${REMOTE_DIR}/server/routes/
 
 # 上传 package.json（后端依赖）
 info "  上传 package.json..."
@@ -93,6 +95,17 @@ fi
 # 启动/重启后端服务
 echo "[远程] 配置 PM2 后端服务..."
 cd "$DEPLOY_DIR"
+
+# 检查 .env 文件是否存在
+if [ ! -f ".env" ]; then
+    echo "[远程] 警告: .env 文件不存在，请手动创建"
+    echo "[远程] 参考 DEPLOY.md 中的数据库配置章节"
+else
+    # 确保 .env 文件权限安全（仅 owner 可读写）
+    chmod 600 .env
+    echo "[远程] .env 文件权限已设置为 600"
+fi
+
 pm2 delete fund-server 2>/dev/null || true
 pm2 start server/index.cjs --name fund-server --cwd "$DEPLOY_DIR"
 pm2 save

@@ -50,13 +50,22 @@ interface AnalysisData {
 }
 
 const INDUSTRIES = [
+  // 夏季投资主线
+  { key: '电力', icon: '💡', label: '电力', tag: '夏季' },
+  { key: '水电', icon: '🌊', label: '水电', tag: '夏季' },
+  { key: '煤炭', icon: '⛏️', label: '煤炭', tag: '夏季' },
+  { key: '啤酒/饮料', icon: '🍺', label: '啤酒/饮料', tag: '夏季' },
+  { key: '家电', icon: '❄️', label: '家电', tag: '夏季' },
+  // 其他行业
   { key: '医药', icon: '💊', label: '医药' },
   { key: '人工智能', icon: '🤖', label: '人工智能' },
   { key: '半导体/芯片', icon: '🔬', label: '半导体' },
+  { key: '证券', icon: '📈', label: '证券' },
   { key: '新能源', icon: '⚡', label: '新能源' },
   { key: '消费', icon: '🛒', label: '消费' },
   { key: '军工', icon: '🚀', label: '军工' },
   { key: '金融', icon: '🏦', label: '金融' },
+  { key: '陶瓷/建材', icon: '🏗️', label: '陶瓷/建材' },
 ];
 
 export default function IndustryAnalysis() {
@@ -148,16 +157,33 @@ export default function IndustryAnalysis() {
       {/* 行业选择器 */}
       <div className="card" style={{ padding: 16 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {INDUSTRIES.map((ind) => (
-            <button
-              key={ind.key}
-              onClick={() => { setSelectedIndustry(ind.key); setActiveTab('compare'); }}
-              className={`btn ${selectedIndustry === ind.key ? 'btn-primary' : 'btn-outline'}`}
-              style={{ fontSize: 14, padding: '8px 20px' }}
-            >
-              {ind.icon} {ind.label}
-            </button>
-          ))}
+          {INDUSTRIES.map((ind, idx) => {
+            const isFirstNonSummer = idx === 5;
+            return (
+              <span key={ind.key} style={{ display: 'contents' }}>
+                {isFirstNonSummer && (
+                  <div style={{ width: '100%', height: 0, borderTop: '1px dashed #e8e8e8', margin: '4px 0' }} />
+                )}
+                <button
+                  onClick={() => { setSelectedIndustry(ind.key); setActiveTab('compare'); }}
+                  className={`btn ${selectedIndustry === ind.key ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ fontSize: 14, padding: '8px 20px', position: 'relative' }}
+                >
+                  {ind.icon} {ind.label}
+                  {ind.tag && (
+                    <span style={{
+                      position: 'absolute', top: -6, right: -6,
+                      background: '#ff4d4f', color: 'white',
+                      fontSize: 9, padding: '1px 4px', borderRadius: 6,
+                      fontWeight: 700,
+                    }}>
+                      {ind.tag}
+                    </span>
+                  )}
+                </button>
+              </span>
+            );
+          })}
         </div>
       </div>
 
@@ -300,7 +326,7 @@ export default function IndustryAnalysis() {
                           </span>
                         </td>
                         <td style={{ fontSize: 12 }}>{fund.index}</td>
-                        <td style={{ fontFamily: 'monospace' }}>{fund.nav.toFixed(4)}</td>
+                        <td style={{ fontFamily: 'monospace' }}>{fund.nav != null ? fund.nav.toFixed(4) : '-'}</td>
                         <td style={{ fontWeight: 600 }}>{formatReturn(fund.return1y)}</td>
                         <td>{formatReturn(fund.return6m)}</td>
                         <td>{formatReturn(fund.return3m)}</td>

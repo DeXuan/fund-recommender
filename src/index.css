@@ -1,16 +1,63 @@
+/* 大厂风格设计系统 - 基金推荐助手 */
 :root {
+  /* 主色调 - 金融蓝 */
   --primary: #1677ff;
-  --primary-dark: #0958d9;
+  --primary-hover: #4096ff;
+  --primary-active: #0958d9;
+  --primary-bg: #e6f4ff;
+  --primary-border: #91caff;
+
+  /* 功能色 */
   --success: #52c41a;
+  --success-bg: #f6ffed;
+  --success-border: #b7eb8f;
   --warning: #faad14;
+  --warning-bg: #fffbe6;
+  --warning-border: #ffe58f;
   --danger: #ff4d4f;
+  --danger-bg: #fff2f0;
+  --danger-border: #ffccc7;
+  --info: #1677ff;
+  --info-bg: #e6f4ff;
+  --info-border: #91caff;
+
+  /* 中国A股习惯：涨红跌绿 */
   --rise: #ff4d4f;
   --fall: #52c41a;
-  --text: #333;
-  --text-secondary: #666;
-  --bg: #f5f5f5;
-  --card-bg: #fff;
-  --border: #e8e8e8;
+
+  /* 中性色 */
+  --text-primary: #1f1f1f;
+  --text-secondary: #595959;
+  --text-tertiary: #8c8c8c;
+  --text-quaternary: #bfbfbf;
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #fafafa;
+  --bg-container: #ffffff;
+  --border-color: #e8e8e8;
+  --border-color-light: #f0f0f0;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 3px 6px -4px rgba(0, 0, 0, 0.05), 0 6px 16px 0 rgba(0, 0, 0, 0.04), 0 9px 28px 8px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 6px 16px -8px rgba(0, 0, 0, 0.08), 0 9px 28px 0 rgba(0, 0, 0, 0.05), 0 12px 48px 16px rgba(0, 0, 0, 0.03);
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* 间距 */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* 字体 */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
 }
 
 * {
@@ -19,145 +66,258 @@
   box-sizing: border-box;
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.6;
+html {
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* 中国A股习惯：涨红跌绿 */
+body {
+  font-family: var(--font-family);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5714;
+  min-height: 100vh;
+}
+
+/* 全局滚动条美化 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d9d9d9;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #bfbfbf;
+}
+
+/* 涨跌颜色 */
 .rise {
-  color: #ff4d4f !important;
+  color: var(--rise) !important;
+  font-weight: 600;
 }
 
 .fall {
-  color: #52c41a !important;
+  color: var(--fall) !important;
+  font-weight: 600;
 }
 
-/* Legacy utility classes for pages not yet migrated to Ant Design */
+/* 卡片组件 - 大厂风格 */
 .card {
-  background: var(--card-bg);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 16px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  background: var(--bg-container);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color-light);
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .card-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  margin-bottom: 16px;
-  color: var(--text);
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
+/* 按钮组件 */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--space-sm);
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  border: none;
-  transition: all 0.2s;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  line-height: 1.5714;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn:active {
+  transform: scale(0.98);
 }
 
 .btn-primary {
   background: var(--primary);
   color: white;
+  border-color: var(--primary);
+  box-shadow: 0 2px 0 rgba(5, 145, 255, 0.1);
 }
 
 .btn-primary:hover {
-  background: var(--primary-dark);
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .btn-outline {
   background: transparent;
-  border: 1px solid var(--primary);
+  border-color: var(--primary);
   color: var(--primary);
 }
 
 .btn-outline:hover {
-  background: var(--primary);
-  color: white;
+  background: var(--primary-bg);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
+/* 表格组件 - 大厂风格 */
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .table th,
 .table td {
-  padding: 12px;
+  padding: 12px 16px;
   text-align: left;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-color-light);
+  transition: background 0.2s ease;
 }
 
 .table th {
-  background: #fafafa;
+  background: var(--bg-secondary);
   font-weight: 600;
   font-size: 13px;
   color: var(--text-secondary);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.table th[style*="cursor: pointer"] {
+  user-select: none;
+}
+
+.table th[style*="cursor: pointer"]:hover {
+  background: #e6e6e6;
+}
+
+.table tbody tr {
+  transition: background 0.15s ease;
 }
 
 .table tbody tr:hover {
-  background: #f5f5f5;
+  background: var(--primary-bg);
 }
 
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 标签组件 */
 .badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
 }
 
 .badge-success {
-  background: #f6ffed;
+  background: var(--success-bg);
   color: var(--success);
-  border: 1px solid #b7eb8f;
+  border: 1px solid var(--success-border);
 }
 
 .badge-warning {
-  background: #fffbe6;
+  background: var(--warning-bg);
   color: var(--warning);
-  border: 1px solid #ffe58f;
+  border: 1px solid var(--warning-border);
 }
 
 .badge-danger {
-  background: #fff2f0;
+  background: var(--danger-bg);
   color: var(--danger);
-  border: 1px solid #ffccc7;
+  border: 1px solid var(--danger-border);
 }
 
+.badge-info {
+  background: var(--info-bg);
+  color: var(--info);
+  border: 1px solid var(--info-border);
+}
+
+/* 标签 */
 .tag {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
-  margin: 2px;
-  background: #f0f0f0;
+  font-weight: 500;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.tag:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-bg);
 }
 
 .tag-active {
   background: var(--primary);
   color: white;
+  border-color: var(--primary);
 }
 
+.tag-active:hover {
+  background: var(--primary-hover);
+  color: white;
+  border-color: var(--primary-hover);
+}
+
+/* 评分 */
 .rating {
   color: #faad14;
-  font-size: 16px;
+  font-size: 14px;
+  letter-spacing: 1px;
 }
 
+/* 辅助类 */
 .text-muted {
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
 }
 
 .text-center {
   text-align: center;
+}
+
+.text-right {
+  text-align: right;
 }
 
 .flex-between {
@@ -166,9 +326,24 @@ body {
   align-items: center;
 }
 
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.gap-sm {
+  gap: var(--space-sm);
+}
+
+.gap-md {
+  gap: var(--space-md);
+}
+
+/* 进度条 */
 .progress-bar {
   height: 8px;
-  background: var(--border);
+  background: var(--border-color-light);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -177,50 +352,244 @@ body {
   height: 100%;
   background: var(--primary);
   border-radius: 4px;
-  transition: width 0.3s;
+  transition: width 0.3s ease;
 }
 
+/* 链接样式 */
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--primary-hover);
+}
+
+/* 表单样式优化 */
+.ant-input:focus,
+.ant-input-focused,
+.ant-input:hover,
+.ant-select-focused .ant-select-selector,
+.ant-picker-focused .ant-picker-input > input {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1) !important;
+}
+
+/* 按钮点击效果 */
+.ant-btn:active {
+  transform: scale(0.98);
+}
+
+/* 卡片 hover 效果 */
+.ant-card-hoverable:hover {
+  border-color: var(--primary-border);
+  box-shadow: var(--shadow-md);
+}
+
+/* 表格行 hover */
+.ant-table-tbody > tr:hover > td {
+  background: var(--primary-bg) !important;
+}
+
+/* Tabs 样式 */
+.ant-tabs-tab {
+  transition: all 0.2s ease;
+}
+
+.ant-tabs-tab:hover {
+  color: var(--primary);
+}
+
+.ant-tabs-tab-active .ant-tabs-tab-btn {
+  font-weight: 600;
+}
+
+/* 响应式布局 */
 @media (max-width: 768px) {
   .table {
     display: block;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .card {
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+  }
+
+  .card-title {
+    font-size: 15px;
   }
 }
 
 /* 大屏适配 1920x1080 */
 @media (min-width: 1600px) {
+  html {
+    font-size: 15px;
+  }
+
   .card {
-    padding: 24px;
+    padding: var(--space-xl);
   }
 
   .table th,
   .table td {
-    padding: 14px 16px;
+    padding: 14px 18px;
     font-size: 14px;
-  }
-
-  .card-title {
-    font-size: 20px;
   }
 }
 
 @media (min-width: 1920px) {
-  .card {
-    padding: 28px;
+  html {
+    font-size: 16px;
   }
 
-  .table th,
-  .table td {
-    padding: 16px 18px;
+  .card {
+    padding: var(--space-2xl);
   }
 }
 
 /* 基金对比 - 分组行样式 */
 .compare-group-row td {
-  background: #f0f5ff !important;
-  border-bottom: 2px solid #1677ff !important;
+  background: var(--primary-bg) !important;
+  border-bottom: 2px solid var(--primary) !important;
+  font-weight: 600;
 }
 
 .compare-group-row td:first-child {
-  border-left: 3px solid #1677ff;
+  border-left: 3px solid var(--primary);
+}
+
+/* 基金对比 - 冻结首行（类似Excel冻结窗格） */
+.compare-table-scroll {
+  max-height: 600px;
+  overflow: auto;
+}
+
+.compare-table-scroll .ant-table {
+  min-width: 600px;
+}
+
+.compare-table-scroll .ant-table-content {
+  overflow: visible !important;
+}
+
+/* 冻结表头 */
+.compare-table-scroll .ant-table-thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.compare-table-scroll .ant-table-thead th {
+  background: #fafafa !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 加载动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* 骨架屏动画 */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 37%, #f0f0f0 63%);
+  background-size: 200px 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* 数字滚动效果 */
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.count-up {
+  animation: countUp 0.4s ease forwards;
+}
+
+/* 页面过渡 */
+.page-enter {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: all 0.3s ease;
+}
+
+/* 渐变背景 */
+.gradient-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.gradient-success {
+  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+}
+
+.gradient-warning {
+  background: linear-gradient(135deg, #faad14 0%, #ffc53d 100%);
+}
+
+.gradient-danger {
+  background: linear-gradient(135deg, #ff4d4f 0%, #ff7875 100%);
+}
+
+/* 玻璃态效果 */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* 暗色模式支持（预留） */
+@media (prefers-color-scheme: dark) {
+  /* 暗色模式变量 - 暂未启用 */
+}
+
+/* 打印样式 */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    color: black;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
 }
