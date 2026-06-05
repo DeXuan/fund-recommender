@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Card, Input, Select, Table, Tag, Button, Space, Spin, AutoComplete, Alert, Row, Col, Tooltip } from 'antd';
-import { SearchOutlined, SwapOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { Card, Input, Select, Table, Tag, Button, Space, Spin, AutoComplete, Alert, Row, Col, Tooltip, message } from 'antd';
+import { SearchOutlined, SwapOutlined, CloseCircleOutlined, StarOutlined, StarFilled } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
-import { fundApi } from '../services/api';
+import { fundApi, watchlistApi } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { formatReturn, getReturnColor, getValuationText } from '../utils/format';
 
 interface Fund {
@@ -49,6 +50,7 @@ interface Fund {
 }
 
 export default function FundList() {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const initialCodes = (searchParams.get('codes')?.split(',') || [])
     .filter(code => /^\d{6}$/.test(code));
@@ -61,6 +63,38 @@ export default function FundList() {
   const [goldOnly, setGoldOnly] = useState(false);
   const [industries, setIndustries] = useState<string[]>([]);
 
+  // 多因子筛选状态
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterReturn1y, setFilterReturn1y] = useState<string>('');
+  const [filterScaleMin, setFilterScaleMin] = useState<string>('');
+  const [filterScaleMax, setFilterScaleMax] = useState<string>('');
+  const [filterFeeMax, setFilterFeeMax] = useState<string>('');
+
+  // 自选基金状态
+  const [watchedCodes, setWatchedCodes] = useState<Set<string>>(new Set());
+
+  // 多因子筛选后的基金列表
+  const filteredFunds = useMemo(() => {
+    let list = goldOnly ? funds.filter(f => f.isGoldSelected) : funds;
+    if (filterReturn1y) {
+      const minReturn = parseFloat(filterReturn1y);
+      if (!isNaN(minReturn)) list = list.filter(f => (f.return1y ?? 0) >= minReturn);
+    }
+    if (filterScaleMin) {
+      const min = parseFloat(filterScaleMin);
+      if (!isNaN(min)) list = list.filter(f => (f.scale ?? 0) >= min);
+    }
+    if (filterScaleMax) {
+      const max = parseFloat(filterScaleMax);
+      if (!isNaN(max)) list = list.filter(f => (f.scale ?? 0) <= max);
+    }
+    if (filterFeeMax) {
+      const max = parseFloat(filterFeeMax);
+      if (!isNaN(max)) list = list.filter(f => (f.totalFee ?? 0) <= max);
+    }
+    return list;
+  }, [funds, goldOnly, filterReturn1y, filterScaleMin, filterScaleMax, filterFeeMax]);
+
   // 对比功能状态
   const [selectedCodes, setSelectedCodes] = useState<string[]>(initialCodes);
   const [compareData, setCompareData] = useState<Fund[]>([]);
@@ -69,13 +103,16 @@ export default function FundList() {
   const [showCompare, setShowCompare] = useState(false);
   const [compareSearchCode, setCompareSearchCode] = useState('');
   const [allFunds, setAllFunds] = useState<Fund[]>([]);
+  const [navHistory, setNavHistory] = useState<Record<string, any[]>>({});
+  const [navHistoryLoading, setNavHistoryLoading] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadIndustries();
     loadFunds();
     loadAllFunds();
-  }, []);
+    if (user) loadWatchlist();
+  }, [user]);
 
   useEffect(() => {
     loadFunds();
@@ -91,9 +128,11 @@ export default function FundList() {
   useEffect(() => {
     if (showCompare && selectedCodes.length > 0) {
       loadCompareData();
+      loadNavHistory();
     } else {
       setCompareData([]);
       setCompareError(null);
+      setNavHistory({});
     }
   }, [selectedCodes, showCompare]);
 
@@ -133,6 +172,31 @@ export default function FundList() {
     }
   };
 
+  const loadWatchlist = async () => {
+    try {
+      const data = await watchlistApi.getList();
+      setWatchedCodes(new Set(data.map((d: any) => d.fund_code)));
+    } catch { /* ignore */ }
+  };
+
+  const toggleWatch = async (fund: Fund) => {
+    if (!user) { message.warning('请先登录'); return; }
+    const isWatched = watchedCodes.has(fund.code);
+    try {
+      if (isWatched) {
+        await watchlistApi.remove(fund.code);
+        setWatchedCodes(prev => { const s = new Set(prev); s.delete(fund.code); return s; });
+        message.success('已移除自选');
+      } else {
+        await watchlistApi.add(fund.code, fund.name);
+        setWatchedCodes(prev => new Set(prev).add(fund.code));
+        message.success('已添加自选');
+      }
+    } catch {
+      message.error('操作失败');
+    }
+  };
+
   const loadCompareData = async () => {
     if (selectedCodes.length === 0) return;
     setCompareLoading(true);
@@ -146,6 +210,19 @@ export default function FundList() {
       setCompareError('加载对比数据失败，请检查基金代码是否正确');
     } finally {
       setCompareLoading(false);
+    }
+  };
+
+  const loadNavHistory = async () => {
+    if (selectedCodes.length === 0) return;
+    setNavHistoryLoading(true);
+    try {
+      const data = await fundApi.compareNavHistory(selectedCodes);
+      setNavHistory(data);
+    } catch {
+      setNavHistory({});
+    } finally {
+      setNavHistoryLoading(false);
     }
   };
 
@@ -192,6 +269,63 @@ export default function FundList() {
         label: `${f.code} - ${f.name} (${f.industry})`,
       }));
   }, [compareSearchCode, allFunds]);
+
+  // 净值走势对比图
+  const navChartOption = useMemo(() => {
+    const codes = Object.keys(navHistory);
+    if (codes.length === 0) return null;
+    // Collect all dates
+    const allDates = new Set<string>();
+    codes.forEach(code => navHistory[code]?.forEach(d => allDates.add(d.date)));
+    const sortedDates = Array.from(allDates).sort();
+    if (sortedDates.length < 2) return null;
+    const colors = ['#1677ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1'];
+    return {
+      tooltip: {
+        trigger: 'axis' as const,
+        formatter: (params: any) => {
+          let html = `${params[0]?.axisValue}<br/>`;
+          params.forEach((p: any) => {
+            html += `${p.marker} ${p.seriesName}: ${p.value}%<br/>`;
+          });
+          return html;
+        },
+      },
+      legend: {
+        data: codes.map(c => {
+          const fund = compareData.find(f => f.code === c) || allFunds.find(f => f.code === c);
+          return fund?.name || c;
+        }),
+        bottom: 0,
+        type: 'scroll' as const,
+      },
+      grid: { top: 20, right: 20, bottom: 40, left: 60 },
+      xAxis: {
+        type: 'category' as const,
+        data: sortedDates,
+        axisLabel: { fontSize: 10, interval: Math.floor(sortedDates.length / 8) },
+      },
+      yAxis: {
+        type: 'value' as const,
+        axisLabel: { formatter: '{value}%', fontSize: 10 },
+        splitLine: { lineStyle: { type: 'dashed' as const } },
+      },
+      series: codes.map((code, i) => {
+        const fund = compareData.find(f => f.code === code) || allFunds.find(f => f.code === code);
+        const dataMap = new Map(navHistory[code]?.map(d => [d.date, d.return_pct]));
+        return {
+          name: fund?.name || code,
+          type: 'line' as const,
+          data: sortedDates.map(d => dataMap.get(d) ?? null),
+          connectNulls: true,
+          smooth: true,
+          lineStyle: { width: 2 },
+          itemStyle: { color: colors[i % colors.length] },
+          showSymbol: false,
+        };
+      }),
+    };
+  }, [navHistory, compareData, allFunds]);
 
   // 图表配置
   const compareChartOption = useMemo(() => {
@@ -400,6 +534,16 @@ export default function FundList() {
       key: 'name',
       render: (name: string, record: Fund) => (
         <Space>
+          {user && (
+            <span
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWatch(record); }}
+              style={{ cursor: 'pointer', fontSize: 15 }}
+            >
+              {watchedCodes.has(record.code)
+                ? <StarFilled style={{ color: '#faad14' }} />
+                : <StarOutlined style={{ color: '#d9d9d9' }} />}
+            </span>
+          )}
           <Link to={`/funds/${record.code}`} style={{ color: '#333', fontWeight: 500 }}>{name}</Link>
           {record.isGoldSelected && <Tag color="gold" style={{ fontSize: 11 }}>金选</Tag>}
         </Space>
@@ -499,6 +643,21 @@ export default function FundList() {
           >
             {goldOnly ? '★ 仅看金选' : '☆ 金选基金'}
           </Button>
+          <Button
+            type={showFilters ? 'primary' : 'default'}
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            多因子筛选
+          </Button>
+          {(filterReturn1y || filterScaleMin || filterScaleMax || filterFeeMax) && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => { setFilterReturn1y(''); setFilterScaleMin(''); setFilterScaleMax(''); setFilterFeeMax(''); }}
+            >
+              清除筛选
+            </Button>
+          )}
           {selectedCodes.length >= 2 && !showCompare && (
             <Button type="primary" icon={<SwapOutlined />} onClick={startCompare}>
               开始对比 ({selectedCodes.length}只)
@@ -511,7 +670,56 @@ export default function FundList() {
       </Card>
 
       <Card>
-        {goldOnly && (
+        {showFilters && (
+          <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: 8, display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+            <span style={{ fontWeight: 600, fontSize: 13, color: '#333' }}>筛选条件：</span>
+            <div>
+              <span style={{ fontSize: 12, color: '#666', marginRight: 4 }}>近1年收益 ≥</span>
+              <Input
+                size="small"
+                style={{ width: 80 }}
+                placeholder="如 20"
+                value={filterReturn1y}
+                onChange={e => setFilterReturn1y(e.target.value)}
+                suffix="%"
+              />
+            </div>
+            <div>
+              <span style={{ fontSize: 12, color: '#666', marginRight: 4 }}>规模</span>
+              <Input
+                size="small"
+                style={{ width: 70 }}
+                placeholder="最小"
+                value={filterScaleMin}
+                onChange={e => setFilterScaleMin(e.target.value)}
+              />
+              <span style={{ margin: '0 4px', color: '#999' }}>-</span>
+              <Input
+                size="small"
+                style={{ width: 70 }}
+                placeholder="最大"
+                value={filterScaleMax}
+                onChange={e => setFilterScaleMax(e.target.value)}
+                suffix="亿"
+              />
+            </div>
+            <div>
+              <span style={{ fontSize: 12, color: '#666', marginRight: 4 }}>综合费率 ≤</span>
+              <Input
+                size="small"
+                style={{ width: 80 }}
+                placeholder="如 0.6"
+                value={filterFeeMax}
+                onChange={e => setFilterFeeMax(e.target.value)}
+                suffix="%"
+              />
+            </div>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+              筛选结果 <strong style={{ color: '#1677ff' }}>{filteredFunds.length}</strong> 只
+            </span>
+          </div>
+        )}
+        {goldOnly && !showFilters && (
           <div style={{ marginBottom: 12, fontSize: 13, color: '#666' }}>
             ★ 金选基金 <span style={{ fontWeight: 600, color: '#faad14' }}>{funds.filter(f => f.isGoldSelected).length}</span> 只
             （共 {funds.length} 只基金）
@@ -519,7 +727,7 @@ export default function FundList() {
         )}
         <Table
           columns={columns}
-          dataSource={goldOnly ? funds.filter(f => f.isGoldSelected) : funds}
+          dataSource={filteredFunds}
           rowKey="code"
           loading={loading}
           size="middle"
@@ -616,6 +824,19 @@ export default function FundList() {
               {compareChartOption && (
                 <Card title="收益对比" style={{ marginBottom: 16 }}>
                   <ReactECharts option={compareChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
+                </Card>
+              )}
+
+              {navChartOption && (
+                <Card
+                  title="净值走势对比（近6月）"
+                  style={{ marginBottom: 16 }}
+                  extra={navHistoryLoading ? <Spin size="small" /> : null}
+                >
+                  <ReactECharts option={navChartOption} style={{ height: 350 }} opts={{ renderer: 'svg' }} />
+                  <div style={{ textAlign: 'center', fontSize: 12, color: '#8c8c8c' }}>
+                    起点归一化为0%，展示各基金相对收益走势
+                  </div>
                 </Card>
               )}
 

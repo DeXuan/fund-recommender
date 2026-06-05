@@ -153,7 +153,38 @@ async function initDatabase() {
         created_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(name, trade_date)
       )`,
+      // 风险评估结果表
+      `CREATE TABLE IF NOT EXISTS risk_profiles (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        age VARCHAR(20) NOT NULL,
+        investment_amount VARCHAR(20) NOT NULL,
+        investment_period VARCHAR(20) NOT NULL,
+        risk_tolerance VARCHAR(20) NOT NULL,
+        loss_tolerance VARCHAR(20) NOT NULL,
+        score INTEGER NOT NULL,
+        risk_type VARCHAR(20) NOT NULL,
+        risk_level VARCHAR(10) NOT NULL,
+        expected_return VARCHAR(20) NOT NULL,
+        allocation JSONB,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_risk_profiles_user ON risk_profiles(user_id)`,
       // 索引
+      // 自选基金表
+      `CREATE TABLE IF NOT EXISTS watchlist (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        fund_code VARCHAR(10) NOT NULL,
+        fund_name VARCHAR(200) DEFAULT '',
+        group_name VARCHAR(50) DEFAULT '默认分组',
+        notes TEXT DEFAULT '',
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, fund_code)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_fund_records_user ON fund_records(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_dca_plans_user ON dca_plans(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_oauth_accounts_provider ON oauth_accounts(provider, provider_user_id)`,

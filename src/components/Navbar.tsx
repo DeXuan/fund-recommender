@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Layout, Menu, Button, Drawer, Grid, Dropdown, Avatar, Space, Badge } from 'antd';
+import { Layout, Menu, Button, Drawer, Grid, Dropdown, Avatar, Space, Badge, List, Tag, Empty } from 'antd';
 import {
   HomeOutlined,
   FundOutlined,
@@ -14,8 +14,14 @@ import {
   UserOutlined,
   LogoutOutlined,
   AccountBookOutlined,
+  StarOutlined,
+  BellOutlined,
+  WarningOutlined,
+  CheckCircleOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { alertsApi } from '../services/api';
 
 const { useBreakpoint } = Grid;
 
@@ -37,10 +43,20 @@ export default function Navbar() {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const { user, logout } = useAuth();
+  const [alerts, setAlerts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      alertsApi.getAlerts().then(setAlerts).catch(() => {});
+    }
+  }, [user]);
 
   const allNavItems = [
     ...navItems,
-    ...(user ? [{ key: '/portfolio', label: '理财记账', icon: <AccountBookOutlined /> }] : []),
+    ...(user ? [
+      { key: '/watchlist', label: '自选基金', icon: <StarOutlined /> },
+      { key: '/portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
+    ] : []),
   ];
 
   const menuItems = allNavItems.map((item) => ({
@@ -90,19 +106,26 @@ export default function Navbar() {
         {isMobile ? (
           <Space size={12}>
             {user ? (
+              <>
+              <Badge count={alerts.length} size="small" offset={[-2, 2]}>
+                <Button type="text" icon={<BellOutlined />} style={{ color: '#595959', fontSize: 16 }} onClick={() => navigate('/portfolio')} />
+              </Badge>
               <Dropdown menu={{
                 items: [
                   { key: 'portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
+                  { key: 'watchlist', label: '自选基金', icon: <StarOutlined /> },
                   { type: 'divider' as const },
                   { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
                 ],
                 onClick: ({ key }) => {
                   if (key === 'logout') { logout(); navigate('/'); }
                   if (key === 'portfolio') navigate('/portfolio');
+                  if (key === 'watchlist') navigate('/watchlist');
                 },
               }}>
                 <Avatar size="small" icon={<UserOutlined />} src={user.avatar_url} style={{ cursor: 'pointer', background: '#1677ff' }} />
               </Dropdown>
+              </>
             ) : (
               <Link to="/login"><Button type="primary" size="small" icon={<UserOutlined />}>登录</Button></Link>
             )}
@@ -129,15 +152,21 @@ export default function Navbar() {
             />
             <Space size={16} style={{ marginLeft: 16 }}>
               {user ? (
+                <>
+                <Badge count={alerts.length} size="small" offset={[-2, 2]}>
+                  <Button type="text" icon={<BellOutlined />} style={{ color: '#595959', fontSize: 16 }} onClick={() => navigate('/portfolio')} />
+                </Badge>
                 <Dropdown menu={{
                   items: [
                     { key: 'portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
+                    { key: 'watchlist', label: '自选基金', icon: <StarOutlined /> },
                     { type: 'divider' as const },
                     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
                   ],
                   onClick: ({ key }) => {
                     if (key === 'logout') { logout(); navigate('/'); }
                     if (key === 'portfolio') navigate('/portfolio');
+                    if (key === 'watchlist') navigate('/watchlist');
                   },
                 }}>
                   <Space style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 8, transition: 'background 0.2s' }}>
@@ -145,6 +174,7 @@ export default function Navbar() {
                     <span style={{ color: '#1f1f1f', fontWeight: 500, fontSize: 14 }}>{user.nickname || user.username}</span>
                   </Space>
                 </Dropdown>
+                </>
               ) : (
                 <Link to="/login">
                   <Button type="primary" icon={<UserOutlined />} style={{ borderRadius: 8 }}>

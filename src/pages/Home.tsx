@@ -14,10 +14,13 @@ import {
   BankOutlined,
   PieChartOutlined,
   TrophyOutlined,
+  AccountBookOutlined,
+  RightOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
-import { fundApi } from '../services/api';
+import { fundApi, portfolioApi } from '../services/api';
 import { formatReturn, getReturnColor } from '../utils/format';
+import { useAuth } from '../contexts/AuthContext';
 
 interface MarketIndex {
   name: string;
@@ -40,10 +43,12 @@ interface SectorData {
 }
 
 export default function Home() {
+  const { user } = useAuth();
   const [indices, setIndices] = useState<MarketIndex[]>([]);
   const [sectors, setSectors] = useState<SectorData[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [capitalFlow, setCapitalFlow] = useState<any>(null);
+  const [portfolioSummary, setPortfolioSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showAllSectors, setShowAllSectors] = useState(false);
 
@@ -51,20 +56,27 @@ export default function Home() {
     loadData();
     const interval = setInterval(loadData, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const loadData = async () => {
     try {
-      const [indicesData, sectorsData, recsData, flowData] = await Promise.all([
+      const promises: Promise<any>[] = [
         fundApi.getMarketIndices(),
         fundApi.getSectors().catch(() => []),
         fundApi.getIndustryRecommendations(),
         fundApi.getCapitalFlow().catch(() => null),
-      ]);
-      setIndices(indicesData);
-      setSectors(sectorsData);
-      setRecommendations(recsData);
-      setCapitalFlow(flowData);
+      ];
+      if (user) {
+        promises.push(portfolioApi.getSummary().catch(() => null));
+      }
+      const results = await Promise.all(promises);
+      setIndices(results[0]);
+      setSectors(results[1]);
+      setRecommendations(results[2]);
+      setCapitalFlow(results[3]);
+      if (user && results[4]) {
+        setPortfolioSummary(results[4]);
+      }
     } catch (error) {
       console.error('加载数据失败:', error);
       message.error('加载市场数据失败');
@@ -225,6 +237,60 @@ export default function Home() {
           ))}
         </Row>
       </Card>
+
+      {/* 持仓概览（登录用户） */}
+      {user && portfolioSummary && portfolioSummary.holdings?.length > 0 && (
+        <Card
+          style={{ marginBottom: 20, borderRadius: 12, border: '1px solid #e6f4ff', background: 'linear-gradient(135deg, #f0f5ff 0%, #e6f4ff 100%)' }}
+          title={
+            <Space>
+              <AccountBookOutlined style={{ color: '#1677ff' }} />
+              <span style={{ fontWeight: 600 }}>我的持仓</span>
+            </Space>
+          }
+          extra={<Link to="/portfolio" style={{ color: '#1677ff', fontSize: 13 }}>查看详情 <RightOutlined /></Link>}
+        >
+          <Row gutter={[16, 12]} style={{ marginBottom: 16 }}>
+            <Col xs={12} sm={6}>
+              <div style={{ color: '#8c8c8c', fontSize: 12 }}>总投入</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#1f1f1f' }}>¥{(portfolioSummary.totalCost || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div style={{ color: '#8c8c8c', fontSize: 12 }}>当前市值</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#1f1f1f' }}>¥{(portfolioSummary.totalValue || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div style={{ color: '#8c8c8c', fontSize: 12 }}>总盈亏</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: (portfolioSummary.totalPnl || 0) >= 0 ? '#cf1322' : '#3f8600' }}>
+                {(portfolioSummary.totalPnl || 0) >= 0 ? '+' : ''}¥{(portfolioSummary.totalPnl || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div style={{ color: '#8c8c8c', fontSize: 12 }}>总收益率</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: (portfolioSummary.totalReturn || 0) >= 0 ? '#cf1322' : '#3f8600' }}>
+                {(portfolioSummary.totalReturn || 0) >= 0 ? '+' : ''}{(portfolioSummary.totalReturn || 0).toFixed(2)}%
+              </div>
+            </Col>
+          </Row>
+          <Row gutter={[8, 8]}>
+            {portfolioSummary.holdings.slice(0, 4).map((h: any) => (
+              <Col xs={12} sm={6} key={h.fund_code}>
+                <Link to={`/funds/${h.fund_code}`} style={{ textDecoration: 'none' }}>
+                  <Card size="small" style={{ borderRadius: 8, border: '1px solid #f0f0f0' }} hoverable>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: '#1f1f1f', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.fund_name}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>¥{h.market_value?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      <Tag color={h.pnl_percent >= 0 ? 'red' : 'green'} style={{ margin: 0, fontSize: 11 }}>
+                        {h.pnl_percent >= 0 ? '+' : ''}{h.pnl_percent?.toFixed(2)}%
+                      </Tag>
+                    </div>
+                  </Card>
+                </Link>
+              </Col>
+            ))}
+          </Row>
+        </Card>
+      )}
 
       {/* 板块轮动 + 资金流向 */}
       <Row gutter={20} style={{ marginBottom: 20 }}>

@@ -7,11 +7,14 @@ import {
   PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined,
   DownloadOutlined, ArrowUpOutlined, ArrowDownOutlined, FundOutlined,
   ScheduleOutlined, SyncOutlined, CheckCircleOutlined, PauseCircleOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
+import { Link } from 'react-router-dom';
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { portfolioApi, fundApi } from '../services/api';
 import type { PortfolioHolding, PortfolioSummary, FundRecord } from '../types';
+import ReturnsMap from '../components/ReturnsMap';
 
 export default function Portfolio() {
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
@@ -29,6 +32,9 @@ export default function Portfolio() {
   const [editingDca, setEditingDca] = useState<any | null>(null);
   const [dcaForm] = Form.useForm();
   const [syncing, setSyncing] = useState(false);
+
+  // 基准对比数据
+  const [benchmarkData, setBenchmarkData] = useState<any[]>([]);
 
   const handleFundCodeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const code = e.target.value.trim();
@@ -50,12 +56,14 @@ export default function Portfolio() {
 
   const loadData = async () => {
     try {
-      const [data, plans] = await Promise.all([
+      const [data, plans, benchmark] = await Promise.all([
         portfolioApi.getSummary(),
         portfolioApi.getDcaPlans().catch(() => []),
+        fundApi.getHS300Benchmark().catch(() => []),
       ]);
       setSummary(data);
       setDcaPlans(plans);
+      setBenchmarkData(benchmark);
     } catch {
       message.error('加载数据失败');
     } finally {
@@ -211,8 +219,20 @@ export default function Portfolio() {
   }[f] || f);
 
   const dcaColumns = [
-    { title: '基金名称', dataIndex: 'fund_name', key: 'fund_name', width: 180 },
-    { title: '基金代码', dataIndex: 'fund_code', key: 'fund_code', width: 100 },
+    {
+      title: '基金名称', dataIndex: 'fund_name', key: 'fund_name', width: 180,
+      render: (name: string, record: any) => (
+        <Link to={`/funds/${record.fund_code}`} style={{ fontWeight: 500 }}>
+          {name} <LinkOutlined style={{ fontSize: 11, color: '#1677ff' }} />
+        </Link>
+      ),
+    },
+    {
+      title: '基金代码', dataIndex: 'fund_code', key: 'fund_code', width: 100,
+      render: (code: string) => (
+        <Link to={`/funds/${code}`} style={{ color: '#8c8c8c', fontFamily: 'monospace' }}>{code}</Link>
+      ),
+    },
     {
       title: '定投金额', dataIndex: 'amount', key: 'amount', width: 110,
       render: (v: number) => `¥${v.toLocaleString()}`,
@@ -284,8 +304,20 @@ export default function Portfolio() {
   } : null;
 
   const columns = [
-    { title: '基金名称', dataIndex: 'fund_name', key: 'fund_name', width: 180 },
-    { title: '基金代码', dataIndex: 'fund_code', key: 'fund_code', width: 100 },
+    {
+      title: '基金名称', dataIndex: 'fund_name', key: 'fund_name', width: 180,
+      render: (name: string, record: PortfolioHolding) => (
+        <Link to={`/funds/${record.fund_code}`} style={{ fontWeight: 500 }}>
+          {name} <LinkOutlined style={{ fontSize: 11, color: '#1677ff' }} />
+        </Link>
+      ),
+    },
+    {
+      title: '基金代码', dataIndex: 'fund_code', key: 'fund_code', width: 100,
+      render: (code: string) => (
+        <Link to={`/funds/${code}`} style={{ color: '#8c8c8c', fontFamily: 'monospace' }}>{code}</Link>
+      ),
+    },
     {
       title: '持有份额', dataIndex: 'total_shares', key: 'total_shares', width: 100,
       render: (v: number) => v.toLocaleString(),
@@ -354,45 +386,39 @@ export default function Portfolio() {
 
       {/* Summary Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic title="总投入" value={summary?.totalCost || 0} precision={2} prefix="¥" />
+        <Col xs={12} sm={12} lg={6}>
+          <Card style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none', borderRadius: 12 }} styles={{ body: { padding: 20 } }}>
+            <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, marginBottom: 4 }}>总投入</div>
+            <div style={{ color: '#fff', fontSize: 24, fontWeight: 700 }}>¥{(summary?.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic title="当前市值" value={summary?.totalValue || 0} precision={2} prefix="¥" />
+        <Col xs={12} sm={12} lg={6}>
+          <Card style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', border: 'none', borderRadius: 12 }} styles={{ body: { padding: 20 } }}>
+            <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, marginBottom: 4 }}>当前市值</div>
+            <div style={{ color: '#fff', fontSize: 24, fontWeight: 700 }}>¥{(summary?.totalValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="总盈亏"
-              value={summary?.totalPnl || 0}
-              precision={2}
-              prefix="¥"
-              valueStyle={{ color: pnlColor(summary?.totalPnl || 0) }}
-              suffix={
-                (summary?.totalPnl || 0) >= 0
-                  ? <ArrowUpOutlined />
-                  : <ArrowDownOutlined />
-              }
-            />
+        <Col xs={12} sm={12} lg={6}>
+          <Card style={{ background: (summary?.totalPnl || 0) >= 0 ? 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)' : 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)', border: 'none', borderRadius: 12 }} styles={{ body: { padding: 20 } }}>
+            <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, marginBottom: 4 }}>总盈亏</div>
+            <div style={{ color: '#fff', fontSize: 24, fontWeight: 700 }}>
+              {(summary?.totalPnl || 0) >= 0 ? '+' : '-'}¥{Math.abs(summary?.totalPnl || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span style={{ fontSize: 14, marginLeft: 4 }}>{(summary?.totalPnl || 0) >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}</span>
+            </div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="总收益率"
-              value={summary?.totalReturn || 0}
-              precision={2}
-              suffix="%"
-              valueStyle={{ color: pnlColor(summary?.totalReturn || 0) }}
-              prefix={(summary?.totalReturn || 0) >= 0 ? '+' : ''}
-            />
+        <Col xs={12} sm={12} lg={6}>
+          <Card style={{ background: (summary?.totalReturn || 0) >= 0 ? 'linear-gradient(135deg, #faad14 0%, #d48806 100%)' : 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)', border: 'none', borderRadius: 12 }} styles={{ body: { padding: 20 } }}>
+            <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, marginBottom: 4 }}>总收益率</div>
+            <div style={{ color: '#fff', fontSize: 24, fontWeight: 700 }}>
+              {(summary?.totalReturn || 0) >= 0 ? '+' : ''}{(summary?.totalReturn || 0).toFixed(2)}%
+            </div>
           </Card>
         </Col>
       </Row>
+
+      {/* 收益地图 */}
+      {holdings.length > 0 && <ReturnsMap />}
 
       {/* Action Buttons */}
       <Card
@@ -441,6 +467,91 @@ export default function Portfolio() {
             </Card>
           </Col>
         </Row>
+      )}
+
+      {/* 基准对比 */}
+      {holdings.length > 0 && benchmarkData.length > 0 && (
+        <Card
+          title="持仓 vs 沪深300 基准对比"
+          style={{ marginBottom: 24 }}
+        >
+          <ReactECharts
+            option={{
+              tooltip: {
+                trigger: 'axis',
+                formatter: (params: any) => {
+                  let html = `${params[0]?.axisValue}<br/>`;
+                  params.forEach((p: any) => {
+                    html += `${p.marker} ${p.seriesName}: ${p.value}%<br/>`;
+                  });
+                  return html;
+                },
+              },
+              legend: { data: ['我的持仓', '沪深300基准'], bottom: 0 },
+              grid: { top: 20, right: 20, bottom: 40, left: 60 },
+              xAxis: {
+                type: 'category',
+                data: benchmarkData.map(d => d.date),
+                axisLabel: { fontSize: 10, interval: Math.floor(benchmarkData.length / 8) },
+              },
+              yAxis: {
+                type: 'value',
+                axisLabel: { formatter: '{value}%', fontSize: 10 },
+                splitLine: { lineStyle: { type: 'dashed' } },
+              },
+              series: [
+                {
+                  name: '沪深300基准',
+                  type: 'line',
+                  data: benchmarkData.map(d => parseFloat(d.return_pct)),
+                  lineStyle: { width: 2, color: '#999', type: 'dashed' },
+                  itemStyle: { color: '#999' },
+                  showSymbol: false,
+                },
+                {
+                  name: '我的持仓',
+                  type: 'line',
+                  data: benchmarkData.map(() => summary?.totalReturn || 0),
+                  lineStyle: { width: 2, color: '#1677ff' },
+                  itemStyle: { color: '#1677ff' },
+                  showSymbol: false,
+                  areaStyle: {
+                    color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                      colorStops: [
+                        { offset: 0, color: 'rgba(22,119,255,0.15)' },
+                        { offset: 1, color: 'rgba(22,119,255,0.02)' },
+                      ],
+                    },
+                  },
+                },
+              ],
+            }}
+            style={{ height: 300 }}
+            opts={{ renderer: 'svg' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginTop: 12 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: '#8c8c8c', fontSize: 12 }}>我的持仓收益</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: (summary?.totalReturn || 0) >= 0 ? '#cf1322' : '#3f8600' }}>
+                {(summary?.totalReturn || 0) >= 0 ? '+' : ''}{(summary?.totalReturn || 0).toFixed(2)}%
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: '#8c8c8c', fontSize: 12 }}>沪深300同期</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: parseFloat(benchmarkData[benchmarkData.length - 1]?.return_pct || 0) >= 0 ? '#cf1322' : '#3f8600' }}>
+                {benchmarkData.length > 0 ? `${parseFloat(benchmarkData[benchmarkData.length - 1].return_pct) >= 0 ? '+' : ''}${benchmarkData[benchmarkData.length - 1].return_pct}%` : '-'}
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: '#8c8c8c', fontSize: 12 }}>超额收益</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#722ed1' }}>
+                {benchmarkData.length > 0
+                  ? `${((summary?.totalReturn || 0) - parseFloat(benchmarkData[benchmarkData.length - 1].return_pct)) >= 0 ? '+' : ''}${((summary?.totalReturn || 0) - parseFloat(benchmarkData[benchmarkData.length - 1].return_pct)).toFixed(2)}%`
+                  : '-'}
+              </div>
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* DCA Plans */}

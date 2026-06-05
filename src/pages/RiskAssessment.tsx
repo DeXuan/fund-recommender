@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Card, Steps, Radio, Button, Progress, Space, Spin, Row, Col, Statistic, Alert, message } from 'antd';
-import { fundApi } from '../services/api';
+import { fundApi, portfolioApi } from '../services/api';
 
 interface RiskProfile {
   age: string;
@@ -32,6 +32,20 @@ export default function RiskAssessment() {
       const data = await fundApi.getRiskProfile(profile);
       setRecommendation(data);
       setStep(4);
+      // 持久化到数据库（如果用户已登录）
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          await portfolioApi.saveRiskProfile({
+            ...profile,
+            score: data.score || 0,
+            riskType: data.type,
+            riskLevel: data.riskLevel,
+            expectedReturn: data.expectedReturn,
+            allocation: data.allocation,
+          });
+        } catch { /* 非登录用户忽略 */ }
+      }
     } catch (error) {
       console.error('风险评估失败:', error);
       message.error('风险评估失败，请重试');

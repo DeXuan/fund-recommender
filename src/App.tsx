@@ -17,6 +17,7 @@ const IndustryAnalysis = lazy(() => import('./pages/IndustryAnalysis'));
 const HS300Analysis = lazy(() => import('./pages/HS300Analysis'));
 const Login = lazy(() => import('./pages/Login'));
 const Portfolio = lazy(() => import('./pages/Portfolio'));
+const Watchlist = lazy(() => import('./pages/Watchlist'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -40,6 +41,7 @@ function AppRoutes() {
         <Route path="/hs300" element={<HS300Analysis />} />
         <Route path="/login" element={<Login />} />
         <Route path="/portfolio" element={<ProtectedRoute><Portfolio /></ProtectedRoute>} />
+        <Route path="/watchlist" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

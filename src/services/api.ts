@@ -103,6 +103,21 @@ export const fundApi = {
   // 沪深300深度分析
   getHS300Analysis: () =>
     fetchApi<any>('/hs300/analysis'),
+
+  // 基金对比净值历史
+  compareNavHistory: (codes: string[]) =>
+    fetchApi<Record<string, any[]>>('/tools/compare-nav', {
+      method: 'POST',
+      body: JSON.stringify({ codes }),
+    }),
+
+  // 估值历史趋势
+  getValuationTrend: () =>
+    fetchApi<any[]>('/market/valuation-trend'),
+
+  // 沪深300基准数据
+  getHS300Benchmark: () =>
+    fetchApi<any[]>('/benchmark/hs300'),
 };
 
 export const authApi = {
@@ -147,6 +162,15 @@ export const portfolioApi = {
   deleteRecord: (id: number) =>
     fetchApi<any>(`/portfolio/records/${id}`, { method: 'DELETE' }),
   getSummary: () => fetchApi<any>('/portfolio/summary'),
+  getReturnsMap: (year?: number) =>
+    fetchApi<any>(`/portfolio/returns-map${year ? `?year=${year}` : ''}`),
+  getInsights: () => fetchApi<any>('/portfolio/insights'),
+  getRiskProfile: () => fetchApi<any>('/portfolio/risk-profile'),
+  saveRiskProfile: (profile: any) =>
+    fetchApi<any>('/portfolio/risk-profile', {
+      method: 'POST',
+      body: JSON.stringify(profile),
+    }),
   importCSV: async (file: File) => {
     const token = localStorage.getItem('token');
     const formData = new FormData();
@@ -177,4 +201,24 @@ export const portfolioApi = {
     fetchApi<{ synced: number; details: any[]; message: string }>('/portfolio/dca-plans/sync', {
       method: 'POST',
     }),
+};
+
+export const watchlistApi = {
+  getList: () => fetchApi<any[]>('/watchlist'),
+  add: (fund_code: string, fund_name?: string) =>
+    fetchApi<any>('/watchlist', {
+      method: 'POST',
+      body: JSON.stringify({ fund_code, fund_name }),
+    }),
+  remove: (fund_code: string) =>
+    fetchApi<any>(`/watchlist/${fund_code}`, { method: 'DELETE' }),
+  check: (codes: string[]) =>
+    fetchApi<Record<string, boolean>>('/watchlist/check', {
+      method: 'POST',
+      body: JSON.stringify({ codes }),
+    }),
+};
+
+export const alertsApi = {
+  getAlerts: () => fetchApi<any[]>('/alerts'),
 };

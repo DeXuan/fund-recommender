@@ -48,6 +48,7 @@ export default function MarketAnalysis() {
   const [indices, setIndices] = useState<MarketIndex[]>([]);
   const [recommendations, setRecommendations] = useState<IndustryRecommendation[]>([]);
   const [batchPlans, setBatchPlans] = useState<BatchPlan[]>([]);
+  const [valuationTrend, setValuationTrend] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -59,14 +60,16 @@ export default function MarketAnalysis() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [indicesData, recsData, plansData] = await Promise.all([
+      const [indicesData, recsData, plansData, trendData] = await Promise.all([
         fundApi.getMarketIndices(),
         fundApi.getIndustryRecommendations(),
         fundApi.getBatchPlans(),
+        fundApi.getValuationTrend().catch(() => []),
       ]);
       setIndices(indicesData);
       setRecommendations(recsData);
       setBatchPlans(plansData);
+      setValuationTrend(trendData);
     } catch (error) {
       console.error('加载市场数据失败:', error);
     } finally {
@@ -238,6 +241,101 @@ export default function MarketAnalysis() {
               <li><strong>核心+卫星</strong>：70%配置核心品种，30%配置弹性品种</li>
               <li><strong>动态调整</strong>：根据市场变化调整后续批次的品种和比例</li>
               <li><strong>设定止损</strong>：单只基金亏损超过15%考虑止损</li>
+            </ul>
+          </Card>
+        </div>
+      ),
+    },
+    {
+      key: 'trend',
+      label: '估值趋势',
+      children: (
+        <div>
+          {valuationTrend.length > 0 ? (
+            valuationTrend.map(idx => (
+              <Card key={idx.code} title={`${idx.name} 估值分位趋势（近12月）`} size="small" style={{ marginBottom: 16 }}>
+                <ReactECharts
+                  option={{
+                    tooltip: {
+                      trigger: 'axis',
+                      formatter: (params: any) => {
+                        let html = `${params[0]?.axisValue}<br/>`;
+                        params.forEach((p: any) => {
+                          html += `${p.marker} ${p.seriesName}: ${p.value}%<br/>`;
+                        });
+                        return html;
+                      },
+                    },
+                    legend: { data: ['PE分位', 'PB分位'], bottom: 0 },
+                    grid: { top: 20, right: 20, bottom: 40, left: 50 },
+                    xAxis: {
+                      type: 'category',
+                      data: idx.months.map((m: any) => m.month),
+                      axisLabel: { fontSize: 10 },
+                    },
+                    yAxis: {
+                      type: 'value',
+                      max: 100,
+                      axisLabel: { formatter: '{value}%', fontSize: 10 },
+                      splitLine: { lineStyle: { type: 'dashed' } },
+                    },
+                    visualMap: {
+                      show: false,
+                      pieces: [
+                        { lte: 20, color: '#52c41a' },
+                        { gt: 20, lte: 40, color: '#73d13d' },
+                        { gt: 40, lte: 60, color: '#1677ff' },
+                        { gt: 60, lte: 80, color: '#ff7a45' },
+                        { gt: 80, color: '#ff4d4f' },
+                      ],
+                    },
+                    series: [
+                      {
+                        name: 'PE分位',
+                        type: 'line',
+                        data: idx.months.map((m: any) => m.pe_percentile),
+                        smooth: true,
+                        lineStyle: { width: 2 },
+                        showSymbol: false,
+                        markLine: {
+                          silent: true,
+                          data: [
+                            { yAxis: 20, lineStyle: { color: '#52c41a', type: 'dashed' }, label: { formatter: '极低20%', fontSize: 10 } },
+                            { yAxis: 80, lineStyle: { color: '#ff4d4f', type: 'dashed' }, label: { formatter: '极高80%', fontSize: 10 } },
+                          ],
+                        },
+                      },
+                      {
+                        name: 'PB分位',
+                        type: 'line',
+                        data: idx.months.map((m: any) => m.pb_percentile),
+                        smooth: true,
+                        lineStyle: { width: 2, type: 'dashed' },
+                        showSymbol: false,
+                      },
+                    ],
+                  }}
+                  style={{ height: 250 }}
+                  opts={{ renderer: 'svg' }}
+                />
+                <div style={{ textAlign: 'center', fontSize: 13, color: '#595959', marginTop: 8 }}>
+                  当前估值：<span style={{ fontWeight: 600, color: getValuationColor(idx.current_valuation) }}>{idx.current_valuation}</span>
+                  <span style={{ marginLeft: 16 }}>建议：{idx.current_suggestion}</span>
+                </div>
+              </Card>
+            ))
+          ) : (
+            <Card style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+              暂无估值趋势数据
+            </Card>
+          )}
+          <Card size="small" style={{ marginTop: 16, background: '#e6f4ff', border: '1px solid #91caff' }}>
+            <strong style={{ color: '#1677ff' }}>估值趋势说明</strong>
+            <ul style={{ margin: '8px 0 0', paddingLeft: 16, lineHeight: 2, fontSize: 13 }}>
+              <li>PE分位越低，表示当前估值越便宜，投资价值越高</li>
+              <li>绿色区域（20%以下）为极度低估，适合重仓布局</li>
+              <li>红色区域（80%以上）为极度高估，建议观望或减仓</li>
+              <li>估值分位是相对指标，需结合绝对估值和市场环境综合判断</li>
             </ul>
           </Card>
         </div>

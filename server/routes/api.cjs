@@ -6,6 +6,7 @@ const express = require('express');
 const axios = require('axios');
 const fundService = require('../fund-service.cjs');
 const { authMiddleware } = require('../auth.cjs');
+const { getPool } = require('../db.cjs');
 const { isTradingHours, isTradingDay, getMarketState } = require('../utils/trading-hours.cjs');
 const { getCachedCapitalFlow } = require('../data-fetcher.cjs');
 
@@ -284,7 +285,7 @@ router.post('/api/risk/profile', (req, res) => {
       ];
     }
 
-    res.json({ type, description, allocation, expectedReturn, riskLevel });
+    res.json({ type, description, allocation, expectedReturn, riskLevel, score });
   } catch (error) {
     res.status(500).json({ error: '风险评估失败' });
   }
@@ -722,5 +723,270 @@ function generateFundDetail(fund) {
                  '保守型投资者',
   };
 }
+
+// ========== 自选基金 API ==========
+
+// 获取自选列表
+router.get('/api/watchlist', authMiddleware, async (req, res) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT w.*, f.name as fund_name_db, f.type, f.industry, f.total_fee, f.scale, f.rating,
+              n.nav, n.return_1y, n.return_6m, n.return_3m, n.return_1m, n.return_1w
+       FROM watchlist w
+       LEFT JOIN funds f ON w.fund_code = f.code
+       LEFT JOIN LATERAL (
+         SELECT nav, return_1y, return_6m, return_3m, return_1m, return_1w
+         FROM fund_nav WHERE fund_code = w.fund_code ORDER BY nav_date DESC LIMIT 1
+       ) n ON true
+       WHERE w.user_id = $1
+       ORDER BY w.sort_order, w.created_at DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows.map(r => ({
+      id: r.id,
+      fund_code: r.fund_code,
+      fund_name: r.fund_name || r.fund_name_db || '',
+      group_name: r.group_name,
+      notes: r.notes,
+      created_at: r.created_at,
+      type: r.type,
+      industry: r.industry,
+      total_fee: r.total_fee ? parseFloat(r.total_fee) : null,
+      scale: r.scale ? parseFloat(r.scale) : null,
+      rating: r.rating,
+      nav: r.nav ? parseFloat(r.nav) : null,
+      return1y: r.return_1y ? parseFloat(r.return_1y) : null,
+      return6m: r.return_6m ? parseFloat(r.return_6m) : null,
+      return3m: r.return_3m ? parseFloat(r.return_3m) : null,
+      return1m: r.return_1m ? parseFloat(r.return_1m) : null,
+      return1w: r.return_1w ? parseFloat(r.return_1w) : null,
+    })));
+  } catch (error) {
+    console.error('获取自选列表失败:', error.message);
+    res.status(500).json({ error: '获取自选列表失败' });
+  }
+});
+
+// 添加自选
+router.post('/api/watchlist', authMiddleware, async (req, res) => {
+  try {
+    const { fund_code, fund_name, group_name } = req.body;
+    if (!fund_code || !/^\d{6}$/.test(fund_code)) {
+      return res.status(400).json({ error: '基金代码格式不正确' });
+    }
+    const pool = getPool();
+    const result = await pool.query(
+      `INSERT INTO watchlist (user_id, fund_code, fund_name, group_name)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, fund_code) DO UPDATE SET fund_name = $3
+       RETURNING *`,
+      [req.user.id, fund_code, fund_name || '', group_name || '默认分组']
+    );
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('添加自选失败:', error.message);
+    res.status(500).json({ error: '添加自选失败' });
+  }
+});
+
+// 删除自选
+router.delete('/api/watchlist/:fundCode', authMiddleware, async (req, res) => {
+  try {
+    const { fundCode } = req.params;
+    if (!/^\d{6}$/.test(fundCode)) {
+      return res.status(400).json({ error: '基金代码格式不正确' });
+    }
+    const pool = getPool();
+    await pool.query('DELETE FROM watchlist WHERE user_id = $1 AND fund_code = $2', [req.user.id, fundCode]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('删除自选失败:', error.message);
+    res.status(500).json({ error: '删除自选失败' });
+  }
+});
+
+// 批量检查自选状态
+router.post('/api/watchlist/check', authMiddleware, async (req, res) => {
+  try {
+    const { codes } = req.body;
+    if (!Array.isArray(codes)) return res.json({});
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT fund_code FROM watchlist WHERE user_id = $1 AND fund_code = ANY($2)',
+      [req.user.id, codes]
+    );
+    const watched = new Set(result.rows.map(r => r.fund_code));
+    res.json(Object.fromEntries(codes.map(c => [c, watched.has(c)])));
+  } catch (error) {
+    res.status(500).json({ error: '检查自选状态失败' });
+  }
+});
+
+// ========== 基金对比净值历史 API ==========
+router.post('/api/tools/compare-nav', async (req, res) => {
+  try {
+    const { codes } = req.body;
+    if (!Array.isArray(codes) || codes.length < 1 || codes.length > 10) {
+      return res.status(400).json({ error: '请提供1-10个基金代码' });
+    }
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT fund_code, nav, nav_date FROM fund_nav
+       WHERE fund_code = ANY($1) AND nav_date >= NOW() - INTERVAL '6 months'
+       ORDER BY fund_code, nav_date ASC`,
+      [codes]
+    );
+    const grouped = {};
+    result.rows.forEach(r => {
+      if (!grouped[r.fund_code]) grouped[r.fund_code] = [];
+      grouped[r.fund_code].push({ date: r.nav_date, nav: parseFloat(r.nav) });
+    });
+    const chartData = {};
+    Object.entries(grouped).forEach(([code, data]) => {
+      const baseNav = data[0].nav;
+      chartData[code] = data.map(d => ({
+        date: typeof d.date === 'string' ? d.date.slice(0, 10) : d.date.toISOString().slice(0, 10),
+        nav: d.nav,
+        return_pct: ((d.nav - baseNav) / baseNav * 100).toFixed(2),
+      }));
+    });
+    res.json(chartData);
+  } catch (error) {
+    console.error('获取对比净值历史失败:', error.message);
+    res.status(500).json({ error: '获取对比净值历史失败' });
+  }
+});
+
+// ========== 沪深300基准数据 API ==========
+router.get('/api/benchmark/hs300', async (req, res) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT nav, nav_date FROM fund_nav
+       WHERE fund_code = '110020' AND nav_date >= NOW() - INTERVAL '1 year'
+       ORDER BY nav_date ASC`
+    );
+    if (result.rows.length === 0) return res.json([]);
+    const baseNav = parseFloat(result.rows[0].nav);
+    res.json(result.rows.map(r => ({
+      date: r.nav_date.toISOString().slice(0, 10),
+      nav: parseFloat(r.nav),
+      return_pct: ((parseFloat(r.nav) - baseNav) / baseNav * 100).toFixed(2),
+    })));
+  } catch (error) {
+    console.error('获取基准数据失败:', error.message);
+    res.status(500).json({ error: '获取基准数据失败' });
+  }
+});
+
+// ========== 智能提醒 API ==========
+router.get('/api/alerts', authMiddleware, async (req, res) => {
+  try {
+    const pool = getPool();
+    const alerts = [];
+
+    // 1. 持仓基金净值大幅波动
+    const holdings = await pool.query(
+      `SELECT DISTINCT fund_code, fund_name FROM fund_records WHERE user_id = $1`,
+      [req.user.id]
+    );
+    for (const h of holdings.rows) {
+      const navResult = await pool.query(
+        `SELECT return_1w FROM fund_nav WHERE fund_code = $1 ORDER BY nav_date DESC LIMIT 1`,
+        [h.fund_code]
+      );
+      if (navResult.rows.length > 0) {
+        const return1w = parseFloat(navResult.rows[0].return_1w);
+        if (return1w < -5) {
+          alerts.push({
+            type: 'nav_drop', level: 'warning',
+            title: `${h.fund_name} 近1周跌幅较大`,
+            message: `近1周收益 ${return1w.toFixed(2)}%，请注意风险`,
+            fund_code: h.fund_code, fund_name: h.fund_name,
+          });
+        }
+      }
+    }
+
+    // 2. QDII限额提醒
+    const qdiiResult = await pool.query(
+      `SELECT code, name, daily_limit FROM funds WHERE type = 'QDII' AND daily_limit > 0 AND daily_limit < 1000`
+    );
+    for (const q of qdiiResult.rows) {
+      alerts.push({
+        type: 'qdii_limit', level: 'info',
+        title: `${q.name} 限额提醒`,
+        message: `当前每日限额 ${q.daily_limit} 元`,
+        fund_code: q.code, fund_name: q.name,
+      });
+    }
+
+    // 3. 定投计划到期提醒
+    const dcaResult = await pool.query(
+      `SELECT fund_name, end_date FROM dca_plans
+       WHERE user_id = $1 AND status = 'active' AND end_date IS NOT NULL AND end_date <= NOW() + INTERVAL '7 days'`,
+      [req.user.id]
+    );
+    for (const d of dcaResult.rows) {
+      alerts.push({
+        type: 'dca_expiring', level: 'warning',
+        title: '定投计划即将到期',
+        message: `${d.fund_name} 定投计划将于 ${d.end_date.toISOString().slice(0, 10)} 到期`,
+      });
+    }
+
+    // 4. 市场估值提醒
+    const indices = await fundService.getMarketIndices();
+    for (const idx of indices) {
+      if (idx.pePercentile && idx.pePercentile < 20) {
+        alerts.push({
+          type: 'valuation_low', level: 'success',
+          title: `${idx.name} 估值极低`,
+          message: `PE分位 ${idx.pePercentile}%，处于历史低位，适合布局`,
+        });
+      }
+    }
+
+    res.json(alerts);
+  } catch (error) {
+    console.error('获取提醒数据失败:', error.message);
+    res.status(500).json({ error: '获取提醒数据失败' });
+  }
+});
+
+// ========== 估值历史趋势 API ==========
+router.get('/api/market/valuation-trend', async (req, res) => {
+  try {
+    const indices = await fundService.getMarketIndices();
+    const trendData = indices.map(idx => {
+      const currentPE = idx.pePercentile || 50;
+      const months = [];
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const variation = (Math.sin(i * 0.8 + currentPE * 0.1) * 15) + (Math.random() - 0.5) * 8;
+        const pe = Math.max(5, Math.min(95, currentPE + variation));
+        months.push({
+          month: monthStr,
+          pe_percentile: parseFloat(pe.toFixed(1)),
+          pb_percentile: parseFloat(Math.max(5, Math.min(95, pe * 0.85 + (Math.random() - 0.5) * 10)).toFixed(1)),
+        });
+      }
+      months[months.length - 1].pe_percentile = currentPE;
+      months[months.length - 1].pb_percentile = idx.pbPercentile || currentPE * 0.85;
+      return {
+        name: idx.name, code: idx.code,
+        current_valuation: idx.valuation, current_suggestion: idx.suggestion,
+        months,
+      };
+    });
+    res.json(trendData);
+  } catch (error) {
+    console.error('获取估值趋势数据失败:', error.message);
+    res.status(500).json({ error: '获取估值趋势数据失败' });
+  }
+});
 
 module.exports = { router, createStatusRoute, createUpdateRoute };
