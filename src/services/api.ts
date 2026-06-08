@@ -88,6 +88,14 @@ export const fundApi = {
   getIndustries: () =>
     fetchApi<string[]>('/industries'),
 
+  // 获取基金经理列表
+  getManagers: () =>
+    fetchApi<Array<{ name: string; fundCount: number }>>('/managers'),
+
+  // 获取明星基金经理详情
+  getStarManagers: () =>
+    fetchApi<Array<{ name: string; company: string; title: string; experience: string; specialty: string; bio: string; tags: string[] }>>('/star-managers'),
+
   // 获取数据更新状态
   getStatus: () =>
     fetchApi<any>('/status'),
@@ -103,6 +111,10 @@ export const fundApi = {
   // 沪深300深度分析
   getHS300Analysis: () =>
     fetchApi<any>('/hs300/analysis'),
+
+  // 标普500深度分析
+  getSP500Analysis: () =>
+    fetchApi<any>('/sp500/analysis'),
 
   // 基金对比净值历史
   compareNavHistory: (codes: string[]) =>
@@ -139,6 +151,11 @@ export const authApi = {
   alipayMockLogin: () =>
     fetchApi<{ token: string; user: any; mock: boolean }>('/auth/alipay/mock-login', {
       method: 'POST',
+    }),
+  changePassword: (oldPassword: string, newPassword: string) =>
+    fetchApi<{ success: boolean; message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ oldPassword, newPassword }),
     }),
 };
 

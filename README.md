@@ -1,6 +1,6 @@
 # 基金推荐助手
 
-基于 React + Node.js + PostgreSQL 的公募基金分析与推荐平台，覆盖 150+ 只主流基金（含 69 只支付宝金选基金），支持 9 大行业深度分析、指数研究、基金对比、风险评估、定投模拟、持仓管理等功能。
+基于 React + Node.js + PostgreSQL 的公募基金分析与推荐平台，覆盖 200+ 只主流基金（含 69 只支付宝金选基金），支持 14 大行业深度分析、指数研究、基金对比、风险评估、定投模拟、持仓管理等功能。
 
 ## 功能一览
 
@@ -10,7 +10,7 @@
 | 基金列表 | `/web/funds` | 全市场基金检索，按行业筛选、金选筛选、多维度排序、最多 5 只横向对比 |
 | 基金详情 | `/web/funds/:code` | 收益走势、费率明细、估值分析、重仓股、投资建议 |
 | QDII 基金 | `/web/qdii` | 纳斯达克 100 / 标普 500 / 全部 QDII 专区，限额监控 |
-| 行业分析 | `/web/industry` | 9 大行业深度分析：费率对比、收益排名、综合推荐、分批建仓方案 |
+| 行业分析 | `/web/industry` | 14 大行业深度分析：费率对比、收益排名、综合推荐、分批建仓方案 |
 | 沪深 300 | `/web/hs300` | 沪深 300 基金对比、权重股基本面、投资策略 |
 | 市场估值 | `/web/market` | 指数估值分位、行业推荐、分批建仓计划 |
 | 风险评估 | `/web/risk-assessment` | 5 步问卷测评，输出风险类型 + 个性化资产配置方案 |
@@ -29,19 +29,23 @@
 - ECharts 6（图表可视化）
 
 **后端**
-- Express 5（端口 3003）
+- Express 5（端口 3003）+ helmet 安全中间件
 - PostgreSQL 数据库（基金数据持久化）
 - 东方财富 API 实时获取基金净值（每 15 分钟自动更新）
 - 新浪财经 API 获取市场指数和板块数据
 
 **数据库**
-- `funds` - 基金基本信息表
+- `funds` - 基金基本信息表（含经理字段）
 - `fund_nav` - 基金净值历史表
 - `market_indices` - 市场指数表
 - `sector_data` - 板块轮动表
 - `users` - 用户表
-- `fund_records` - 持仓记录表（含定投功能）
+- `fund_records` - 持仓记录表（含定投功能 + 盈亏预计算）
 - `dca_plans` - 定投计划表（兼容旧数据）
+- `watchlist` - 自选基金表（含分组和排序）
+- `risk_profiles` - 风险评估结果表
+- `oauth_accounts` - 第三方登录表
+- `hs300_fund_details` - 沪深300基金详情表
 
 ## 快速开始
 
@@ -67,8 +71,11 @@ npm run dev
 创建 `.env` 文件，配置以下变量：
 
 ```env
-# JWT 密钥
+# JWT 密钥（至少32字符）
 JWT_SECRET=your_jwt_secret_here_at_least_32_chars
+
+# CORS 允许的前端域名（逗号分隔）
+ALLOWED_ORIGINS=http://your-domain:8688,http://localhost:5173,http://localhost:5174
 
 # 模拟登录（生产环境设为false）
 ENABLE_MOCK_AUTH=false
@@ -134,14 +141,14 @@ bash /var/www/fix-permission.sh
 fund-recommender/
 ├── server/
 │   ├── index.cjs            # Express 入口（~200行），启动 + 中间件 + 调度
-│   ├── db.cjs               # PostgreSQL 数据库初始化
-│   ├── fund-service.cjs     # 基金数据服务层（含分页）
-│   ├── fund-data.cjs        # 基金种子数据（100+ 只）
-│   ├── auth.cjs             # 认证模块（JWT + 支付宝 OAuth，token 加密存储）
-│   ├── portfolio.cjs        # 持仓管理模块
+│   ├── db.cjs               # PostgreSQL 数据库初始化（11 张表）
+│   ├── fund-service.cjs     # 基金数据服务层（含分页 + 收益率缓存）
+│   ├── fund-data.cjs        # 基金种子数据（200+ 只，覆盖 14 个行业）
+│   ├── auth.cjs             # 认证模块（JWT + 支付宝 OAuth + 修改密码）
+│   ├── portfolio.cjs        # 持仓管理模块（含定投、收益地图、组合洞察）
 │   ├── data-fetcher.cjs     # 数据抓取模块（腾讯/新浪/东方财富 API）
 │   ├── routes/
-│   │   └── api.cjs          # API 路由（基金、市场、工具、行业分析）
+│   │   └── api.cjs          # API 路由（基金、市场、工具、行业分析、SP500）
 │   └── utils/
 │       ├── rate-limiter.cjs # 共享速率限制器（带 TTL 自动清理）
 │       ├── scheduler.cjs    # 共享调度器（每日任务、交易时间任务）
@@ -154,9 +161,11 @@ fund-recommender/
 │   ├── components/
 │   │   ├── Navbar.tsx       # 响应式导航栏
 │   │   ├── DataStatus.tsx   # 数据更新状态栏
-│   │   └── ErrorBoundary.tsx # 全局错误捕获
-│   ├── pages/               # 11 个页面组件（懒加载）
-│   ├── services/api.ts      # API 请求封装
+│   │   ├── ErrorBoundary.tsx # 全局错误捕获
+│   │   ├── GsapEnhancer.tsx # GSAP 动画增强
+│   │   └── ReturnsMap.tsx   # 收益地图组件
+│   ├── pages/               # 12 个页面组件（懒加载）
+│   ├── services/api.ts      # API 请求封装（fundApi/authApi/portfolioApi/watchlistApi/alertsApi）
 │   ├── contexts/AuthContext.tsx # 认证上下文
 │   ├── utils/format.ts      # 格式化工具函数
 │   └── types/index.ts       # TypeScript 类型定义
@@ -199,8 +208,11 @@ fund-recommender/
 | GET | `/api/recommendations/industry` | 行业推荐 |
 | GET | `/api/recommendations/batch-plans` | 分批建仓方案 |
 | GET | `/api/industries` | 行业列表 |
-| GET | `/api/industry-analysis/:industry` | 行业深度分析 |
+| GET | `/api/managers` | 基金经理列表 |
+| GET | `/api/star-managers` | 明星基金经理详情 |
+| GET | `/api/industry-analysis/:industry` | 行业深度分析（14 个行业） |
 | GET | `/api/hs300/analysis` | 沪深 300 深度分析 |
+| GET | `/api/sp500/analysis` | 标普 500 深度分析 |
 
 ### 工具
 | 方法 | 路径 | 说明 |
@@ -215,6 +227,7 @@ fund-recommender/
 |------|------|------|
 | POST | `/api/auth/register` | 用户注册 |
 | POST | `/api/auth/login` | 用户登录 |
+| POST | `/api/auth/change-password` | 修改密码（需认证） |
 | GET | `/api/auth/me` | 获取当前用户信息 |
 | GET | `/api/auth/alipay/qrcode` | 获取支付宝授权URL |
 | GET | `/api/auth/alipay/callback` | 支付宝回调处理 |
@@ -244,7 +257,16 @@ fund-recommender/
 | PUT | `/api/portfolio/records/:id` | 更新持仓记录 |
 | DELETE | `/api/portfolio/records/:id` | 删除持仓记录 |
 | GET | `/api/portfolio/summary` | 获取持仓汇总 |
+| GET | `/api/portfolio/returns-map` | 收益地图（按日盈亏） |
+| GET | `/api/portfolio/insights` | 组合洞察（资产配置分析） |
+| GET | `/api/portfolio/risk-profile` | 获取风险评估结果 |
+| POST | `/api/portfolio/risk-profile` | 保存风险评估结果 |
 | POST | `/api/portfolio/import` | CSV 导入持仓 |
+| GET | `/api/portfolio/dca-plans` | 定投计划列表 |
+| POST | `/api/portfolio/dca-plans` | 创建定投计划 |
+| PUT | `/api/portfolio/dca-plans/:id` | 更新定投计划 |
+| DELETE | `/api/portfolio/dca-plans/:id` | 删除定投计划 |
+| POST | `/api/portfolio/dca-plans/sync` | 同步定投计划到持仓 |
 
 ### 系统
 | 方法 | 路径 | 说明 |
@@ -270,9 +292,9 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 - OAuth Token 加密存储（AES-256-GCM，独立加密密钥）
 - 支付宝 OAuth CSRF 防护（state 参数 HMAC-SHA256 签名 + timingSafeEqual）
 - Mock 登录双重防护（ENABLE_MOCK_AUTH + NODE_ENV 非 production）
-- 请求速率限制（通用 60 次/分钟，认证 10 次/分钟，数据更新 3 次/15 分钟）
-- 安全响应头（X-Content-Type-Options、X-Frame-Options、CSP、Permissions-Policy）
-- HSTS 仅在 HTTPS 环境下启用
+- 请求速率限制（通用 300 次/分钟，认证 10 次/分钟，数据更新 3 次/15 分钟）
+- helmet 安全中间件（自动管理 CSP、HSTS、X-Content-Type-Options、X-Frame-Options 等 11 项安全头）
+- HSTS 仅在 HTTPS 环境下启用（trust proxy + X-Forwarded-Proto）
 - 请求体大小限制 10KB
 - 输入参数校验（基金代码格式、ID 正整数、搜索长度、数值范围）
 - 环境变量敏感信息保护（.env 已 gitignore）
@@ -284,6 +306,30 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 - 404 路由兜底（未知路径重定向首页）
 
 ## 版本更新记录
+
+### v0.5 (2026-06-08)
+
+**安全加固**
+- 引入 helmet 中间件：替代手动设置安全响应头，自动管理 CSP、HSTS、X-Content-Type-Options 等
+- 支付宝回调地址环境变量化：不再硬编码 IP，改为 ALIPAY_RETURN_URL 环境变量
+- CSV 导入基金代码校验：添加 6 位数字正则验证，拒绝非法代码
+- auth.cjs 代码清理：移除重复的 crypto require 调用
+- .env.example 完善：新增 ALLOWED_ORIGINS 配置项，更新 ALIPAY_RETURN_URL 说明
+
+**新增功能**
+- 标普500深度分析页：新增 `/web/sp500` 路由，含 14 只标普500基金对比、美股 Top10 权重股分析、建仓方案
+- 基金经理管理：新增基金经理列表 API、明星基金经理详情 API
+- 修改密码功能：登录用户可修改密码（需验证旧密码）
+- 沪深300基金扩容：从 17 只扩展到 37 只，含 15 只指数增强基金
+- 标普500基金扩容：从 5 只扩展到 14 只（7 组 A/C 份额），每日限额 10000 元
+- 纳斯达克100基金补充：新增华夏/南方/天弘 I/D 类份额
+- 行业分析扩展：从 9 个行业扩展到 14 个行业（电力、水电、啤酒/饮料、家电等）
+- 首页持仓概览增强：持仓卡片展示更多指标
+
+**数据优化**
+- 基金收益率缓存：新增 30 分钟内存缓存，减少外部 API 调用
+- 每日数据更新整合：收益率+QDII 限额+HS300+持仓盈亏统一在 9:30 执行
+- 沪深300估值数据更新：PE 从 12.5 更新到 14.39，分位从 42% 更新到 87.8%
 
 ### v0.4 (2026-06-05)
 
@@ -450,6 +496,12 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 | 2026-06-05 | MEDIUM | 多个页面 API 失败时无用户反馈 | 增加 message.error 错误提示 |
 | 2026-06-05 | MEDIUM | Portfolio 删除持仓用 forEach 无 await | 改用 Promise.all + await |
 | 2026-06-05 | MEDIUM | CORS 允许无 Origin 请求（.env 变更后） | 保持 !origin 放行（Bearer token API 可接受） |
+| 2026-06-08 | HIGH | 行业基金代码和名称与支付宝数据不匹配 | 从天天基金网验证并更新所有14个行业的基金代码和名称 |
+| 2026-06-08 | MEDIUM | 安全响应头手动设置不完整，缺少部分 helmet 标准头 | 引入 helmet 中间件，自动管理 X-Content-Type-Options、X-Frame-Options、CSP、HSTS 等 |
+| 2026-06-08 | MEDIUM | 支付宝回调地址硬编码在代码中（IP 地址） | 改为从 ALIPAY_RETURN_URL 环境变量读取，.env.example 已更新 |
+| 2026-06-08 | MEDIUM | CSV 导入缺少基金代码格式校验 | 添加 `/^\d{6}$/` 正则校验，拒绝非法基金代码 |
+| 2026-06-08 | MEDIUM | auth.cjs 中 crypto 模块重复 require（函数内部） | 移除 mock-login 和 alipay/callback 中的重复 require，使用顶部已导入的 crypto |
+| 2026-06-08 | LOW | .env.example 缺少 ALLOWED_ORIGINS 配置说明 | 新增 ALLOWED_ORIGINS 示例，更新 ALIPAY_RETURN_URL 说明 |
 
 ## License
 

@@ -70,14 +70,14 @@ bash /var/www/update.sh
 ```env
 PG_HOST=localhost      # 不要用IP地址！
 PG_PORT=5432
-PG_DATABASE=soulquad
-PG_USER=soulquad_user
-PG_PASSWORD=SoulQuad2024!
+PG_DATABASE=your_database
+PG_USER=your_db_user
+PG_PASSWORD=your_db_password
 ```
 
 ### 支付宝配置
 ```env
-ALIPAY_APP_ID=2021006159645339
+ALIPAY_APP_ID=your_alipay_app_id
 ALIPAY_PRIVATE_KEY=keys/alipay_private_key.pem
 ALIPAY_PUBLIC_KEY=keys/alipay_public_key_from_alipay.pem
 ALIPAY_RETURN_URL=http://47.116.77.67:8688/api/auth/alipay/callback
@@ -138,7 +138,7 @@ cat /var/www/jijin/.env | grep PG_
 curl http://localhost:3003/api/funds
 
 # 如果返回空，检查数据库
-psql -h localhost -U soulquad_user -d soulquad -c "SELECT COUNT(*) FROM funds;"
+psql -h localhost -U your_db_user -d your_database -c "SELECT COUNT(*) FROM funds;"
 ```
 
 ---

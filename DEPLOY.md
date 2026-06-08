@@ -113,9 +113,9 @@ sudo systemctl enable postgresql
 sudo -u postgres psql
 
 # 在 PostgreSQL 命令行中执行：
-CREATE DATABASE soulquad;
-CREATE USER soulquad_user WITH PASSWORD 'SoulQuad2024!';
-GRANT ALL PRIVILEGES ON DATABASE soulquad TO soulquad_user;
+CREATE DATABASE fund_db;
+CREATE USER fund_user WITH PASSWORD 'your_db_password';
+GRANT ALL PRIVILEGES ON DATABASE fund_db TO fund_user;
 \q
 ```
 
@@ -124,12 +124,17 @@ GRANT ALL PRIVILEGES ON DATABASE soulquad TO soulquad_user;
 在服务器上创建 `/var/www/jijin/.env` 文件：
 
 ```env
-# JWT 密钥
-JWT_SECRET=b0AolGYvplzI5XMC2CknFUVegst41_6ViXmPdhQY-QM9_dzZmEpdmOajc_Sk7dwb
+# JWT 密钥（至少32字符，使用 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))" 生成）
+JWT_SECRET=your_jwt_secret_here_at_least_32_chars
+
+# CORS 允许的前端域名（逗号分隔）
+ALLOWED_ORIGINS=http://47.116.77.67:8688,http://localhost:5173,http://localhost:5174
+
+# Mock 登录（生产环境必须为 false）
 ENABLE_MOCK_AUTH=false
 
 # 支付宝配置
-ALIPAY_APP_ID=2021006159645339
+ALIPAY_APP_ID=your_alipay_app_id
 ALIPAY_PRIVATE_KEY=keys/alipay_private_key.pem
 ALIPAY_PUBLIC_KEY=keys/alipay_public_key_from_alipay.pem
 ALIPAY_RETURN_URL=http://47.116.77.67:8688/api/auth/alipay/callback
@@ -137,9 +142,9 @@ ALIPAY_RETURN_URL=http://47.116.77.67:8688/api/auth/alipay/callback
 # PostgreSQL 数据库（数据库和服务器在同一台机器，必须使用localhost）
 PG_HOST=localhost
 PG_PORT=5432
-PG_DATABASE=soulquad
-PG_USER=soulquad_user
-PG_PASSWORD=SoulQuad2024!
+PG_DATABASE=your_database
+PG_USER=your_db_user
+PG_PASSWORD=your_db_password
 ```
 
 **重要：** 数据库和服务器在同一台机器上，`PG_HOST` 必须使用 `localhost`，不能使用IP地址！
@@ -305,11 +310,14 @@ chmod 600 /var/www/jijin/.env
 
 ### Nginx 安全头
 
-部署脚本已自动配置以下安全头：
+后端使用 helmet 中间件自动管理安全响应头：
 - `X-Content-Type-Options: nosniff` — 防止 MIME 类型嗅探
 - `X-Frame-Options: DENY` — 防止点击劫持
 - `Content-Security-Policy` — 限制资源加载来源
 - `Strict-Transport-Security` — 强制 HTTPS（需配合 SSL 证书）
+- `X-DNS-Prefetch-Control` — 控制 DNS 预获取
+- `X-Download-Options` — 防止 IE 执行下载
+- `X-Permitted-Cross-Domain-Policies` — 限制跨域策略
 
 ### 网络安全
 
@@ -336,7 +344,7 @@ sudo -u postgres psql -c "SELECT count(*) FROM pg_stat_activity;"
 | -------------------- | --------------------------------------------------- |
 | 网站打不开           | `curl -I http://47.116.77.67:8688/web/`             |
 | API 返回 502         | `pm2 logs fund-server` 检查后端是否运行             |
-| 数据库连接失败       | 确保 `PG_HOST=localhost`，测试: `psql -h localhost -U soulquad_user -d soulquad` |
+| 数据库连接失败       | 确保 `PG_HOST=localhost`，测试: `psql -h localhost -U your_db_user -d your_database` |
 | 页面没有数据         | `curl http://localhost:3003/api/funds` 检查API返回  |
 | Nginx 配置错误       | `nginx -t` 查看语法错误                             |
 | 端口被占用           | `lsof -i :8688` 或 `lsof -i :3003`                 |

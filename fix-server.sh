@@ -35,17 +35,18 @@ info "检查 .env 文件..."
 if [ ! -f ".env" ] || [ ! -s ".env" ]; then
     warn ".env 文件不存在或为空，正在创建..."
     cat > .env << 'EOF'
-JWT_SECRET=b0AolGYvplzI5XMC2CknFUVegst41_6ViXmPdhQY-QM9_dzZmEpdmOajc_Sk7dwb
+JWT_SECRET=CHANGE_ME_TO_A_RANDOM_STRING_AT_LEAST_32_CHARS
+ALLOWED_ORIGINS=http://47.116.77.67:8688,http://localhost:5173,http://localhost:5174
 ENABLE_MOCK_AUTH=false
-ALIPAY_APP_ID=2021006159645339
+ALIPAY_APP_ID=your_alipay_app_id
 ALIPAY_PRIVATE_KEY=keys/alipay_private_key.pem
 ALIPAY_PUBLIC_KEY=keys/alipay_public_key_from_alipay.pem
 ALIPAY_RETURN_URL=http://47.116.77.67:8688/api/auth/alipay/callback
 PG_HOST=localhost
 PG_PORT=5432
-PG_DATABASE=soulquad
-PG_USER=soulquad_user
-PG_PASSWORD=SoulQuad2024!
+PG_DATABASE=your_database
+PG_USER=your_db_user
+PG_PASSWORD=your_db_password
 EOF
     chmod 600 .env
     info ".env 文件已创建"
@@ -59,7 +60,7 @@ fi
 echo ""
 info "检查数据库连接..."
 if command -v psql &> /dev/null; then
-    PGPASSWORD="SoulQuad2024!" psql -h localhost -U soulquad_user -d soulquad -c "SELECT 1;" 2>/dev/null && \
+    PGPASSWORD="your_db_password" psql -h localhost -U your_db_user -d your_database -c "SELECT 1;" 2>/dev/null && \
         info "数据库连接成功" || \
         warn "数据库连接失败，请检查PostgreSQL是否运行"
 else

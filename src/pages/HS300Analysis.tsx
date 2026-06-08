@@ -373,10 +373,10 @@ export default function HS300Analysis() {
             <div style={{ position: 'relative', paddingLeft: 30 }}>
               <div style={{ position: 'absolute', left: 15, top: 0, bottom: 0, width: 2, background: '#e8e8e8' }}></div>
               {[
-                { batch: 1, time: '本周', pct: 30, action: '首批建仓30%，优选增强型基金', reason: '当前估值偏低，先建底仓' },
-                { batch: 2, time: '2-3周后', pct: 30, action: '第二批30%，搭配低费率联接基金', reason: '观察市场走势，逢低加仓' },
-                { batch: 3, time: '1个月后', pct: 25, action: '第三批25%，定投方式', reason: '持续摊薄成本' },
-                { batch: 4, time: '2个月后', pct: 15, action: '最后15%，机动资金', reason: '预留资金应对意外下跌' },
+                { batch: 1, time: '本周', pct: 20, action: '首批建仓20%，优选低费率ETF联接基金', reason: 'PE分位87.8%偏高，先建小仓位试探' },
+                { batch: 2, time: '2-3周后', pct: 25, action: '第二批25%，定投方式买入增强型基金', reason: '观察回调幅度，逢低加仓' },
+                { batch: 3, time: '1个月后', pct: 30, action: '第三批30%，搭配增强型+低费率联接', reason: '若回调到位加大仓位' },
+                { batch: 4, time: '2-3个月后', pct: 25, action: '最后25%，机动资金', reason: '预留资金应对持续下跌或追加定投' },
               ].map((plan, idx) => (
                 <div key={idx} style={{ marginBottom: 24, position: 'relative' }}>
                   <div style={{
@@ -430,8 +430,8 @@ export default function HS300Analysis() {
               </table>
             </div>
             <p style={{ marginTop: 12, fontSize: 13, color: '#666' }}>
-              当前沪深300 PE分位约 <strong style={{ color: '#1677ff' }}>{data.valuation.pePercentile}%</strong>，
-              处于<strong style={{ color: '#1677ff' }}>{data.valuation.valuation}</strong>区间，
+              当前沪深300 PE分位约 <strong style={{ color: '#ff4d4f' }}>{data.valuation.pePercentile}%</strong>，
+              处于<strong style={{ color: '#ff4d4f' }}>{data.valuation.valuation}</strong>区间，
               {data.valuation.suggestion}。
             </p>
           </div>

@@ -45,7 +45,7 @@
 
 ### 环境变量（/var/www/jijin/.env）
 ```env
-ALIPAY_APP_ID=2021006159645339
+ALIPAY_APP_ID=your_alipay_app_id
 ALIPAY_PRIVATE_KEY=keys/alipay_private_key.pem
 ALIPAY_PUBLIC_KEY=keys/alipay_public_key_from_alipay.pem
 ALIPAY_RETURN_URL=http://47.116.77.67:8688/api/auth/alipay/callback

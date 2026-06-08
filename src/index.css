@@ -577,6 +577,38 @@ a:hover {
   /* 暗色模式变量 - 暂未启用 */
 }
 
+/* GSAP tilt cards get transform-style set via JS */
+
+/* Navbar logo pulse */
+@keyframes logoPulse {
+  0%, 100% { box-shadow: 0 2px 8px rgba(22, 119, 255, 0.3); }
+  50% { box-shadow: 0 2px 16px rgba(22, 119, 255, 0.5); }
+}
+
+.navbar-logo-animated {
+  animation: logoPulse 3s ease-in-out infinite;
+}
+
+/* Smooth page transitions */
+.page-wrapper {
+  will-change: opacity, transform;
+}
+
+/* Floating particles effect */
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  33% { transform: translateY(-10px) rotate(5deg); }
+  66% { transform: translateY(5px) rotate(-3deg); }
+}
+
+.floating-particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.15;
+  animation: float 6s ease-in-out infinite;
+}
+
 /* 打印样式 */
 @media print {
   .no-print {

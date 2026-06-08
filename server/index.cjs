@@ -1,7 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { allFunds } = require('./fund-data.cjs');
+const helmet = require('helmet');
+const { allFunds, fundManagerMap } = require('./fund-data.cjs');
 const { initDatabase } = require('./db.cjs');
 const fundService = require('./fund-service.cjs');
 const authRoutes = require('./auth.cjs');
@@ -12,6 +13,7 @@ const { isTradingHours, isTradingDay, getNextUpdateTime } = require('./utils/tra
 const {
   fetchCapitalFlow, fetchQDIIData, fetchHS300FundDetails,
   updateAllFundData: fetchUpdateAllFundData, updateAllFundReturns, updatePortfolioPnl,
+  runDailyDataUpdate,
   defaultIndices,
 } = require('./data-fetcher.cjs');
 const { router: apiRoutes, createStatusRoute, createUpdateRoute } = require('./routes/api.cjs');
@@ -25,38 +27,49 @@ app.set('trust proxy', 1);
 // CORS: 仅允许前端域名
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://47.116.77.67:8688', 'http://localhost:5174'];
+  : ['http://47.116.77.67:8688', 'http://localhost:5173', 'http://localhost:5174'];
 
 app.use(cors({
   origin: (origin, callback) => {
+    // 允许无 Origin 的请求（服务器到服务器、Postman 等非浏览器场景）
+    // 浏览器跨域请求必须携带 Origin，且必须在白名单中
     if (!origin || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
   },
+  credentials: true,
+  maxAge: 86400,
 }));
 
 // 请求体大小限制
 app.use(express.json({ limit: '10kb' }));
 
 // 速率限制（使用共享模块）
-const generalLimiter = createRateLimit(60 * 1000, 60, 'general');
+const generalLimiter = createRateLimit(60 * 1000, 300, 'general');
 const updateLimiter = createRateLimit(15 * 60 * 1000, 3, 'update');
 
 app.use('/api/', generalLimiter);
 app.use('/api/update', updateLimiter);
 
-// 安全响应头
+// 安全响应头（使用 helmet + 自定义补充）
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      fontSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  hsts: { maxAge: 31536000, includeSubDomains: true },
+}));
 app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'");
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  }
   next();
 });
 
@@ -122,26 +135,29 @@ async function startServer() {
     await initDatabase();
     console.log('数据库初始化完成');
 
-    // 导入种子数据（ON CONFLICT DO NOTHING，安全幂等）
+    // 同步种子数据（ON CONFLICT DO UPDATE，fund-data.cjs 为数据源）
     const fundCount = await fundService.getFundCount();
-    console.log(`[种子数据] 数据库已有 ${fundCount} 只基金，同步 fund-data.cjs 中的新增基金...`);
+    console.log(`[种子数据] 数据库已有 ${fundCount} 只基金，同步 fund-data.cjs ...`);
     await fundService.seedFunds(allFunds);
     const newCount = await fundService.getFundCount();
     if (newCount > fundCount) {
       console.log(`[种子数据] 新增 ${newCount - fundCount} 只基金`);
+    } else {
+      console.log(`[种子数据] 已同步 ${newCount} 只基金数据`);
     }
+
+    // 更新基金经理信息
+    await fundService.updateFundManagers(fundManagerMap);
 
     // 初始化市场指数
     await fundService.initMarketIndices(defaultIndices);
 
-    // 启动自动更新
+    // 启动自动更新（开盘时间每15分钟更新净值+指数）
     startAutoUpdate();
     scheduleCapitalFlowUpdate();
 
-    // 使用共享调度器安排每日任务
-    scheduleDaily(() => fetchQDIIData(allFunds), 9, 30, 'QDII');
-    scheduleDaily(() => fetchHS300FundDetails(allFunds), 9, 30, 'HS300');
-    scheduleDaily(() => updatePortfolioPnl(allFunds), 9, 30, '持仓');
+    // 每日9:30执行完整数据更新（收益率+QDII限额+HS300+持仓盈亏）
+    scheduleDaily(() => runDailyDataUpdate(allFunds), 9, 30, '每日数据更新');
 
     app.listen(PORT, () => {
       console.log(`基金推荐服务器运行在 http://localhost:${PORT}`);

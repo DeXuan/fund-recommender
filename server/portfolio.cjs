@@ -499,6 +499,10 @@ router.post('/import', upload.single('file'), async (req, res) => {
         errors.push(`第${i + 1}行: 数据格式错误`);
         continue;
       }
+      if (!/^\d{6}$/.test(fundCode)) {
+        errors.push(`第${i + 1}行: 基金代码必须为6位数字`);
+        continue;
+      }
       if (shares <= 0 || costPrice <= 0) {
         errors.push(`第${i + 1}行: 份额和成本价必须大于0`);
         continue;

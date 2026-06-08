@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card, Row, Col, Table, Tag, Progress, Statistic, Spin, Space, Badge, Modal, message } from 'antd';
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
   FundOutlined,
-  SwapOutlined,
   SafetyOutlined,
   CalculatorOutlined,
   LineChartOutlined,
@@ -16,6 +15,7 @@ import {
   TrophyOutlined,
   AccountBookOutlined,
   RightOutlined,
+  GlobalOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { fundApi, portfolioApi } from '../services/api';
@@ -42,8 +42,16 @@ interface SectorData {
   leadingStock: string;
 }
 
+// API 行业名 → 行业分析页 INDUSTRIES key 的映射
+const INDUSTRY_NAME_MAP: Record<string, string> = {
+  '人工智能/AI': '人工智能',
+  '半导体/芯片': '半导体/芯片',
+  '纳斯达克100': '',
+};
+
 export default function Home() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [indices, setIndices] = useState<MarketIndex[]>([]);
   const [sectors, setSectors] = useState<SectorData[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -159,7 +167,7 @@ export default function Home() {
     { to: '/industry', icon: <BarChartOutlined />, label: '行业分析', desc: '九大行业深度研究', color: '#f093fb' },
     { to: '/market', icon: <LineChartOutlined />, label: '市场估值', desc: '指数PE/PB估值仪表盘', color: '#a18cd1' },
     { to: '/hs300', icon: <StockOutlined />, label: '沪深300', desc: '核心宽基指数深度分析', color: '#fbc2eb' },
-    { to: '/qdii', icon: <SwapOutlined />, label: 'QDII基金', desc: '海外指数基金限额监控', color: '#4facfe' },
+    { to: '/qdii', icon: <GlobalOutlined />, label: '标普500/QDII', desc: '美股核心指数深度分析', color: '#1890ff' },
     { to: '/portfolio', icon: <PieChartOutlined />, label: '我的持仓', desc: '投资组合与盈亏管理', color: '#36cfc9' },
     { to: '/dca-calculator', icon: <CalculatorOutlined />, label: '定投计算器', desc: '智能定投收益测算', color: '#fa709a' },
     { to: '/risk-assessment', icon: <SafetyOutlined />, label: '风险评估', desc: '了解你的风险偏好', color: '#43e97b' },
@@ -499,9 +507,16 @@ export default function Home() {
         style={{ marginBottom: 20, borderRadius: 12 }}
       >
         <Row gutter={[16, 16]}>
-          {recommendations.slice(0, 6).map((rec) => (
+          {recommendations.slice(0, 6).map((rec) => {
+            const sectorKey = INDUSTRY_NAME_MAP[rec.industry] ?? rec.industry;
+            return (
             <Col xs={24} sm={12} key={rec.industry}>
-              <Card size="small" style={{ marginBottom: 0, borderRadius: 10, border: '1px solid #f0f0f0' }} hoverable>
+              <Card
+                size="small"
+                style={{ marginBottom: 0, borderRadius: 10, border: '1px solid #f0f0f0', cursor: 'pointer' }}
+                hoverable
+                onClick={() => sectorKey && navigate(`/industry?sector=${encodeURIComponent(sectorKey)}`)}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <strong style={{ fontSize: 16, color: '#1f1f1f' }}>{rec.industry}</strong>
                   <Tag color={rec.buySuggestion === '优先配置' ? 'red' : rec.buySuggestion === '限大额配置' ? 'orange' : 'green'} style={{ borderRadius: 6, fontWeight: 500 }}>
@@ -522,7 +537,7 @@ export default function Home() {
                 </Space>
               </Card>
             </Col>
-          ))}
+          )})}
         </Row>
       </Card>
 

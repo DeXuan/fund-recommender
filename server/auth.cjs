@@ -182,15 +182,53 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /api/auth/change-password
+router.post('/change-password', authMiddleware, strictLimit, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ error: '旧密码和新密码不能为空' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: '新密码长度不能少于8个字符' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: '用户不存在' });
+    }
+
+    const valid = await bcrypt.compare(oldPassword, result.rows[0].password_hash);
+    if (!valid) {
+      return res.status(400).json({ error: '旧密码错误' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, req.user.id]);
+
+    res.json({ success: true, message: '密码修改成功' });
+  } catch (error) {
+    console.error('修改密码失败:', error.message);
+    res.status(500).json({ error: '修改密码失败' });
+  }
+});
+
 // GET /api/auth/alipay/qrcode
 router.get('/alipay/qrcode', (req, res) => {
   const appId = process.env.ALIPAY_APP_ID;
+  // 开发环境：启用模拟登录时直接返回 mock 模式
+  if (process.env.ENABLE_MOCK_AUTH === 'true' && process.env.NODE_ENV !== 'production') {
+    return res.json({ mock: true });
+  }
   if (!appId) {
     return res.status(503).json({ error: '支付宝登录暂未配置，请联系管理员', mock: true });
   }
 
-  // 使用后端回调地址
-  const returnUrl = 'http://47.116.77.67:8688/api/auth/alipay/callback';
+  // 使用后端回调地址（优先从环境变量读取）
+  const returnUrl = process.env.ALIPAY_RETURN_URL || 'http://47.116.77.67:8688/api/auth/alipay/callback';
   // Use cryptographically secure random for OAuth state parameter
   const state = crypto.randomBytes(16).toString('hex');
 
@@ -226,7 +264,6 @@ router.post('/alipay/mock-login', strictLimit, async (req, res) => {
       username = existing.rows[0].username;
     } else {
       username = 'alipay_demo_user';
-      const crypto = require('crypto');
       const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
       const userResult = await pool.query(
         'INSERT INTO users (username, password_hash, nickname, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id',
@@ -273,7 +310,7 @@ setInterval(() => {
 router.get('/alipay/callback', async (req, res) => {
   try {
     const { auth_code, state } = req.query;
-    if (!auth_code) {
+    if (!auth_code || typeof auth_code !== 'string' || auth_code.length > 128 || !/^[a-zA-Z0-9_-]+$/.test(auth_code)) {
       return res.status(400).send('<h1>缺少授权码</h1>');
     }
 
@@ -325,7 +362,6 @@ router.get('/alipay/callback', async (req, res) => {
       }
 
       username = `alipay_${user_id}`;
-      const crypto = require('crypto');
       const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
       const userResult = await pool.query(
         'INSERT INTO users (username, password_hash, nickname, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id',
@@ -378,8 +414,8 @@ router.get('/alipay/callback', async (req, res) => {
 // GET /api/auth/alipay/check?state=xxx — PC frontend polls this to check if auth completed
 router.get('/alipay/check', (req, res) => {
   const { state } = req.query;
-  if (!state || typeof state !== 'string') {
-    return res.status(400).json({ error: '缺少state参数' });
+  if (!state || typeof state !== 'string' || state.length > 200 || !/^[a-zA-Z0-9_.]+$/.test(state)) {
+    return res.status(400).json({ error: '无效的state参数' });
   }
 
   const result = pendingAuth.get(state);

@@ -69,7 +69,7 @@ console.log('   d) 将下面的应用公钥内容粘贴到"填写公钥字符"�
 console.log('   e) 保存后，支付宝会生成"支付宝公钥"，将其保存到:');
 console.log('      ' + path.join(keysDir, 'alipay_public_key_from_alipay.pem'));
 console.log('\n4. 更新 .env 文件：');
-console.log('   ALIPAY_APP_ID=2021006159645339');
+console.log('   ALIPAY_APP_ID=your_alipay_app_id');
 console.log('   ALIPAY_PRIVATE_KEY=<私钥文件路径或私钥内容>');
 console.log('   ALIPAY_PUBLIC_KEY=<支付宝公钥文件路径或公钥内容>');
 console.log('\n5. 应用公钥内容（可直接复制）：');

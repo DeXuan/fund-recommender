@@ -6,6 +6,7 @@ dist/
 .env.local
 .env.*
 !.env.example
+.env.deploy
 
 # 数据库
 server/data/
@@ -35,3 +36,19 @@ coverage/
 
 # Claude Code
 .claude/
+
+# 备份和临时文件
+*.backup
+server/fund-managers-data.json
+server/fund-manager-map.js
+
+# 部署产物
+fund-recommender.zip
+make-zip.ps1
+
+# 临时脚本和数据
+scripts/*.py
+scripts/*.json
+scripts/*.csv
+test_*.py
+*.tmp

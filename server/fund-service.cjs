@@ -79,6 +79,7 @@ function formatFund(row) {
     logic: row.logic,
     isGoldSelected: row.is_gold_selected,
     dailyLimit: row.daily_limit,
+    manager: row.manager || null,
     // 从 fund_nav 表动态获取的字段（需要 JOIN 或单独查询）
     nav: null,
     navDate: null,
@@ -166,6 +167,54 @@ async function getLatestNav(code) {
 }
 
 // 获取所有基金的最新净值（带LEFT JOIN）
+// 收益率内存缓存（code -> { returns, timestamp }）
+const returnsCache = new Map();
+const RETURNS_CACHE_TTL = 30 * 60 * 1000; // 30分钟
+
+// 从东方财富API获取单只基金收益率
+async function fetchReturnsFromAPI(code) {
+  try {
+    const axios = require('axios');
+    const resp = await axios.get(`https://fund.eastmoney.com/pingzhongdata/${code}.js`, {
+      timeout: 8000,
+      headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://fund.eastmoney.com/', Range: 'bytes=0-3000' },
+    });
+    const text = resp.data || '';
+    const extract = (key) => {
+      const m = text.match(new RegExp(key + "\\s*=\\s*['\"]([^'\"]+)"));
+      return m ? parseFloat(m[1]) : null;
+    };
+    return { return1y: extract('syl_1n'), return6m: extract('syl_6y'), return3m: extract('syl_3y'), return1m: extract('syl_1y') };
+  } catch { return null; }
+}
+
+// 批量获取收益率（带缓存+并发控制）
+async function batchFetchReturns(codes) {
+  const now = Date.now();
+  const toFetch = codes.filter(c => {
+    const cached = returnsCache.get(c);
+    return !cached || (now - cached.timestamp > RETURNS_CACHE_TTL);
+  });
+
+  // 并发获取，每批5个
+  for (let i = 0; i < toFetch.length; i += 5) {
+    const batch = toFetch.slice(i, i + 5);
+    const results = await Promise.all(batch.map(c => fetchReturnsFromAPI(c)));
+    batch.forEach((code, idx) => {
+      if (results[idx]) {
+        returnsCache.set(code, { returns: results[idx], timestamp: now });
+      }
+    });
+  }
+
+  const map = new Map();
+  codes.forEach(c => {
+    const cached = returnsCache.get(c);
+    map.set(c, cached ? cached.returns : null);
+  });
+  return map;
+}
+
 async function getAllFundsWithNav(filters = {}) {
   const pool = getPool();
   let query = `
@@ -176,7 +225,7 @@ async function getAllFundsWithNav(filters = {}) {
       SELECT nav, total_nav, nav_date, return_1w, return_1m, return_3m, return_6m, return_1y
       FROM fund_nav
       WHERE fund_code = f.code
-      ORDER BY nav_date DESC
+      ORDER BY return_1y IS NOT NULL DESC, nav_date DESC
       LIMIT 1
     ) n ON true
     WHERE 1=1
@@ -196,6 +245,10 @@ async function getAllFundsWithNav(filters = {}) {
     query += ` AND (f.code ILIKE $${paramIndex} OR f.name ILIKE $${paramIndex})`;
     params.push(`%${filters.search}%`);
     paramIndex++;
+  }
+  if (filters.manager) {
+    query += ` AND f.manager = $${paramIndex++}`;
+    params.push(filters.manager);
   }
 
   // 排序（camelCase → 数据库列名映射）
@@ -225,8 +278,20 @@ async function getAllFundsWithNav(filters = {}) {
   params.push(pageSize, offset);
 
   const result = await pool.query(query, params);
+
+  // 找出收益率为空的基金，从外部API补充
+  const nullReturnCodes = result.rows
+    .filter(r => r.return_1y == null || r.return_1m == null)
+    .map(r => r.code);
+  let apiReturns = new Map();
+  if (nullReturnCodes.length > 0) {
+    try { apiReturns = await batchFetchReturns(nullReturnCodes); } catch {}
+  }
+
   return {
-    data: result.rows.map(row => ({
+    data: result.rows.map(row => {
+    const apiRet = apiReturns.get(row.code);
+    return {
     code: row.code,
     name: row.name,
     type: row.type,
@@ -244,14 +309,16 @@ async function getAllFundsWithNav(filters = {}) {
     logic: row.logic,
     isGoldSelected: row.is_gold_selected,
     dailyLimit: row.daily_limit,
+    manager: row.manager || null,
     nav: row.nav ? parseFloat(row.nav) : null,
     navDate: row.nav_date || null,
     return1w: row.return_1w ? parseFloat(row.return_1w) : null,
-    return1m: row.return_1m ? parseFloat(row.return_1m) : null,
-    return3m: row.return_3m ? parseFloat(row.return_3m) : null,
-    return6m: row.return_6m ? parseFloat(row.return_6m) : null,
-    return1y: row.return_1y ? parseFloat(row.return_1y) : null,
-    })),
+    return1m: row.return_1m ? parseFloat(row.return_1m) : (apiRet?.return1m ?? null),
+    return3m: row.return_3m ? parseFloat(row.return_3m) : (apiRet?.return3m ?? null),
+    return6m: row.return_6m ? parseFloat(row.return_6m) : (apiRet?.return6m ?? null),
+    return1y: row.return_1y ? parseFloat(row.return_1y) : (apiRet?.return1y ?? null),
+    };
+    }),
     total,
     page,
     pageSize,
@@ -276,6 +343,7 @@ async function getMarketIndices() {
     pbPercentile: row.pb_percentile ? parseFloat(row.pb_percentile) : null,
     valuation: row.valuation,
     suggestion: row.suggestion,
+    dataDate: row.updated_at,
   }));
 }
 
@@ -321,16 +389,16 @@ async function initMarketIndices(indices) {
 
 async function getSectorData() {
   const pool = getPool();
-  const today = new Date().toISOString().split('T')[0];
+  // 获取最新一天的板块数据（交易日有数据，休息日取上一个交易日）
   const result = await pool.query(
-    'SELECT * FROM sector_data WHERE trade_date = $1 ORDER BY change_percent DESC',
-    [today]
+    `SELECT * FROM sector_data WHERE trade_date = (SELECT MAX(trade_date) FROM sector_data) ORDER BY change_percent DESC`
   );
   return result.rows.map(row => ({
     name: row.name,
     change: parseFloat(row.change_percent) || 0,
     volume: row.volume,
     leadingStock: row.leading_stock,
+    dataDate: row.trade_date,
   }));
 }
 
@@ -363,7 +431,24 @@ async function seedFunds(funds) {
       await pool.query(
         `INSERT INTO funds (code, name, type, industry, index_name, management_fee, custody_fee, service_fee, total_fee, scale, rating, buy_suggestion, valuation, trend, logic, is_gold_selected, daily_limit)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-         ON CONFLICT (code) DO NOTHING`,
+         ON CONFLICT (code) DO UPDATE SET
+           name = EXCLUDED.name,
+           type = EXCLUDED.type,
+           industry = EXCLUDED.industry,
+           index_name = EXCLUDED.index_name,
+           management_fee = EXCLUDED.management_fee,
+           custody_fee = EXCLUDED.custody_fee,
+           service_fee = EXCLUDED.service_fee,
+           total_fee = EXCLUDED.total_fee,
+           scale = EXCLUDED.scale,
+           rating = EXCLUDED.rating,
+           buy_suggestion = EXCLUDED.buy_suggestion,
+           valuation = EXCLUDED.valuation,
+           trend = EXCLUDED.trend,
+           logic = EXCLUDED.logic,
+           is_gold_selected = EXCLUDED.is_gold_selected,
+           daily_limit = EXCLUDED.daily_limit,
+           updated_at = NOW()`,
         [
           fund.code,
           fund.name,
@@ -391,6 +476,37 @@ async function seedFunds(funds) {
   }
 
   console.log(`[种子数据] 尝试插入 ${funds.length} 只基金，成功 ${insertedCount} 只`);
+}
+
+// 批量更新基金经理
+async function updateFundManagers(managerMap) {
+  const pool = getPool();
+  let updatedCount = 0;
+  for (const [code, manager] of Object.entries(managerMap)) {
+    try {
+      const result = await pool.query(
+        'UPDATE funds SET manager = $1 WHERE code = $2 AND (manager IS NULL OR manager = \'\')',
+        [manager, code]
+      );
+      if (result.rowCount > 0) updatedCount++;
+    } catch (e) {
+      console.warn(`更新基金经理失败 ${code}:`, e.message);
+    }
+  }
+  console.log(`[基金经理] 更新 ${updatedCount} 只基金的经理信息`);
+}
+
+// 获取所有基金经理列表（去重，按管理基金数量降序）
+async function getManagers() {
+  const pool = getPool();
+  const result = await pool.query(`
+    SELECT manager, COUNT(*) as fund_count
+    FROM funds
+    WHERE manager IS NOT NULL AND manager != ''
+    GROUP BY manager
+    ORDER BY fund_count DESC
+  `);
+  return result.rows.map(r => ({ name: r.manager, fundCount: parseInt(r.fund_count) }));
 }
 
 async function getFundCount() {
@@ -468,6 +584,7 @@ module.exports = {
   getFundsByIndustry,
   getIndustries,
   getAllFundsWithNav,
+  batchFetchReturns,
   updateFundNav,
   updateFundReturns,
   getLatestNav,
@@ -477,6 +594,8 @@ module.exports = {
   getSectorData,
   updateSectorData,
   seedFunds,
+  updateFundManagers,
+  getManagers,
   getFundCount,
   getHS300FundDetails,
   updateHS300FundDetail,

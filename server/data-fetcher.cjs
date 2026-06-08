@@ -664,14 +664,26 @@ async function updateAllFundData(allFunds, dataUpdateStatus, isTradingDay, getNe
   }
 }
 
-// 批量更新所有基金的收益率
+// 批量更新所有基金的收益率（带重试）
 async function updateAllFundReturns(allFunds) {
+  if (!allFunds || allFunds.length === 0) {
+    console.log('[收益率] 无基金数据，跳过');
+    return 0;
+  }
+
   let updatedCount = 0;
   let failedCount = 0;
-  for (let i = 0; i < allFunds.length; i += 10) {
+  const total = allFunds.length;
+
+  console.log(`[收益率] 开始更新 ${total} 只基金收益率...`);
+
+  for (let i = 0; i < total; i += 10) {
     const batch = allFunds.slice(i, i + 10);
-    const results = await Promise.all(batch.map(f => fetchFundReturns(f.code)));
-    const weekResults = await Promise.all(batch.map(f => fetchReturn1w(f.code)));
+    // 并发获取收益率和近1周收益率
+    const [results, weekResults] = await Promise.all([
+      Promise.all(batch.map(f => fetchFundReturns(f.code))),
+      Promise.all(batch.map(f => fetchReturn1w(f.code))),
+    ]);
 
     for (let j = 0; j < results.length; j++) {
       const result = results[j];
@@ -681,7 +693,7 @@ async function updateAllFundReturns(allFunds) {
           await fundService.updateFundReturns(batch[j].code, result);
           updatedCount++;
         } catch (e) {
-          console.warn(`保存基金 ${batch[j].code} 收益率失败:`, e.message);
+          console.warn(`[收益率] 保存 ${batch[j].code} 失败:`, e.message);
           failedCount++;
         }
       } else {
@@ -689,13 +701,43 @@ async function updateAllFundReturns(allFunds) {
       }
     }
 
-    if (i + 10 < allFunds.length) {
-      await new Promise(r => setTimeout(r, 300));
+    // 进度日志（每50只输出一次）
+    if ((i + 10) % 50 === 0 || i + 10 >= total) {
+      console.log(`[收益率] 进度: ${Math.min(i + 10, total)}/${total} (成功${updatedCount}, 失败${failedCount})`);
+    }
+
+    if (i + 10 < total) {
+      await new Promise(r => setTimeout(r, 500));
     }
   }
 
-  console.log(`[收益率] 更新完成: 成功 ${updatedCount}, 失败 ${failedCount}, 共 ${allFunds.length} 只`);
+  console.log(`[收益率] 更新完成: 成功 ${updatedCount}, 失败 ${failedCount}, 共 ${total} 只`);
   return updatedCount;
+}
+
+// 每日9:30执行的完整数据更新任务
+async function runDailyDataUpdate(allFunds) {
+  console.log('========== [每日任务] 开始执行 ==========');
+  const startTime = Date.now();
+
+  try {
+    // 1. 更新所有基金收益率 → 写入 fund_nav 表
+    await updateAllFundReturns(allFunds);
+
+    // 2. 更新QDII基金申购状态+限额 → 写入 funds 表
+    await fetchQDIIData(allFunds);
+
+    // 3. 更新沪深300基金详情
+    await fetchHS300FundDetails(allFunds);
+
+    // 4. 更新持仓盈亏
+    await updatePortfolioPnl(allFunds);
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`========== [每日任务] 执行完成，耗时 ${elapsed}s ==========`);
+  } catch (error) {
+    console.error('[每日任务] 执行失败:', error.message);
+  }
 }
 
 // 更新所有用户的持仓盈亏数据
@@ -772,4 +814,5 @@ module.exports = {
   updateAllFundData,
   updateAllFundReturns,
   updatePortfolioPnl,
+  runDailyDataUpdate,
 };

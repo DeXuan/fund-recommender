@@ -109,6 +109,7 @@ async function initDatabase() {
         logic TEXT,
         is_gold_selected BOOLEAN DEFAULT false,
         daily_limit INTEGER DEFAULT 0,
+        manager VARCHAR(50),
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )`,
@@ -196,6 +197,11 @@ async function initDatabase() {
         ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS pnl NUMERIC(15,2) DEFAULT 0;
         ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS pnl_percent NUMERIC(8,2) DEFAULT 0;
         ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS nav_updated_at TIMESTAMP;
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$`,
+      // 基金经理字段
+      `DO $$ BEGIN
+        ALTER TABLE funds ADD COLUMN IF NOT EXISTS manager VARCHAR(50);
       EXCEPTION WHEN duplicate_column THEN NULL;
       END $$`,
       // 沪深300基金详情表（申购费、超额收益等）

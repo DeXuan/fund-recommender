@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import DataStatus from './components/DataStatus';
 import ErrorBoundary from './components/ErrorBoundary';
+import GsapEnhancer from './components/GsapEnhancer';
 
 const Home = lazy(() => import('./pages/Home'));
 const FundList = lazy(() => import('./pages/FundList'));
@@ -15,6 +16,7 @@ const MarketAnalysis = lazy(() => import('./pages/MarketAnalysis'));
 const QDIIFunds = lazy(() => import('./pages/QDIIFunds'));
 const IndustryAnalysis = lazy(() => import('./pages/IndustryAnalysis'));
 const HS300Analysis = lazy(() => import('./pages/HS300Analysis'));
+
 const Login = lazy(() => import('./pages/Login'));
 const Portfolio = lazy(() => import('./pages/Portfolio'));
 const Watchlist = lazy(() => import('./pages/Watchlist'));
@@ -53,6 +55,7 @@ function App() {
     <Router basename="/web">
       <AuthProvider>
         <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
+          <GsapEnhancer />
           <Navbar />
           <div style={{ position: 'sticky', top: 64, zIndex: 99, padding: '8px 24px', background: 'rgba(245, 245, 245, 0.8)', backdropFilter: 'blur(8px)' }}>
             <DataStatus />

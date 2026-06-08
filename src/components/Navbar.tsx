@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Layout, Menu, Button, Drawer, Grid, Dropdown, Avatar, Space, Badge, List, Tag, Empty } from 'antd';
+import { Layout, Menu, Button, Drawer, Grid, Dropdown, Avatar, Space, Badge, List, Tag, Empty, Modal, Input, Form, message } from 'antd';
 import {
   HomeOutlined,
   FundOutlined,
@@ -19,9 +19,13 @@ import {
   WarningOutlined,
   CheckCircleOutlined,
   InfoCircleOutlined,
+  RiseOutlined,
+  FallOutlined,
+  ExclamationCircleOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
-import { alertsApi } from '../services/api';
+import { alertsApi, authApi } from '../services/api';
 
 const { useBreakpoint } = Grid;
 
@@ -36,6 +40,25 @@ const navItems = [
   { key: '/dca-calculator', label: '定投计算器', icon: <CalculatorOutlined /> },
 ];
 
+const DISMISSED_KEY = 'dismissed_alerts';
+
+function getDismissedAlerts(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+
+function dismissAlert(key: string) {
+  const dismissed = getDismissedAlerts();
+  dismissed.add(key);
+  localStorage.setItem(DISMISSED_KEY, JSON.stringify([...dismissed]));
+}
+
+function alertKey(item: any): string {
+  return `${item.type}_${item.fund_code || 'global'}`;
+}
+
 export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -44,12 +67,42 @@ export default function Navbar() {
   const isMobile = !screens.md;
   const { user, logout } = useAuth();
   const [alerts, setAlerts] = useState<any[]>([]);
+  const [pwdModalOpen, setPwdModalOpen] = useState(false);
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdForm] = Form.useForm();
+
+  const handleChangePassword = async () => {
+    try {
+      const values = await pwdForm.validateFields();
+      setPwdLoading(true);
+      await authApi.changePassword(values.oldPassword, values.newPassword);
+      message.success('密码修改成功');
+      setPwdModalOpen(false);
+      pwdForm.resetFields();
+    } catch (err: any) {
+      if (err.errorFields) return; // form validation error
+      message.error(err.message || '修改密码失败');
+    } finally {
+      setPwdLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
-      alertsApi.getAlerts().then(setAlerts).catch(() => {});
+      alertsApi.getAlerts().then((data: any[]) => {
+        const dismissed = getDismissedAlerts();
+        setAlerts(data.filter(a => !dismissed.has(alertKey(a))));
+      }).catch(() => {});
     }
   }, [user]);
+
+  const handleDismissAlert = (item: any) => {
+    const key = alertKey(item);
+    dismissAlert(key);
+    setAlerts(prev => prev.filter(a => alertKey(a) !== key));
+    if (item.fund_code) navigate(`/funds/${item.fund_code}`);
+    else navigate('/market');
+  };
 
   const allNavItems = [
     ...navItems,
@@ -107,20 +160,55 @@ export default function Navbar() {
           <Space size={12}>
             {user ? (
               <>
-              <Badge count={alerts.length} size="small" offset={[-2, 2]}>
-                <Button type="text" icon={<BellOutlined />} style={{ color: '#595959', fontSize: 16 }} onClick={() => navigate('/portfolio')} />
-              </Badge>
+              <Dropdown
+                trigger={['click']}
+                dropdownRender={() => (
+                  <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 6px 16px rgba(0,0,0,0.12)', padding: 12, width: 300, maxHeight: 360, overflow: 'auto' }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, padding: '0 4px' }}>消息提醒</div>
+                    {alerts.length === 0 ? (
+                      <Empty description="暂无提醒" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                    ) : (
+                      <List
+                        size="small"
+                        dataSource={alerts.slice(0, 10)}
+                        renderItem={(item: any) => (
+                          <List.Item
+                            style={{ padding: '8px 4px', alignItems: 'flex-start', cursor: 'pointer' }}
+                            onClick={() => handleDismissAlert(item)}
+                          >
+                            <div style={{ marginRight: 8, marginTop: 2 }}>
+                              {item.level === 'warning' ? <WarningOutlined style={{ color: '#faad14' }} /> :
+                               item.level === 'success' ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> :
+                               <InfoCircleOutlined style={{ color: '#1677ff' }} />}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 500, fontSize: 13 }}>{item.title}</div>
+                              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>{item.message}</div>
+                            </div>
+                          </List.Item>
+                        )}
+                      />
+                    )}
+                  </div>
+                )}
+              >
+                <Badge count={alerts.length} size="small" offset={[-2, 2]}>
+                  <Button type="text" icon={<BellOutlined />} style={{ color: '#595959', fontSize: 16 }} />
+                </Badge>
+              </Dropdown>
               <Dropdown menu={{
                 items: [
                   { key: 'portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
                   { key: 'watchlist', label: '自选基金', icon: <StarOutlined /> },
                   { type: 'divider' as const },
+                  { key: 'changePassword', label: '修改密码', icon: <KeyOutlined /> },
                   { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
                 ],
                 onClick: ({ key }) => {
                   if (key === 'logout') { logout(); navigate('/'); }
                   if (key === 'portfolio') navigate('/portfolio');
                   if (key === 'watchlist') navigate('/watchlist');
+                  if (key === 'changePassword') setPwdModalOpen(true);
                 },
               }}>
                 <Avatar size="small" icon={<UserOutlined />} src={user.avatar_url} style={{ cursor: 'pointer', background: '#1677ff' }} />
@@ -153,20 +241,62 @@ export default function Navbar() {
             <Space size={16} style={{ marginLeft: 16 }}>
               {user ? (
                 <>
-                <Badge count={alerts.length} size="small" offset={[-2, 2]}>
-                  <Button type="text" icon={<BellOutlined />} style={{ color: '#595959', fontSize: 16 }} onClick={() => navigate('/portfolio')} />
-                </Badge>
+                <Dropdown
+                  trigger={['click']}
+                  dropdownRender={() => (
+                    <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 6px 16px rgba(0,0,0,0.12)', padding: 12, width: 320, maxHeight: 400, overflow: 'auto' }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, padding: '0 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>消息提醒</span>
+                        {alerts.length > 0 && <Tag color="red" style={{ margin: 0 }}>{alerts.length} 条</Tag>}
+                      </div>
+                      {alerts.length === 0 ? (
+                        <Empty description="暂无提醒" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                      ) : (
+                        <List
+                          size="small"
+                          dataSource={alerts.slice(0, 10)}
+                          renderItem={(item: any) => (
+                            <List.Item
+                              style={{ padding: '8px 4px', alignItems: 'flex-start', cursor: 'pointer' }}
+                              onClick={() => handleDismissAlert(item)}
+                            >
+                              <div style={{ marginRight: 8, marginTop: 2 }}>
+                                {item.type?.includes('drop') || item.type === 'holding_loss' ? <FallOutlined style={{ color: '#ff4d4f' }} /> :
+                                 item.type?.includes('surge') ? <RiseOutlined style={{ color: '#52c41a' }} /> :
+                                 item.type === 'valuation_low' ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> :
+                                 item.type === 'valuation_high' ? <WarningOutlined style={{ color: '#faad14' }} /> :
+                                 item.type === 'qdii_limit' ? <InfoCircleOutlined style={{ color: '#1890ff' }} /> :
+                                 item.level === 'warning' ? <ExclamationCircleOutlined style={{ color: '#faad14' }} /> :
+                                 <InfoCircleOutlined style={{ color: '#1677ff' }} />}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 500, fontSize: 13 }}>{item.title}</div>
+                                <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>{item.message}</div>
+                              </div>
+                            </List.Item>
+                          )}
+                        />
+                      )}
+                    </div>
+                  )}
+                >
+                  <Badge count={alerts.length} size="small" offset={[-2, 2]}>
+                    <Button type="text" icon={<BellOutlined />} style={{ color: '#595959', fontSize: 16 }} />
+                  </Badge>
+                </Dropdown>
                 <Dropdown menu={{
                   items: [
                     { key: 'portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
                     { key: 'watchlist', label: '自选基金', icon: <StarOutlined /> },
                     { type: 'divider' as const },
+                    { key: 'changePassword', label: '修改密码', icon: <KeyOutlined /> },
                     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
                   ],
                   onClick: ({ key }) => {
                     if (key === 'logout') { logout(); navigate('/'); }
                     if (key === 'portfolio') navigate('/portfolio');
                     if (key === 'watchlist') navigate('/watchlist');
+                    if (key === 'changePassword') setPwdModalOpen(true);
                   },
                 }}>
                   <Space style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 8, transition: 'background 0.2s' }}>
@@ -220,6 +350,55 @@ export default function Navbar() {
           </div>
         )}
       </Drawer>
+
+      <Modal
+        title="修改密码"
+        open={pwdModalOpen}
+        onOk={handleChangePassword}
+        onCancel={() => { setPwdModalOpen(false); pwdForm.resetFields(); }}
+        confirmLoading={pwdLoading}
+        okText="确认修改"
+        cancelText="取消"
+        destroyOnClose
+      >
+        <Form form={pwdForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item
+            name="oldPassword"
+            label="当前密码"
+            rules={[{ required: true, message: '请输入当前密码' }]}
+          >
+            <Input.Password placeholder="请输入当前密码" />
+          </Form.Item>
+          <Form.Item
+            name="newPassword"
+            label="新密码"
+            rules={[
+              { required: true, message: '请输入新密码' },
+              { min: 8, message: '密码长度不能少于8个字符' },
+            ]}
+          >
+            <Input.Password placeholder="请输入新密码（至少8位）" />
+          </Form.Item>
+          <Form.Item
+            name="confirmPassword"
+            label="确认新密码"
+            dependencies={['newPassword']}
+            rules={[
+              { required: true, message: '请确认新密码' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('newPassword') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('两次输入的密码不一致'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password placeholder="请再次输入新密码" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Layout.Header>
   );
 }

@@ -228,6 +228,26 @@ router.get('/api/industries', async (req, res) => {
   }
 });
 
+// 获取基金经理列表
+router.get('/api/managers', async (req, res) => {
+  try {
+    const managers = await fundService.getManagers();
+    res.json(managers);
+  } catch (error) {
+    res.status(500).json({ error: '获取基金经理列表失败' });
+  }
+});
+
+// 获取明星基金经理详情
+router.get('/api/star-managers', (req, res) => {
+  try {
+    const { starManagers } = require('../fund-data.cjs');
+    res.json(starManagers);
+  } catch (error) {
+    res.status(500).json({ error: '获取明星基金经理详情失败' });
+  }
+});
+
 // 风险评估
 router.post('/api/risk/profile', (req, res) => {
   try {
@@ -311,7 +331,7 @@ router.post('/api/tools/dca', (req, res) => {
       monthlyDetails.push({
         month: i + 1, investment: monthlyAmount, cumulativeInvestment,
         value: parseFloat(totalValue.toFixed(2)),
-        return: parseFloat((totalValue - cumulativeInvestment).toFixed(2)),
+        return: parseFloat((((totalValue - cumulativeInvestment) / cumulativeInvestment) * 100).toFixed(2)),
       });
     }
 
@@ -381,7 +401,35 @@ router.get('/api/industry-analysis/:industry', async (req, res) => {
       '军工': { match: ['军工'], trend: '温和上涨', valuation: '合理', buySuggestion: '可配置', logic: '国防预算持续增长，装备放量期，八一建军节前主题催化' },
       '金融': { match: ['金融'], trend: '稳步上涨', valuation: '合理偏低', buySuggestion: '可配置', logic: '高股息+低估值，防守属性强' },
       '煤炭': { match: ['煤炭'], trend: '震荡上行', valuation: '低估', buySuggestion: '分批建仓', logic: '高股息(5-8%)+低估值(PE 8-10倍)+供需偏紧，防御属性强，冬季供暖和夏季用电旺季有支撑' },
-      '陶瓷/建材': { match: ['陶瓷/建材'], trend: '底部企稳', valuation: '低估', buySuggestion: '逢低布局', logic: '房地产政策持续优化，基建投资稳增长，建材需求有望触底反弹；陶瓷行业集中度提升，龙头企业受益' },
+      '陶瓷/建材': {
+        match: ['陶瓷/建材'], trend: '底部企稳', valuation: '低估', buySuggestion: '逢低布局',
+        logic: '房地产政策持续优化，基建投资稳增长，建材需求有望触底反弹；陶瓷行业集中度提升，龙头企业受益',
+        tradingVolumeAnalysis: {
+          summary: '陶瓷/建材板块近期交易量显著放大，主要受政策预期、估值修复、板块轮动等多重因素驱动',
+          reasons: [
+            { title: '政策敏感度高', detail: '房地产政策（限购放松、房贷利率下调、城中村改造）和基建投资（专项债加速发行）频繁出台，市场预期差大，多空博弈激烈', impact: 'high' },
+            { title: '估值处于历史低位', detail: '中证全指建筑材料指数PE约12倍，PB约1.1倍，均处于近5年10%以下分位，吸引左侧布局资金持续流入', impact: 'high' },
+            { title: '板块轮动效应', detail: '当AI、半导体等热门板块高位震荡时，资金向低估值周期板块切换，建材作为价值洼地成为轮动目标', impact: 'medium' },
+            { title: '先进陶瓷概念叠加', detail: '陶瓷行业同时受益于"建材复苏"和"新材料/高端制造"两条主线，先进陶瓷用于半导体、新能源、5G等高科技领域，吸引不同类型的投资者', impact: 'medium' },
+            { title: '基金规模小易放大', detail: '建材ETF规模普遍在5-12亿，相比百亿级宽基ETF更容易被资金进出放大波动和交易量', impact: 'low' },
+          ],
+        },
+        customBatchPlan: [
+          { batch: 1, time: '立即', percentage: 25, targets: '建材ETF联接C (013020)', method: '支付宝申购C类免申购费', reason: '当前建材板块估值处历史低位，先建底仓，C类灵活调仓' },
+          { batch: 2, time: '2周后', percentage: 25, targets: '建材ETF联接C (013020) 或 建材ETF富国 (516750)', method: '支付宝定投或手动买入', reason: '观察房地产销售数据和基建投资进度，确认趋势' },
+          { batch: 3, time: '1个月后', percentage: 25, targets: '建材ETF联接A (013019)', method: '支付宝申购A类', reason: '趋势确认后切换A类降低长期费率，A类持有>=1年免赎回费' },
+          { batch: 4, time: '2个月后', percentage: 25, targets: '表现最优基金', method: '加仓或调仓', reason: '根据实际表现调整，可搭配广发建材指数A (004856)分散风险' },
+        ],
+        customRiskWarning: '1. 基金有风险，投资需谨慎。以上推荐基于数据分析，不构成投资建议。\n2. 陶瓷/建材板块属于强周期行业，与房地产和基建高度关联，受政策影响极大。\n3. 最大风险：房地产复苏不及预期、原材料（天然气、高岭土）成本上升压缩利润。\n4. 建材板块波动大，建议占总仓位的5-10%，不超过15%。\n5. 止盈线建议设在20-25%，止损线-15%。\n6. 建议以定投为主，避免一次性大额买入。\n7. 关注先进陶瓷（半导体/新能源用）概念的长期增长逻辑。',
+        investmentAdvice: {
+          shortTerm: '未来1-3个月：观望为主，交易量大但方向不明，不宜追高。关注房地产销售数据和政策信号。',
+          mediumTerm: '未来3-12个月：可小仓位配置，作为周期轮动的品种。推荐C类基金先建底仓，趋势确认后切换A类降低费率。',
+          longTerm: '未来1年以上：建材板块适合定投而非一次性买入。先进陶瓷（半导体/新能源领域）具有长期增长潜力。',
+          targetAllocation: '建议占总仓位的5-10%，不超过15%',
+          stopProfit: '20-25%',
+          stopLoss: '-15%',
+        },
+      },
       '电力': { match: ['电力'], trend: '季节性上涨', valuation: '合理偏低', buySuggestion: '夏季首选', logic: '夏季用电高峰(7-8月)确定性最强，全社会用电量创年度峰值，发电量/电价双升；高股息+防御属性，攻守兼备' },
       '水电': { match: ['水电'], trend: '丰水期上涨', valuation: '合理', buySuggestion: '丰水期配置', logic: '6-10月主汛期来水量增加，水电发电量提升；长江电力等龙头股息率约3-5%，丰水期业绩弹性最大' },
       '啤酒/饮料': { match: ['啤酒/饮料'], trend: '季节性上涨', valuation: '合理偏低', buySuggestion: '夏季旺季', logic: '夏季为啤酒消费绝对旺季，Q2-Q3营收占全年40%+；2026年有世界杯赛事催化，叠加油价下行降低运输成本' },
@@ -428,13 +476,15 @@ router.get('/api/industry-analysis/:industry', async (req, res) => {
         logic: f.logic || config.logic,
         isGoldSelected: f.isGoldSelected || false,
       })),
-      batchPlan: [
+      batchPlan: config.customBatchPlan || [
         { batch: 1, time: '立即', percentage: 30, targets: `${decodedIndustry}C类基金`, method: '支付宝申购C类免申购费', reason: `当前${decodedIndustry}板块估值处历史低位，先建底仓` },
         { batch: 2, time: '1个月后', percentage: 30, targets: `${decodedIndustry}C类基金`, method: '支付宝定投或手动买入', reason: '观察走势确认趋势，C类灵活调仓' },
         { batch: 3, time: '2个月后', percentage: 20, targets: `${decodedIndustry}C类基金`, method: '支付宝申购', reason: '分散持仓降低单一基金风险' },
         { batch: 4, time: '3个月后', percentage: 20, targets: '表现最优基金', method: '切换为A类降低长期费率', reason: '加仓表现最好的基金' },
       ],
-      riskWarning: `1. 基金有风险，投资需谨慎。以上推荐基于数据分析，不构成投资建议。\n2. ${decodedIndustry}行业受政策影响较大，请关注相关行业政策动态。\n3. 历史收益不代表未来表现，请根据个人风险承受能力合理配置。\n4. 建议定投为主，分散投资，避免一次性大额买入。`,
+      riskWarning: config.customRiskWarning || `1. 基金有风险，投资需谨慎。以上推荐基于数据分析，不构成投资建议。\n2. ${decodedIndustry}行业受政策影响较大，请关注相关行业政策动态。\n3. 历史收益不代表未来表现，请根据个人风险承受能力合理配置。\n4. 建议定投为主，分散投资，避免一次性大额买入。`,
+      tradingVolumeAnalysis: config.tradingVolumeAnalysis || null,
+      investmentAdvice: config.investmentAdvice || null,
     };
 
     res.json(analysis);
@@ -448,9 +498,9 @@ router.get('/api/hs300/analysis', async (req, res) => {
   try {
     let indexValuation = {
       name: '沪深300', code: '000300',
-      pe: 12.5, pb: 1.3, pePercentile: 42, pbPercentile: 32,
-      valuation: '合理偏低', suggestion: '适合定投',
-      roe: 10.4, dividendYield: 2.8,
+      pe: 14.39, pb: 1.44, pePercentile: 87.8, pbPercentile: 44.4,
+      valuation: '偏高', suggestion: '建议定投，避免一次性重仓',
+      roe: 10.0, dividendYield: 2.8,
     };
 
     try {
@@ -465,7 +515,7 @@ router.get('/api/hs300/analysis', async (req, res) => {
       }
     } catch (e) { /* 使用默认估值数据 */ }
 
-    const result = await fundService.getAllFundsWithNav();
+    const result = await fundService.getAllFundsWithNav({ pageSize: 500 });
     const allFundsData = result.data || result;
 
     let hs300DetailsMap = {};
@@ -512,30 +562,33 @@ router.get('/api/hs300/analysis', async (req, res) => {
       funds: hs300Funds,
       topHoldings,
       recommendation: {
-        summary: '沪深300当前估值合理偏低（PE分位42%），近1年收益约30%，近3月收益约5%，适合定投和分批建仓。',
+        summary: '沪深300当前PE 14.39x，历史分位87.8%偏高，PB 1.44x分位44.4%适中。近1年收益+21.67%，近3月仅+1.14%，短期回调明显。建议以定投为主，避免一次性重仓。',
         bullFactors: [
-          '估值处于历史中低位，PE约12.5x，PB约1.3x，安全边际较高',
-          '近1年收益30%+，市场趋势向好，经济基本面改善',
+          'PB分位44.4%仍处合理区间，净资产质量稳健，ROE 10%',
+          '近1年收益+21.67%，中长期趋势向好，经济基本面改善',
+          '股息率2.8%，高股息权重股提供安全垫',
           '政策面积极，降准降息预期，流动性宽松',
-          '外资持续流入，北向资金净买入趋势明显',
-          '权重股基本面稳健，贵州茅台/宁德时代/比亚迪业绩增长强劲',
+          '权重股基本面稳健，宁德时代/比亚迪业绩增长强劲',
         ],
         bearFactors: [
+          'PE分位87.8%偏高，短期估值压力较大',
+          '近1月-3.25%回调，市场情绪偏谨慎',
           '中美贸易摩擦不确定性，关税政策可能反复',
           '房地产行业仍在底部，拖累相关权重股',
-          '部分权重股估值已修复至合理区间，上涨空间收窄',
           '美联储降息节奏不确定，可能影响全球流动性',
         ],
         strategy: {
-          shortTerm: '未来3个月预期收益+3%~+8%，建议分2-3批建仓，每次30-40%',
-          mediumTerm: '未来6个月预期收益+5%~+15%，适合定投+逢低加仓',
-          longTerm: '未来1年预期收益+10%~+25%，核心配置品种',
+          shortTerm: '未来3个月预期收益-2%~+5%，建议定投为主，分3-4批建仓，每次20-30%',
+          mediumTerm: '未来6个月预期收益+3%~+12%，适合定投+逢低加仓，等待PE分位回落',
+          longTerm: '未来1年预期收益+8%~+20%，核心配置品种，长期持有',
         },
         bestPicks: [
-          { code: '005113', name: '平安沪深300指数量化A', reason: '量化增强收益最高，近1年+44.7%，超额收益14.74%' },
-          { code: '005102', name: '富国沪深300指数增强A', reason: '增强收益稳定，近1年+35.2%，金选基金' },
-          { code: '110020', name: '易方达沪深300ETF联接A', reason: '费率最低0.15%+0.05%=0.2%，纯跟踪误差小' },
-          { code: '000051', name: '华夏沪深300ETF联接A', reason: '费率最低0.2%，规模大120亿，金选基金' },
+          { code: '010736', name: '东方红沪深300指数增强A', reason: '近1年+68.27%，超额收益+46.60%，增强效果最佳（注意风格偏离风险）' },
+          { code: '004788', name: '富荣沪深300指数增强A', reason: '近1年+42.08%，超额收益+20.41%，费率仅0.70%，性价比高' },
+          { code: '005113', name: '平安沪深300指数量化增强A', reason: '近1年+41.11%，超额收益+19.44%，量化增强稳定' },
+          { code: '110020', name: '易方达沪深300ETF联接A', reason: '费率最低0.20%，规模167亿，纯跟踪误差小，金选基金' },
+          { code: '000051', name: '华夏沪深300ETF联接A', reason: '费率0.20%，规模248亿最大，流动性好，金选基金' },
+          { code: '100038', name: '富国沪深300指数增强A', reason: '规模46亿最大增强基金，超额收益+5.31%稳定，金选基金' },
         ],
       },
     };
@@ -544,6 +597,93 @@ router.get('/api/hs300/analysis', async (req, res) => {
   } catch (error) {
     console.error('沪深300分析数据获取失败:', error.message);
     res.status(500).json({ error: '获取沪深300分析数据失败' });
+  }
+});
+
+// 标普500指数基金深度分析
+router.get('/api/sp500/analysis', async (req, res) => {
+  try {
+    // 标普500指数当前估值（基于历史数据）
+    const indexValuation = {
+      name: '标普500', code: 'SPX',
+      pe: 23.5, pb: 4.8, pePercentile: 72, pbPercentile: 68,
+      valuation: '偏高估', suggestion: '小额定投',
+      roe: 20.4, dividendYield: 1.3,
+      currentPrice: 5350,
+    };
+
+    const result = await fundService.getAllFundsWithNav({ pageSize: 500 });
+    const allFundsData = result.data || result;
+
+    const sp500Funds = allFundsData.filter(f => f.industry === '标普500').map(f => ({
+      code: f.code, name: f.name, type: f.type,
+      managementFee: f.managementFee, custodyFee: f.custodyFee,
+      totalFee: f.totalFee, scale: f.scale,
+      return1y: f.return1y, return6m: f.return6m, return3m: f.return3m,
+      return1m: f.return1m, return1w: f.return1w,
+      purchaseStatus: f.buySuggestion === '暂停申购' ? 'suspended' : f.buySuggestion === '限大额' ? 'limited' : 'open',
+      dailyLimit: f.dailyLimit || 0, rating: f.rating,
+      isGoldSelected: f.isGoldSelected || false,
+      buySuggestion: f.buySuggestion,
+    }));
+
+    const topHoldings = [
+      { name: '苹果', code: 'AAPL', weight: 7.2, industry: '科技', pe: 32.5, roe: 172, revenueGrowth: 8.5, epsGrowth: 12.3, analystConsensus: '买入', outlook: 'AI生态持续扩展，服务收入高增' },
+      { name: '微软', code: 'MSFT', weight: 6.8, industry: '科技', pe: 35.2, roe: 38.5, revenueGrowth: 16.2, epsGrowth: 18.5, analystConsensus: '强烈买入', outlook: 'Azure云+AI双轮驱动，Copilot商业化加速' },
+      { name: '英伟达', code: 'NVDA', weight: 6.1, industry: '半导体', pe: 45.8, roe: 115, revenueGrowth: 122, epsGrowth: 145, analystConsensus: '强烈买入', outlook: 'AI芯片垄断地位，数据中心需求持续爆发' },
+      { name: '亚马逊', code: 'AMZN', weight: 3.8, industry: '消费/科技', pe: 42.1, roe: 22.5, revenueGrowth: 12.8, epsGrowth: 35.2, analystConsensus: '买入', outlook: 'AWS云+电商+广告三大引擎' },
+      { name: 'Meta', code: 'META', weight: 2.5, industry: '科技', pe: 25.8, roe: 32.1, revenueGrowth: 22.5, epsGrowth: 35.8, analystConsensus: '买入', outlook: '广告收入强劲，AI投入产出比提升' },
+      { name: '谷歌', code: 'GOOGL', weight: 3.9, industry: '科技', pe: 24.2, roe: 29.5, revenueGrowth: 14.5, epsGrowth: 22.8, analystConsensus: '买入', outlook: '搜索+云+AI三线并进' },
+      { name: '伯克希尔', code: 'BRK.B', weight: 1.8, industry: '金融', pe: 10.5, roe: 12.8, revenueGrowth: 5.2, epsGrowth: 8.5, analystConsensus: '持有', outlook: '现金储备创新高，等待投资机会' },
+      { name: '礼来', code: 'LLY', weight: 1.5, industry: '医药', pe: 58.2, roe: 52.5, revenueGrowth: 32.5, epsGrowth: 45.2, analystConsensus: '买入', outlook: '减肥药Mounjaro/Zepbound销售超预期' },
+      { name: '摩根大通', code: 'JPM', weight: 1.3, industry: '银行', pe: 12.8, roe: 17.5, revenueGrowth: 18.5, epsGrowth: 22.3, analystConsensus: '买入', outlook: '利率环境有利，投行业务复苏' },
+      { name: 'Visa', code: 'V', weight: 1.2, industry: '支付', pe: 30.5, roe: 48.2, revenueGrowth: 10.2, epsGrowth: 14.5, analystConsensus: '买入', outlook: '全球支付网络龙头，跨境交易恢复' },
+    ];
+
+    const analysis = {
+      valuation: indexValuation,
+      funds: sp500Funds,
+      topHoldings,
+      recommendation: {
+        summary: '标普500当前PE约23.5x，处于历史偏高位置（72%分位），但科技巨头盈利强劲支撑估值。近1年收益约+19%，受益于AI革命和美国经济韧性。支付宝可投标普500基金共14只（7组A/C份额），国泰017028每日限额1万元最为宽松，摩根017641费率最低0.65%。',
+        bullFactors: [
+          'AI革命驱动科技巨头盈利超预期，英伟达/微软/谷歌业绩持续高增',
+          '美国经济韧性强劲，就业市场稳健，消费支出持续增长',
+          '美联储降息预期升温，有利于估值扩张',
+          '标普500成分股质量高，ROE中位数约20%，盈利增长确定性强',
+          '全球化配置需求增加，分散A股单一市场风险',
+        ],
+        bearFactors: [
+          '估值处于历史偏高位置（PE 72%分位），回调风险存在',
+          'QDII额度紧张，多数基金限大额（10-100元/日），买入难度大',
+          '中美关系不确定性，可能影响中概股和贸易相关板块',
+          '美联储降息节奏不确定，若延迟可能引发市场波动',
+          '地缘政治风险（俄乌、中东）可能冲击全球市场',
+        ],
+        strategy: {
+          shortTerm: '未来3个月预期收益+2%~+8%，估值偏高建议小额定投，避免一次性重仓',
+          mediumTerm: '未来6个月预期收益+5%~+15%，关注QDII额度恢复，逢回调加仓',
+          longTerm: '未来1年预期收益+8%~+20%，核心配置品种，长期持有分享美国科技红利',
+        },
+        bestPicks: [
+          { code: '017028', name: '国泰标普500ETF联接A', reason: '每日限额10000元最宽松!费率0.75%合理，可大额买入建仓' },
+          { code: '017641', name: '摩根标普500指数A', reason: '费率0.65%最低，规模36.62亿，近1年+19.2%，收益率最高之一' },
+          { code: '050025', name: '博时标普500ETF联接A', reason: '规模59.27亿最大，流动性最好，成立时间长（2012年），跟踪误差小' },
+          { code: '018064', name: '华夏标普500ETF联接A', reason: '费率0.75%适中，华夏品牌，近1年+18.75%' },
+        ],
+        batchPlan: [
+          { batch: 1, time: '本周', pct: 25, action: '首批25%，优选国泰017028（限额10000元/日，额度最充足）', reason: '当前可买入额度最大，先建底仓' },
+          { batch: 2, time: '2-3周后', pct: 25, action: '第二批25%，搭配摩根017641（费率最低0.65%）', reason: '分散基金公司风险，降低综合费率' },
+          { batch: 3, time: '1个月后', pct: 25, action: '第三批25%，博时050025（规模最大59亿）', reason: '持续摊薄成本，选流动性最佳' },
+          { batch: 4, time: '2个月后', pct: 25, action: '最后25%，机动资金', reason: '预留资金应对意外下跌或QDII额度恢复后加仓' },
+        ],
+      },
+    };
+
+    res.json(analysis);
+  } catch (error) {
+    console.error('标普500分析数据获取失败:', error.message);
+    res.status(500).json({ error: '获取标普500分析数据失败' });
   }
 });
 
@@ -886,40 +1026,60 @@ router.get('/api/alerts', authMiddleware, async (req, res) => {
     const pool = getPool();
     const alerts = [];
 
-    // 1. 持仓基金净值大幅波动
+    // 1. 持仓基金净值大幅波动（近1周跌幅>5% 或 涨幅>8%）
     const holdings = await pool.query(
       `SELECT DISTINCT fund_code, fund_name FROM fund_records WHERE user_id = $1`,
       [req.user.id]
     );
+    const heldCodes = new Set(holdings.rows.map(h => h.fund_code));
     for (const h of holdings.rows) {
       const navResult = await pool.query(
-        `SELECT return_1w FROM fund_nav WHERE fund_code = $1 ORDER BY nav_date DESC LIMIT 1`,
+        `SELECT return_1w, return_1m FROM fund_nav WHERE fund_code = $1 ORDER BY nav_date DESC LIMIT 1`,
         [h.fund_code]
       );
       if (navResult.rows.length > 0) {
-        const return1w = parseFloat(navResult.rows[0].return_1w);
+        const return1w = parseFloat(navResult.rows[0].return_1w || 0);
+        const return1m = parseFloat(navResult.rows[0].return_1m || 0);
         if (return1w < -5) {
           alerts.push({
             type: 'nav_drop', level: 'warning',
-            title: `${h.fund_name} 近1周跌幅较大`,
+            title: `${h.fund_name} 近1周大跌`,
             message: `近1周收益 ${return1w.toFixed(2)}%，请注意风险`,
-            fund_code: h.fund_code, fund_name: h.fund_name,
+            fund_code: h.fund_code,
+          });
+        } else if (return1w > 8) {
+          alerts.push({
+            type: 'nav_surge', level: 'success',
+            title: `${h.fund_name} 近1周大涨`,
+            message: `近1周收益 +${return1w.toFixed(2)}%，可考虑止盈`,
+            fund_code: h.fund_code,
+          });
+        }
+        if (return1m < -10) {
+          alerts.push({
+            type: 'nav_drop_month', level: 'warning',
+            title: `${h.fund_name} 近1月跌幅较大`,
+            message: `近1月收益 ${return1m.toFixed(2)}%，可考虑定投摊低成本`,
+            fund_code: h.fund_code,
           });
         }
       }
     }
 
-    // 2. QDII限额提醒
-    const qdiiResult = await pool.query(
-      `SELECT code, name, daily_limit FROM funds WHERE type = 'QDII' AND daily_limit > 0 AND daily_limit < 1000`
-    );
-    for (const q of qdiiResult.rows) {
-      alerts.push({
-        type: 'qdii_limit', level: 'info',
-        title: `${q.name} 限额提醒`,
-        message: `当前每日限额 ${q.daily_limit} 元`,
-        fund_code: q.code, fund_name: q.name,
-      });
+    // 2. QDII限额提醒（仅用户持有的QDII基金）
+    if (heldCodes.size > 0) {
+      const qdiiResult = await pool.query(
+        `SELECT code, name, daily_limit FROM funds WHERE code = ANY($1) AND type = 'QDII' AND daily_limit > 0 AND daily_limit < 1000`,
+        [Array.from(heldCodes)]
+      );
+      for (const q of qdiiResult.rows) {
+        alerts.push({
+          type: 'qdii_limit', level: 'info',
+          title: `${q.name} 限额提醒`,
+          message: `当前每日限额 ${q.daily_limit} 元，注意分批买入`,
+          fund_code: q.code,
+        });
+      }
     }
 
     // 3. 定投计划到期提醒
@@ -944,6 +1104,34 @@ router.get('/api/alerts', authMiddleware, async (req, res) => {
           type: 'valuation_low', level: 'success',
           title: `${idx.name} 估值极低`,
           message: `PE分位 ${idx.pePercentile}%，处于历史低位，适合布局`,
+        });
+      } else if (idx.pePercentile && idx.pePercentile > 80) {
+        alerts.push({
+          type: 'valuation_high', level: 'warning',
+          title: `${idx.name} 估值偏高`,
+          message: `PE分位 ${idx.pePercentile}%，处于历史高位，注意风险`,
+        });
+      }
+    }
+
+    // 5. 持仓盈亏提醒（单只基金亏损>15%）
+    const summaryResult = await pool.query(
+      `SELECT fund_code, fund_name, pnl, pnl_percent FROM fund_records WHERE user_id = $1 AND pnl IS NOT NULL`,
+      [req.user.id]
+    );
+    const fundPnl = {};
+    for (const r of summaryResult.rows) {
+      const code = r.fund_code;
+      if (!fundPnl[code]) fundPnl[code] = { name: r.fund_name, pnl: 0 };
+      fundPnl[code].pnl += parseFloat(r.pnl || 0);
+    }
+    for (const [code, d] of Object.entries(fundPnl)) {
+      if (d.pnl < -500) {
+        alerts.push({
+          type: 'holding_loss', level: 'warning',
+          title: `${d.name} 持仓亏损`,
+          message: `当前亏损 ¥${Math.abs(d.pnl).toFixed(0)}，请评估是否需要调整`,
+          fund_code: code,
         });
       }
     }

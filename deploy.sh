@@ -62,9 +62,9 @@ rsync -avz server/index.cjs server/db.cjs server/fund-service.cjs server/fund-da
 rsync -avz server/utils/ ${REMOTE_DIR}/server/utils/
 rsync -avz server/routes/ ${REMOTE_DIR}/server/routes/
 
-# 上传 package.json（后端依赖）
-info "  上传 package.json..."
-scp package.json ${REMOTE_DIR}/
+# 上传 package.json 和 package-lock.json（后端依赖）
+info "  上传 package.json & package-lock.json..."
+scp package.json package-lock.json ${REMOTE_DIR}/
 
 info "文件上传完成 ✓"
 

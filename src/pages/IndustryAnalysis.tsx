@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { fundApi } from '../services/api';
 
 interface IndustryFund {
@@ -37,6 +38,26 @@ interface BatchPlan {
   reason: string;
 }
 
+interface TradingVolumeReason {
+  title: string;
+  detail: string;
+  impact: 'high' | 'medium' | 'low';
+}
+
+interface TradingVolumeAnalysis {
+  summary: string;
+  reasons: TradingVolumeReason[];
+}
+
+interface InvestmentAdvice {
+  shortTerm: string;
+  mediumTerm: string;
+  longTerm: string;
+  targetAllocation: string;
+  stopProfit: string;
+  stopLoss: string;
+}
+
 interface AnalysisData {
   industry: string;
   trend: string;
@@ -47,6 +68,8 @@ interface AnalysisData {
   funds: IndustryFund[];
   batchPlan: BatchPlan[];
   riskWarning: string;
+  tradingVolumeAnalysis?: TradingVolumeAnalysis;
+  investmentAdvice?: InvestmentAdvice;
 }
 
 const INDUSTRIES = [
@@ -68,8 +91,25 @@ const INDUSTRIES = [
   { key: '陶瓷/建材', icon: '🏗️', label: '陶瓷/建材' },
 ];
 
+// API 行业名 → INDUSTRIES key 的映射
+const INDUSTRY_NAME_MAP: Record<string, string> = {
+  '人工智能/AI': '人工智能',
+  '半导体/芯片': '半导体/芯片',
+  '纳斯达克100': '',  // 不在 INDUSTRIES 中
+};
+
 export default function IndustryAnalysis() {
-  const [selectedIndustry, setSelectedIndustry] = useState('医药');
+  const [searchParams] = useSearchParams();
+  const sectorParam = searchParams.get('sector');
+  const initialIndustry = (() => {
+    if (!sectorParam) return '医药';
+    const mapped = INDUSTRY_NAME_MAP[sectorParam];
+    if (mapped !== undefined) return mapped || '医药';
+    // 直接匹配 INDUSTRIES key
+    if (INDUSTRIES.some(ind => ind.key === sectorParam)) return sectorParam;
+    return '医药';
+  })();
+  const [selectedIndustry, setSelectedIndustry] = useState(initialIndustry);
   const [data, setData] = useState<AnalysisData | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('compare');
@@ -237,6 +277,8 @@ export default function IndustryAnalysis() {
                 { key: 'return', label: '收益率排名' },
                 { key: 'recommend', label: '综合推荐' },
                 { key: 'batch', label: '分批建仓' },
+                ...(data.tradingVolumeAnalysis ? [{ key: 'volume', label: '交易量分析' }] : []),
+                ...(data.investmentAdvice ? [{ key: 'advice', label: '投资建议' }] : []),
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -315,9 +357,9 @@ export default function IndustryAnalysis() {
                             {fund.isGoldSelected && (
                               <span style={{ fontSize: 10, background: '#faad14', color: 'white', padding: '1px 4px', borderRadius: 2 }}>金选</span>
                             )}
-                            <a href={`/funds/${fund.code}`} style={{ color: '#1677ff', textDecoration: 'none' }}>
+                            <Link to={`/funds/${fund.code}`} style={{ color: '#1677ff', textDecoration: 'none' }}>
                               {fund.name}
-                            </a>
+                            </Link>
                           </div>
                         </td>
                         <td>
@@ -373,7 +415,7 @@ export default function IndustryAnalysis() {
                   <tbody>
                     {getSortedFunds().sort((a, b) => a.totalFee - b.totalFee).map((fund) => (
                       <tr key={fund.code}>
-                        <td>{fund.name}</td>
+                        <td><Link to={`/funds/${fund.code}`} style={{ color: '#1677ff', textDecoration: 'none' }}>{fund.name}</Link></td>
                         <td style={{ fontFamily: 'monospace' }}>{fund.code}</td>
                         <td>
                           <span className={`badge ${getAClassLabel(fund.name) === 'C' ? 'badge-warning' : 'badge-success'}`}>
@@ -454,7 +496,7 @@ export default function IndustryAnalysis() {
                             {index + 1}
                           </span>
                         </td>
-                        <td>{fund.name}</td>
+                        <td><Link to={`/funds/${fund.code}`} style={{ color: '#1677ff', textDecoration: 'none' }}>{fund.name}</Link></td>
                         <td style={{ fontFamily: 'monospace' }}>{fund.code}</td>
                         <td>
                           <span className={`badge ${getAClassLabel(fund.name) === 'C' ? 'badge-warning' : 'badge-success'}`}>
@@ -513,7 +555,7 @@ export default function IndustryAnalysis() {
                         .map((fund) => (
                           <tr key={fund.code}>
                             <td>{getRatingStars(fund.rating)}</td>
-                            <td style={{ fontWeight: 600 }}>{fund.name}</td>
+                            <td style={{ fontWeight: 600 }}><Link to={`/funds/${fund.code}`} style={{ color: '#1677ff', textDecoration: 'none' }}>{fund.name}</Link></td>
                             <td style={{ fontFamily: 'monospace' }}>{fund.code}</td>
                             <td style={{ fontSize: 13, maxWidth: 300 }}>{fund.logic}</td>
                             <td>
@@ -629,6 +671,171 @@ export default function IndustryAnalysis() {
                 <h3 style={{ color: '#ff4d4f', marginBottom: 12 }}>风险提示</h3>
                 <div style={{ fontSize: 13, lineHeight: 1.8, color: '#666', whiteSpace: 'pre-line' }}>
                   {data.riskWarning}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 交易量分析 */}
+          {activeTab === 'volume' && data.tradingVolumeAnalysis && (
+            <div>
+              <div className="card" style={{
+                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                color: 'white',
+              }}>
+                <h2 style={{ fontSize: 20, marginBottom: 8 }}>
+                  {data.industry}交易量分析
+                </h2>
+                <p style={{ opacity: 0.9, fontSize: 14 }}>
+                  {data.tradingVolumeAnalysis.summary}
+                </p>
+              </div>
+
+              <div className="card">
+                <h3 className="card-title">交易量放大原因分析</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {data.tradingVolumeAnalysis.reasons.map((reason, idx) => (
+                    <div key={idx} style={{
+                      padding: 16,
+                      borderRadius: 8,
+                      border: '1px solid #e8e8e8',
+                      background: reason.impact === 'high' ? '#f6ffed' : reason.impact === 'medium' ? '#e6f4ff' : '#f5f5f5',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <h4 style={{ margin: 0, fontSize: 15 }}>
+                          {idx + 1}. {reason.title}
+                        </h4>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background: reason.impact === 'high' ? '#52c41a' : reason.impact === 'medium' ? '#1677ff' : '#999',
+                          color: 'white',
+                        }}>
+                          {reason.impact === 'high' ? '高影响' : reason.impact === 'medium' ? '中影响' : '低影响'}
+                        </span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: 13, color: '#555', lineHeight: 1.6 }}>
+                        {reason.detail}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="card" style={{ border: '1px solid #b7eb8f', background: '#f6ffed' }}>
+                <h3 style={{ color: '#52c41a', marginBottom: 12 }}>交易量分析结论</h3>
+                <div style={{ fontSize: 14, lineHeight: 1.8, color: '#333' }}>
+                  <p>当前{data.industry}板块交易量放大是<strong>多重因素共振</strong>的结果：</p>
+                  <ul style={{ paddingLeft: 20, marginTop: 8 }}>
+                    <li><strong>政策驱动</strong>：房地产和基建政策频繁出台，市场预期差大</li>
+                    <li><strong>估值修复</strong>：低估值吸引左侧资金持续流入</li>
+                    <li><strong>板块轮动</strong>：热门板块高位震荡，资金向价值洼地切换</li>
+                  </ul>
+                  <p style={{ marginTop: 12 }}>
+                    <strong>建议</strong>：交易量大不代表方向明确，不宜追高。建议分批建仓，先用C类基金试水，确认趋势后再加仓。
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 投资建议 */}
+          {activeTab === 'advice' && data.investmentAdvice && (
+            <div>
+              <div className="card" style={{
+                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                color: 'white',
+              }}>
+                <h2 style={{ fontSize: 20, marginBottom: 8 }}>
+                  {data.industry}投资建议
+                </h2>
+                <p style={{ opacity: 0.9, fontSize: 14 }}>
+                  基于估值水平、行业趋势、资金流向的综合分析
+                </p>
+              </div>
+
+              <div className="card">
+                <h3 className="card-title">分周期投资策略</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ padding: 16, borderRadius: 8, border: '1px solid #ffd666', background: '#fffbe6' }}>
+                    <h4 style={{ margin: '0 0 8px', color: '#faad14' }}>短期策略（1-3个月）</h4>
+                    <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8 }}>{data.investmentAdvice.shortTerm}</p>
+                  </div>
+                  <div style={{ padding: 16, borderRadius: 8, border: '1px solid #91d5ff', background: '#e6f7ff' }}>
+                    <h4 style={{ margin: '0 0 8px', color: '#1677ff' }}>中期策略（3-12个月）</h4>
+                    <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8 }}>{data.investmentAdvice.mediumTerm}</p>
+                  </div>
+                  <div style={{ padding: 16, borderRadius: 8, border: '1px solid #b7eb8f', background: '#f6ffed' }}>
+                    <h4 style={{ margin: '0 0 8px', color: '#52c41a' }}>长期策略（1年以上）</h4>
+                    <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8 }}>{data.investmentAdvice.longTerm}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <h3 className="card-title">关键指标</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+                  <div style={{ padding: 16, borderRadius: 8, background: '#f0f5ff', textAlign: 'center' }}>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#1677ff' }}>{data.investmentAdvice.targetAllocation}</div>
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>建议仓位占比</div>
+                  </div>
+                  <div style={{ padding: 16, borderRadius: 8, background: '#f6ffed', textAlign: 'center' }}>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#52c41a' }}>{data.investmentAdvice.stopProfit}</div>
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>止盈线</div>
+                  </div>
+                  <div style={{ padding: 16, borderRadius: 8, background: '#fff2f0', textAlign: 'center' }}>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#ff4d4f' }}>{data.investmentAdvice.stopLoss}</div>
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>止损线</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <h3 className="card-title">推荐标的</h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>优先级</th>
+                        <th>基金名称</th>
+                        <th>代码</th>
+                        <th>类型</th>
+                        <th>理由</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><span style={{ background: '#faad14', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>首选</span></td>
+                        <td><Link to={`/funds/516750`} style={{ color: '#1677ff', textDecoration: 'none' }}>建材ETF富国</Link></td>
+                        <td style={{ fontFamily: 'monospace' }}>516750</td>
+                        <td>ETF</td>
+                        <td style={{ fontSize: 13 }}>规模最大(12.3亿)，流动性最好，场内交易灵活</td>
+                      </tr>
+                      <tr>
+                        <td><span style={{ background: '#1677ff', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>次选</span></td>
+                        <td><Link to={`/funds/013019`} style={{ color: '#1677ff', textDecoration: 'none' }}>国泰建材ETF联接A</Link></td>
+                        <td style={{ fontFamily: 'monospace' }}>013019</td>
+                        <td>ETF联接</td>
+                        <td style={{ fontSize: 13 }}>费率低(0.60%)，适合长期持有(&gt;=1年免赎回费)</td>
+                      </tr>
+                      <tr>
+                        <td><span style={{ background: '#52c41a', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>短期</span></td>
+                        <td><Link to={`/funds/013020`} style={{ color: '#1677ff', textDecoration: 'none' }}>国泰建材ETF联接C</Link></td>
+                        <td style={{ fontFamily: 'monospace' }}>013020</td>
+                        <td>ETF联接</td>
+                        <td style={{ fontSize: 13 }}>免申购费，短期灵活进出，适合试水建仓</td>
+                      </tr>
+                      <tr>
+                        <td><span style={{ background: '#722ed1', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>分散</span></td>
+                        <td><Link to={`/funds/004856`} style={{ color: '#1677ff', textDecoration: 'none' }}>广发建材指数A</Link></td>
+                        <td style={{ fontFamily: 'monospace' }}>004856</td>
+                        <td>指数增强</td>
+                        <td style={{ fontSize: 13 }}>不同基金公司，分散单一基金公司风险</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

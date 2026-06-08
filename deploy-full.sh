@@ -77,11 +77,16 @@ cd "$DEPLOY_DIR"
 
 cat > .env << EOF
 # 服务器配置
-JWT_SECRET=b0AolGYvplzI5XMC2CknFUVegst41_6ViXmPdhQY-QM9_dzZmEpdmOajc_Sk7dwb
+JWT_SECRET=CHANGE_ME_TO_A_RANDOM_STRING_AT_LEAST_32_CHARS
+
+# CORS 允许的前端域名（逗号分隔）
+ALLOWED_ORIGINS=http://${SERVER_IP}:${NGINX_PORT},http://localhost:5173,http://localhost:5174
+
+# Mock 登录（生产环境必须为 false）
 ENABLE_MOCK_AUTH=false
 
 # 支付宝配置
-ALIPAY_APP_ID=2021006159645339
+ALIPAY_APP_ID=your_alipay_app_id
 ALIPAY_PRIVATE_KEY=keys/alipay_private_key.pem
 ALIPAY_PUBLIC_KEY=keys/alipay_public_key_from_alipay.pem
 ALIPAY_RETURN_URL=http://${SERVER_IP}:${NGINX_PORT}/api/auth/alipay/callback
@@ -89,9 +94,9 @@ ALIPAY_RETURN_URL=http://${SERVER_IP}:${NGINX_PORT}/api/auth/alipay/callback
 # 数据库配置（数据库和服务器在同一台机器，使用localhost）
 PG_HOST=localhost
 PG_PORT=5432
-PG_DATABASE=soulquad
-PG_USER=soulquad_user
-PG_PASSWORD=SoulQuad2024!
+PG_DATABASE=your_database
+PG_USER=your_db_user
+PG_PASSWORD=your_db_password
 EOF
 
 chmod 600 .env
@@ -170,6 +175,7 @@ server {
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_connect_timeout 30s;
         proxy_read_timeout 60s;
     }

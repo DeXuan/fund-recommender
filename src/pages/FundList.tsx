@@ -47,6 +47,7 @@ interface Fund {
   recommendation?: string;
   topHoldings?: { name: string; percentage: number }[];
   isGoldSelected?: boolean;
+  manager?: string;
 }
 
 export default function FundList() {
@@ -70,12 +71,21 @@ export default function FundList() {
   const [filterScaleMax, setFilterScaleMax] = useState<string>('');
   const [filterFeeMax, setFilterFeeMax] = useState<string>('');
 
+  // 基金经理筛选状态
+  const [managers, setManagers] = useState<Array<{ name: string; fundCount: number }>>([]);
+  const [selectedManager, setSelectedManager] = useState<string>('');
+  const [showStarManagers, setShowStarManagers] = useState(false);
+  const [starManagers, setStarManagers] = useState<Array<{ name: string; company: string; title: string; experience: string; specialty: string; bio: string; tags: string[] }>>([]);
+
   // 自选基金状态
   const [watchedCodes, setWatchedCodes] = useState<Set<string>>(new Set());
 
   // 多因子筛选后的基金列表
   const filteredFunds = useMemo(() => {
     let list = goldOnly ? funds.filter(f => f.isGoldSelected) : funds;
+    if (selectedManager) {
+      list = list.filter(f => f.manager === selectedManager);
+    }
     if (filterReturn1y) {
       const minReturn = parseFloat(filterReturn1y);
       if (!isNaN(minReturn)) list = list.filter(f => (f.return1y ?? 0) >= minReturn);
@@ -93,7 +103,7 @@ export default function FundList() {
       if (!isNaN(max)) list = list.filter(f => (f.totalFee ?? 0) <= max);
     }
     return list;
-  }, [funds, goldOnly, filterReturn1y, filterScaleMin, filterScaleMax, filterFeeMax]);
+  }, [funds, goldOnly, selectedManager, filterReturn1y, filterScaleMin, filterScaleMax, filterFeeMax]);
 
   // 对比功能状态
   const [selectedCodes, setSelectedCodes] = useState<string[]>(initialCodes);
@@ -111,6 +121,7 @@ export default function FundList() {
     loadIndustries();
     loadFunds();
     loadAllFunds();
+    loadManagers();
     if (user) loadWatchlist();
   }, [user]);
 
@@ -142,6 +153,19 @@ export default function FundList() {
       setIndustries(['全部', ...data]);
     } catch (error) {
       console.error('加载行业列表失败:', error);
+    }
+  };
+
+  const loadManagers = async () => {
+    try {
+      const [managerList, starList] = await Promise.all([
+        fundApi.getManagers(),
+        fundApi.getStarManagers(),
+      ]);
+      setManagers(managerList);
+      setStarManagers(starList);
+    } catch (error) {
+      console.error('加载基金经理列表失败:', error);
     }
   };
 
@@ -557,6 +581,20 @@ export default function FundList() {
       render: (text: string) => <Tag>{text}</Tag>,
     },
     {
+      title: '基金经理',
+      dataIndex: 'manager',
+      key: 'manager',
+      width: 100,
+      render: (manager: string) => manager ? (
+        <span
+          style={{ color: '#722ed1', cursor: 'pointer', fontWeight: 500 }}
+          onClick={(e) => { e.stopPropagation(); setSelectedManager(manager); }}
+        >
+          {manager}
+        </span>
+      ) : '-',
+    },
+    {
       title: '最新净值',
       dataIndex: 'nav',
       key: 'nav',
@@ -636,6 +674,21 @@ export default function FundList() {
             style={{ width: 160 }}
             options={industries.map((ind) => ({ label: ind, value: ind }))}
           />
+          <Select
+            value={selectedManager || undefined}
+            onChange={(v) => setSelectedManager(v || '')}
+            style={{ width: 180 }}
+            placeholder="按基金经理筛选"
+            allowClear
+            options={managers.map((m) => ({ label: `${m.name} (${m.fundCount}只)`, value: m.name }))}
+          />
+          <Button
+            type={showStarManagers ? 'primary' : 'default'}
+            style={showStarManagers ? { background: '#722ed1', borderColor: '#722ed1' } : {}}
+            onClick={() => setShowStarManagers(!showStarManagers)}
+          >
+            {showStarManagers ? '★ 明星经理' : '☆ 明星经理'}
+          </Button>
           <Button
             type={goldOnly ? 'primary' : 'default'}
             style={goldOnly ? { background: '#faad14', borderColor: '#faad14' } : {}}
@@ -649,11 +702,11 @@ export default function FundList() {
           >
             多因子筛选
           </Button>
-          {(filterReturn1y || filterScaleMin || filterScaleMax || filterFeeMax) && (
+          {(selectedManager || filterReturn1y || filterScaleMin || filterScaleMax || filterFeeMax) && (
             <Button
               type="link"
               size="small"
-              onClick={() => { setFilterReturn1y(''); setFilterScaleMin(''); setFilterScaleMax(''); setFilterFeeMax(''); }}
+              onClick={() => { setSelectedManager(''); setFilterReturn1y(''); setFilterScaleMin(''); setFilterScaleMax(''); setFilterFeeMax(''); }}
             >
               清除筛选
             </Button>
@@ -668,6 +721,62 @@ export default function FundList() {
           )}
         </Space>
       </Card>
+
+      {/* 明星基金经理展示 */}
+      {showStarManagers && starManagers.length > 0 && (
+        <Card
+          title={<span style={{ fontWeight: 600 }}>明星基金经理</span>}
+          extra={<span style={{ fontSize: 12, color: '#8c8c8c' }}>点击经理筛选其管理的基金</span>}
+          style={{ marginBottom: 16 }}
+        >
+          <Row gutter={[16, 16]}>
+            {starManagers.map((mgr) => (
+              <Col xs={24} sm={12} md={8} lg={6} key={mgr.name}>
+                <Card
+                  size="small"
+                  hoverable
+                  style={{
+                    border: selectedManager === mgr.name ? '2px solid #722ed1' : '1px solid #f0f0f0',
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onClick={() => setSelectedManager(selectedManager === mgr.name ? '' : mgr.name)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #722ed1 0%, #9254de 100%)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'white', fontWeight: 700, fontSize: 16, marginRight: 12,
+                    }}>
+                      {mgr.name.charAt(0)}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 15 }}>{mgr.name}</div>
+                      <div style={{ fontSize: 12, color: '#8c8c8c' }}>{mgr.company}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                    <strong>职位：</strong>{mgr.title}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                    <strong>经验：</strong>{mgr.experience} | <strong>擅长：</strong>{mgr.specialty}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#999', marginBottom: 8, lineHeight: 1.5 }}>
+                    {mgr.bio}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {mgr.tags.map((tag) => (
+                      <Tag key={tag} color="purple" style={{ fontSize: 11 }}>{tag}</Tag>
+                    ))}
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </Card>
+      )}
 
       <Card>
         {showFilters && (

@@ -23,7 +23,7 @@ npm run generate-alipay-keys
 ### 2. 配置支付宝开放平台
 
 1. 登录 [支付宝开放平台](https://open.alipay.com)
-2. 进入你的应用（APPID: 2021006159645339）
+2. 进入你的应用（APPID: 在支付宝开放平台查看）
 3. 在"开发设置" -> "接口加签方式"中：
    - 选择"公钥"模式
    - 将 `keys/alipay_public_key.pem` 的内容粘贴到"填写公钥字符"输入框
@@ -38,7 +38,7 @@ npm run generate-alipay-keys
 编辑服务器上的 `/var/www/jijin/.env` 文件：
 
 ```env
-ALIPAY_APP_ID=2021006159645339
+ALIPAY_APP_ID=your_alipay_app_id
 ALIPAY_PRIVATE_KEY=keys/alipay_private_key.pem
 ALIPAY_PUBLIC_KEY=keys/alipay_public_key_from_alipay.pem
 ALIPAY_RETURN_URL=http://47.116.77.67:8688/api/auth/alipay/callback
