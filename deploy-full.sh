@@ -75,9 +75,12 @@ info "文件解压完成"
 step "4/8 配置环境变量"
 cd "$DEPLOY_DIR"
 
+# 自动生成安全的 JWT_SECRET
+AUTO_JWT_SECRET=$(openssl rand -hex 48 2>/dev/null || head -c 96 /dev/urandom | base64 | tr -d '\n/' | head -c 64)
+
 cat > .env << EOF
-# 服务器配置
-JWT_SECRET=CHANGE_ME_TO_A_RANDOM_STRING_AT_LEAST_32_CHARS
+# 服务器配置（已自动生成，请勿泄露）
+JWT_SECRET=${AUTO_JWT_SECRET}
 
 # CORS 允许的前端域名（逗号分隔）
 ALLOWED_ORIGINS=http://${SERVER_IP}:${NGINX_PORT},http://localhost:5173,http://localhost:5174
@@ -106,7 +109,7 @@ info ".env 文件已创建"
 step "5/8 检查Node.js环境"
 if ! command -v node &> /dev/null; then
     warn "Node.js未安装，正在安装..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - 2>/dev/null
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - 2>/dev/null
     apt-get install -y nodejs 2>/dev/null
 fi
 info "Node.js版本: $(node -v)"
@@ -150,6 +153,7 @@ cd "$DEPLOY_DIR"
 pm2 delete "$PM2_NAME" 2>/dev/null || true
 pm2 start server/index.cjs --name "$PM2_NAME" --cwd "$DEPLOY_DIR"
 pm2 save
+pm2 startup 2>/dev/null || true
 info "PM2服务已启动"
 
 # ---- 配置Nginx ----
@@ -162,6 +166,13 @@ if command -v nginx &> /dev/null; then
 server {
     listen ${NGINX_PORT};
     server_name ${SERVER_IP};
+
+    # 安全响应头
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
 
     # gzip压缩
     gzip on;

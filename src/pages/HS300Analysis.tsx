@@ -222,7 +222,7 @@ export default function HS300Analysis() {
                     <tr key={fund.code}>
                       <td><Link to={`/funds/${fund.code}`} style={{ color: '#1677ff' }}>{fund.code}</Link></td>
                       <td style={{ maxWidth: 200 }}>
-                        <Link to={`/funds/${fund.code}`} style={{ textDecoration: 'none', color: '#333' }}>
+                        <Link to={`/funds/${fund.code}`} style={{ textDecoration: 'none', color: '#1677ff' }}>
                           {fund.name}
                         </Link>
                         {fund.isEnhanced && <span className="badge badge-warning" style={{ marginLeft: 4, fontSize: 10 }}>增强</span>}

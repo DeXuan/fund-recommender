@@ -184,7 +184,7 @@ export default function QDIIFunds() {
       dataIndex: 'name',
       key: 'name',
       render: (name: string, record: Fund) => (
-        <Link to={`/funds/${record.code}`} style={{ color: '#333', fontWeight: 500 }}>{name}</Link>
+        <Link to={`/funds/${record.code}`} style={{ color: '#1677ff', fontWeight: 500 }}>{name}</Link>
       ),
     },
     {
@@ -241,7 +241,7 @@ export default function QDIIFunds() {
       title: '基金名称', dataIndex: 'name', key: 'name', width: 220,
       render: (name: string, record: SP500Fund) => (
         <div>
-          <Link to={`/funds/${record.code}`} style={{ color: '#333', fontWeight: 500, fontSize: 13 }}>{name}</Link>
+          <Link to={`/funds/${record.code}`} style={{ color: '#1677ff', fontWeight: 500, fontSize: 13 }}>{name}</Link>
           {record.isGoldSelected && <Tag color="gold" style={{ marginLeft: 4, fontSize: 10 }}>金选</Tag>}
         </div>
       ),

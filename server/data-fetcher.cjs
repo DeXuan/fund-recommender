@@ -730,8 +730,11 @@ async function runDailyDataUpdate(allFunds) {
     // 3. 更新沪深300基金详情
     await fetchHS300FundDetails(allFunds);
 
-    // 4. 更新持仓盈亏
-    await updatePortfolioPnl(allFunds);
+    // 4. 更新持仓盈亏（含数值校验）
+    const pnlResult = await updatePortfolioPnl(allFunds);
+    if (pnlResult.warnings.length > 0) {
+      console.warn(`[每日任务] 持仓校验发现 ${pnlResult.warnings.length} 条警告`);
+    }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`========== [每日任务] 执行完成，耗时 ${elapsed}s ==========`);
@@ -740,49 +743,146 @@ async function runDailyDataUpdate(allFunds) {
   }
 }
 
+// 校验持仓数值是否正确
+function validatePortfolioValues(record, currentNav, shares, costPrice, buyFee) {
+  const errors = [];
+  const totalCost = shares * costPrice + buyFee;
+  const marketValue = shares * currentNav;
+  const pnl = marketValue - totalCost;
+  const pnlPercent = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
+
+  // 基础数值校验
+  if (currentNav <= 0) errors.push(`净值异常: ${currentNav}`);
+  if (shares <= 0) errors.push(`份额异常: ${shares}`);
+  if (costPrice <= 0) errors.push(`成本价异常: ${costPrice}`);
+  if (marketValue < 0) errors.push(`市值为负: ${marketValue}`);
+
+  // 逻辑校验: 市值 = 份额 × 净值
+  const expectedMV = parseFloat((shares * currentNav).toFixed(2));
+  if (Math.abs(marketValue - expectedMV) > 0.01) {
+    errors.push(`市值计算不一致: 期望${expectedMV}, 实际${marketValue}`);
+  }
+
+  // 逻辑校验: 盈亏 = 市值 - 总成本
+  const expectedPnl = parseFloat((expectedMV - totalCost).toFixed(2));
+  const actualPnl = parseFloat(pnl.toFixed(2));
+  if (Math.abs(actualPnl - expectedPnl) > 0.01) {
+    errors.push(`盈亏计算不一致: 期望${expectedPnl}, 实际${actualPnl}`);
+  }
+
+  // 逻辑校验: 收益率 = 盈亏 / 总成本 × 100
+  if (totalCost > 0) {
+    const expectedPct = parseFloat(((expectedPnl / totalCost) * 100).toFixed(2));
+    const actualPct = parseFloat(pnlPercent.toFixed(2));
+    if (Math.abs(actualPct - expectedPct) > 0.01) {
+      errors.push(`收益率计算不一致: 期望${expectedPct}%, 实际${actualPct}%`);
+    }
+  }
+
+  // 收益率合理性校验: 单日涨跌幅一般不超过20%（含杠杆基金放宽到30%）
+  if (Math.abs(pnlPercent) > 300) {
+    errors.push(`收益率异常偏高: ${pnlPercent}%，请检查份额或成本价是否正确`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    values: {
+      totalCost: parseFloat(totalCost.toFixed(2)),
+      marketValue: parseFloat(expectedMV.toFixed(2)),
+      pnl: parseFloat(expectedPnl.toFixed(2)),
+      pnlPercent: parseFloat(((totalCost > 0 ? expectedPnl / totalCost : 0) * 100).toFixed(2)),
+    },
+  };
+}
+
 // 更新所有用户的持仓盈亏数据
 async function updatePortfolioPnl(allFunds) {
   const pool = getPool();
   try {
-    const recordsResult = await pool.query('SELECT id, fund_code, shares, cost_price, buy_fee FROM fund_records');
+    const recordsResult = await pool.query('SELECT id, fund_code, fund_name, shares, cost_price, buy_fee FROM fund_records');
     if (recordsResult.rows.length === 0) {
       console.log('[持仓] 没有持仓记录，跳过更新');
-      return 0;
+      return { updated: 0, validated: 0, warnings: [] };
     }
 
+    // 持仓中涉及的所有基金代码（去重）
+    const heldCodes = [...new Set(recordsResult.rows.map(r => r.fund_code))];
+    console.log(`[持仓] 需要更新 ${heldCodes.length} 只基金的 ${recordsResult.rows.length} 条持仓记录`);
+
+    // 第1优先级: 从 fund_nav 表获取最新净值
     const navResult = await pool.query(
-      `SELECT DISTINCT ON (fund_code) fund_code, nav FROM fund_nav ORDER BY fund_code, nav_date DESC`
+      `SELECT DISTINCT ON (fund_code) fund_code, nav, nav_date FROM fund_nav
+       WHERE fund_code = ANY($1) ORDER BY fund_code, nav_date DESC`,
+      [heldCodes]
     );
     const navMap = new Map();
-    navResult.rows.forEach(row => navMap.set(row.fund_code, parseFloat(row.nav)));
+    const navDateMap = new Map();
+    navResult.rows.forEach(row => {
+      navMap.set(row.fund_code, parseFloat(row.nav));
+      navDateMap.set(row.fund_code, row.nav_date);
+    });
+    console.log(`[持仓] fund_nav 表命中 ${navMap.size}/${heldCodes.length} 只基金`);
 
+    // 第2优先级: 从种子数据补充
     allFunds.forEach(f => {
       if (f.nav && !navMap.has(f.code)) navMap.set(f.code, f.nav);
     });
 
-    const missingCodes = recordsResult.rows
-      .map(r => r.fund_code)
-      .filter(code => !navMap.has(code));
+    // 第3优先级: 从API实时获取缺失的净值，并写回 fund_nav 表持久化
+    const missingCodes = heldCodes.filter(code => !navMap.has(code));
     if (missingCodes.length > 0) {
-      console.log(`[持仓] 从API获取 ${missingCodes.length} 只基金净值...`);
-      const batchNav = await fetchFundNavBatch(missingCodes);
-      batchNav.forEach((val, code) => {
-        if (val.nav > 0) navMap.set(code, val.nav);
-      });
+      console.log(`[持仓] 从API获取 ${missingCodes.length} 只基金净值: ${missingCodes.join(',')}`);
+      try {
+        const batchNav = await fetchFundNavBatch(missingCodes);
+        for (const [code, val] of batchNav) {
+          if (val.nav > 0) {
+            navMap.set(code, val.nav);
+            // 持久化到 fund_nav 表，下次不需要再请求API
+            try {
+              await pool.query(
+                `INSERT INTO fund_nav (fund_code, nav, total_nav, nav_date)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (fund_code, nav_date) DO UPDATE SET nav = EXCLUDED.nav`,
+                [code, val.nav, val.totalNav || val.nav, val.navDate || new Date().toISOString().split('T')[0]]
+              );
+            } catch (e) {
+              // 忽略写入失败，净值仍在内存中可用
+            }
+          }
+        }
+        console.log(`[持仓] API获取成功 ${batchNav.size} 只，最终覆盖 ${navMap.size}/${heldCodes.length} 只基金`);
+      } catch (e) {
+        console.warn(`[持仓] API批量获取失败: ${e.message}`);
+      }
     }
 
+    // 逐条更新持仓记录
     let updated = 0;
+    let validated = 0;
+    const warnings = [];
+
     for (const record of recordsResult.rows) {
       const currentNav = navMap.get(record.fund_code);
-      if (!currentNav) continue;
+      if (!currentNav || currentNav <= 0) {
+        warnings.push(`${record.fund_code}(${record.fund_name}): 无法获取净值`);
+        continue;
+      }
 
       const shares = parseFloat(record.shares);
       const costPrice = parseFloat(record.cost_price);
       const buyFee = parseFloat(record.buy_fee || 0);
-      const totalCost = shares * costPrice + buyFee;
-      const marketValue = parseFloat((shares * currentNav).toFixed(2));
-      const pnl = parseFloat((marketValue - totalCost).toFixed(2));
-      const pnlPercent = totalCost > 0 ? parseFloat(((pnl / totalCost) * 100).toFixed(2)) : 0;
+
+      // 校验数值
+      const validation = validatePortfolioValues(record, currentNav, shares, costPrice, buyFee);
+      validated++;
+
+      if (!validation.valid) {
+        warnings.push(`${record.fund_code}(${record.fund_name}): ${validation.errors.join('; ')}`);
+      }
+
+      // 使用校验后的值写入
+      const { marketValue, pnl, pnlPercent } = validation.values;
 
       await pool.query(
         `UPDATE fund_records SET current_nav = $1, market_value = $2, pnl = $3, pnl_percent = $4, nav_updated_at = NOW() WHERE id = $5`,
@@ -791,12 +891,456 @@ async function updatePortfolioPnl(allFunds) {
       updated++;
     }
 
-    console.log(`[持仓] 更新完成: ${updated} 条记录`);
-    return updated;
+    if (warnings.length > 0) {
+      console.warn(`[持仓] 校验警告 (${warnings.length}):`);
+      warnings.forEach(w => console.warn(`  - ${w}`));
+    }
+
+    console.log(`[持仓] 更新完成: ${updated}/${recordsResult.rows.length} 条记录, 校验 ${validated} 条, ${warnings.length} 条警告`);
+    return { updated, validated, warnings };
   } catch (error) {
     console.warn('[持仓] 更新失败:', error.message);
-    return 0;
+    return { updated: 0, validated: 0, warnings: [error.message] };
   }
+}
+
+// 从支付宝/东方财富API获取易方达基金的基金经理、最新净值和收益率，并写入数据库
+async function fetchYiFangDaFundData() {
+  const pool = getPool();
+  try {
+    // 1. 获取数据库中所有易方达基金
+    const fundResult = await pool.query(
+      "SELECT code, name, manager FROM funds WHERE name LIKE '%易方达%'"
+    );
+    const funds = fundResult.rows;
+    if (funds.length === 0) {
+      console.log('[易方达] 数据库中无易方达基金');
+      return { fetched: 0, updated: 0 };
+    }
+    console.log(`[易方达] 开始更新 ${funds.length} 只易方达基金数据...`);
+
+    let navUpdated = 0;
+    let detailUpdated = 0;
+    const errors = [];
+
+    // 2. 逐只获取数据（API有限频，控制并发）
+    for (let i = 0; i < funds.length; i += 3) {
+      const batch = funds.slice(i, i + 3);
+      const results = await Promise.allSettled(
+        batch.map(fund => fetchSingleFundFromAlipay(fund.code))
+      );
+
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
+        const fund = batch[j];
+        if (result.status !== 'fulfilled' || !result.value) {
+          errors.push(`${fund.code}(${fund.name}): API请求失败`);
+          continue;
+        }
+
+        const data = result.value;
+
+        // 写入基金经理、规模到 funds 表
+        if (data.manager || data.scale) {
+          try {
+            await fundService.updateFundDetail(fund.code, {
+              manager: data.manager,
+              scale: data.scale,
+              buySuggestion: data.buySuggestion,
+              dailyLimit: data.dailyLimit,
+            });
+            detailUpdated++;
+          } catch (e) {
+            errors.push(`${fund.code}: 写入详情失败 ${e.message}`);
+          }
+        }
+
+        // 写入净值到 fund_nav 表
+        if (data.nav > 0 && data.navDate) {
+          try {
+            await fundService.updateFundNav(fund.code, {
+              nav: data.nav,
+              totalNav: data.totalNav || data.nav,
+              navDate: data.navDate,
+              return1w: data.return1w,
+              return1m: data.return1m,
+              return3m: data.return3m,
+              return6m: data.return6m,
+              return1y: data.return1y,
+            });
+            navUpdated++;
+          } catch (e) {
+            errors.push(`${fund.code}: 写入净值失败 ${e.message}`);
+          }
+        }
+      }
+
+      // 批次间延迟，避免API限频
+      if (i + 3 < funds.length) {
+        await new Promise(r => setTimeout(r, 800));
+      }
+    }
+
+    if (errors.length > 0) {
+      console.warn(`[易方达] 错误 (${errors.length}):`);
+      errors.forEach(e => console.warn(`  - ${e}`));
+    }
+
+    console.log(`[易方达] 更新完成: 净值 ${navUpdated}/${funds.length}, 详情 ${detailUpdated}/${funds.length}`);
+    return { fetched: funds.length, navUpdated, detailUpdated, errors };
+  } catch (error) {
+    console.error('[易方达] 更新失败:', error.message);
+    return { fetched: 0, navUpdated: 0, detailUpdated: 0, errors: [error.message] };
+  }
+}
+
+// 从支付宝/东方财富API获取单只基金的完整数据
+async function fetchSingleFundFromAlipay(code) {
+  let manager = null;
+  let scale = null, buySuggestion = '开放申购', dailyLimit = 0;
+  let nav = null, totalNav = null, navDate = null;
+  let return1w = null, return1m = null, return3m = null, return6m = null, return1y = null;
+
+  // A. 从支付宝基金基本信息API获取基金经理、规模、申购状态
+  try {
+    const infoRes = await axios.get(
+      'https://fundmobapi.eastmoney.com/FundMApi/FundBasicInformation.ashx',
+      { params: { FCODE: code, deviceid: 'wap', plat: 'Wap', product: 'EFund', version: '2.0.0' }, timeout: 8000 }
+    );
+    const info = infoRes.data?.Datas;
+    if (info) {
+      manager = info.JJJL || null;  // 基金经理（如 "余海燕,庞亚平"）
+      // ENDNAV 是基金规模（元），转换为亿
+      scale = info.ENDNAV ? parseFloat((parseFloat(info.ENDNAV) / 1e8).toFixed(2)) : null;
+
+      const sgzt = info.SGZT || '';
+      const maxsg = parseInt(info.MAXSG);
+      if (sgzt.includes('暂停')) {
+        buySuggestion = '暂停申购';
+      } else if (sgzt.includes('限') || sgzt.includes('大额')) {
+        buySuggestion = '限大额';
+        dailyLimit = isNaN(maxsg) ? 10 : maxsg;
+      }
+    }
+  } catch (e) {
+    // 静默失败，继续尝试其他API
+  }
+
+  // B. 从东方财富历史净值API获取最新净值和收益率
+  try {
+    const lsjzRes = await axios.get(
+      `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=260`,
+      { timeout: 8000, headers: { Referer: 'https://fund.eastmoney.com/', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
+    );
+    const list = lsjzRes.data?.Data?.LSJZList;
+    if (list && list.length > 0) {
+      nav = parseFloat(list[0].DWJZ);
+      totalNav = parseFloat(list[0].LJJZ) || nav;
+      navDate = list[0].FSRQ;
+
+      const findNav = (days) => {
+        const target = new Date(navDate);
+        target.setDate(target.getDate() - days);
+        const ts = target.toISOString().split('T')[0];
+        for (const item of list) {
+          if (item.FSRQ <= ts) return parseFloat(item.DWJZ);
+        }
+        return null;
+      };
+      const calcReturn = (n) => n ? parseFloat(((nav - n) / n * 100).toFixed(2)) : null;
+
+      return1w = calcReturn(findNav(7));
+      return1m = calcReturn(findNav(30));
+      return3m = calcReturn(findNav(90));
+      return6m = calcReturn(findNav(180));
+      return1y = calcReturn(findNav(365));
+    }
+  } catch (e) {
+    // 静默失败
+  }
+
+  // C. 从东方财富基金概况API补充基金经理（如果A步骤未获取到）
+  if (!manager) {
+    try {
+      const detailRes = await axios.get(
+        `https://fund.eastmoney.com/pingzhongdata/${code}.js`,
+        { timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://fund.eastmoney.com/', Range: 'bytes=0-8000' } }
+      );
+      const text = detailRes.data || '';
+      const mgrMatch = text.match(/Data_currentFundManager\s*=\s*\[([^\]]+)\]/);
+      if (mgrMatch) {
+        const names = [];
+        const nameRegex = /"name"\s*:\s*"([^"]+)"/g;
+        let m;
+        while ((m = nameRegex.exec(mgrMatch[1])) !== null) names.push(m[1]);
+        if (names.length > 0) manager = names.join(',');
+      }
+    } catch (e) { /* 忽略 */ }
+  }
+
+  if (!nav) return null;
+
+  return {
+    manager, scale, buySuggestion, dailyLimit,
+    nav, totalNav, navDate,
+    return1w, return1m, return3m, return6m, return1y,
+  };
+}
+
+// 支付宝金选基金代码列表 - 来自蚂蚁财富精选基金池
+const GOLD_FUND_CODES = [
+  // 宽基指数 - 沪深300
+  '110020', '310318', '519671', '002910', '007531', '010253',
+  // 宽基指数 - 中证500
+  '161017', '000478', '007028', '013349', '009626',
+  // 宽基指数 - 创业板指
+  '159915', '001593', '005668', '010657',
+  // 宽基指数 - 科创50
+  '588000', '588080', '011612', '011613',
+  // 宽基指数 - 上证50
+  '110003', '001549', '007136',
+  // 宽基指数 - 中证1000
+  '560010', '006165', '014987',
+  // 宽基指数 - 中证A500
+  '022430', '022455', '022386',
+  // 行业 - 医药
+  '001180', '012634', '000059', '161726',
+  // 行业 - 半导体/芯片
+  '008887', '012414', '007300', '012557',
+  // 行业 - 人工智能/AI
+  '013349', '011612', '014673',
+  // 行业 - 新能源
+  '012831', '007380', '010253', '005668',
+  // 行业 - 消费
+  '000248', '161725', '001156',
+  // 行业 - 证券
+  '512880', '006098', '012349',
+  // 行业 - 军工
+  '005693', '004854', '006113',
+  // 行业 - 金融/银行
+  '001550', '161005',
+  // 行业 - 煤炭
+  '008279', '161724', '161032',
+  // 行业 - 电力
+  '017032', '016907', '012834',
+  // 行业 - 家电
+  '005968', '008169',
+  // 行业 - 白酒
+  '003095',
+  // QDII - 纳斯达克100
+  '040046', '270042', '160213', '015299',
+  // QDII - 标普500
+  '007721', '050025', '006075', '019547',
+  // QDII - 恒生科技
+  '012348', '013402', '008334',
+  // 策略 - 中证红利
+  '090010', '100032', '005561',
+  // 行业 - 有色金属
+  '159880', '007874', '012520',
+  // 行业 - 光伏
+  '011102',
+  // 固收 - 债券
+  '000171', '000172', '002611', '003327',
+];
+
+// 金选基金分类函数
+function classifyGoldCategory(name, indexName, fundType) {
+  const n = (name || '').toLowerCase();
+  const idx = (indexName || '').toLowerCase();
+
+  if (n.includes('纳斯达克') || n.includes('nasdaq')) return 'QDII-美股';
+  if (n.includes('标普') || n.includes('s&p')) return 'QDII-美股';
+  if (n.includes('恒生')) return 'QDII-港股';
+  if (n.includes('沪深300')) return '宽基-沪深300';
+  if (n.includes('中证500')) return '宽基-中证500';
+  if (n.includes('创业板')) return '宽基-创业板';
+  if (n.includes('科创50')) return '宽基-科创50';
+  if (n.includes('上证50')) return '宽基-上证50';
+  if (n.includes('中证1000')) return '宽基-中证1000';
+  if (n.includes('中证A500') || n.includes('a500')) return '宽基-A500';
+  if (n.includes('医药') || n.includes('医疗') || n.includes('健康')) return '行业-医药';
+  if (n.includes('半导体') || n.includes('芯片')) return '行业-半导体';
+  if (n.includes('人工智能') || n.includes('ai')) return '行业-AI';
+  if (n.includes('新能源')) return '行业-新能源';
+  if (n.includes('消费')) return '行业-消费';
+  if (n.includes('证券') || n.includes('券商')) return '行业-证券';
+  if (n.includes('军工') || n.includes('国防')) return '行业-军工';
+  if (n.includes('金融') || n.includes('银行')) return '行业-金融';
+  if (n.includes('煤炭')) return '行业-煤炭';
+  if (n.includes('电力')) return '行业-电力';
+  if (n.includes('家电')) return '行业-家电';
+  if (n.includes('白酒')) return '行业-白酒';
+  if (n.includes('红利')) return '策略-红利';
+  if (n.includes('光伏')) return '行业-光伏';
+  if (n.includes('机器人')) return '行业-机器人';
+  if (n.includes('债券') || n.includes('固收')) return '固收-债券';
+  if (fundType === 'ETF联接' || fundType === 'ETF') return '指数-其他';
+  return '其他';
+}
+
+// 根据金选分类推断行业
+function inferIndustry(name, goldCategory) {
+  if (goldCategory.startsWith('QDII')) {
+    if (name.includes('纳斯达克')) return '纳斯达克100';
+    if (name.includes('标普')) return '标普500';
+    if (name.includes('恒生')) return '恒生指数';
+  }
+  if (goldCategory.includes('沪深300')) return '沪深300';
+  if (goldCategory.includes('中证500')) return '中证500';
+  if (goldCategory.includes('创业板')) return '创业板';
+  if (goldCategory.includes('科创')) return '科创50';
+  if (goldCategory.includes('医药')) return '医药';
+  if (goldCategory.includes('半导体')) return '半导体/芯片';
+  if (goldCategory.includes('AI')) return '人工智能';
+  if (goldCategory.includes('新能源')) return '新能源';
+  if (goldCategory.includes('消费')) return '消费';
+  if (goldCategory.includes('证券')) return '证券';
+  if (goldCategory.includes('军工')) return '军工';
+  if (goldCategory.includes('金融')) return '金融';
+  if (goldCategory.includes('煤炭')) return '煤炭';
+  if (goldCategory.includes('电力')) return '电力';
+  if (goldCategory.includes('家电')) return '家电';
+  if (goldCategory.includes('白酒')) return '消费';
+  if (goldCategory.includes('红利')) return '沪深300';
+  if (goldCategory.includes('光伏')) return '新能源';
+  if (goldCategory.includes('机器人')) return '人工智能';
+  if (goldCategory.includes('债券')) return '债券';
+  return '其他';
+}
+
+// 估算基金评级
+function estimateRating(totalFee, return1y, scale) {
+  let score = 3;
+  if (totalFee <= 0.6) score += 0.5;
+  else if (totalFee > 1.0) score -= 0.5;
+  if (return1y != null && return1y > 20) score += 1;
+  else if (return1y != null && return1y > 10) score += 0.5;
+  else if (return1y != null && return1y < -10) score -= 0.5;
+  if (scale > 10) score += 0.5;
+  else if (scale < 1) score -= 0.5;
+  return Math.max(1, Math.min(5, Math.round(score)));
+}
+
+// 抓取金选基金完整数据并写入数据库
+async function fetchGoldFundData() {
+  const pool = getPool();
+  console.log(`[金选基金] 开始抓取 ${GOLD_FUND_CODES.length} 只金选基金...`);
+
+  // 重置所有金选标记
+  try {
+    await pool.query("UPDATE funds SET is_gold_selected = false WHERE is_gold_selected = true");
+  } catch (e) {
+    console.warn('[金选基金] 重置金选标记失败:', e.message);
+  }
+
+  let successCount = 0;
+  let newCount = 0;
+  let navCount = 0;
+  const errors = [];
+  const results = [];
+
+  for (let i = 0; i < GOLD_FUND_CODES.length; i += 3) {
+    const batch = GOLD_FUND_CODES.slice(i, i + 3);
+    const batchResults = await Promise.allSettled(
+      batch.map(code => fetchSingleFundFromAlipay(code))
+    );
+
+    for (let j = 0; j < batchResults.length; j++) {
+      const code = batch[j];
+      const result = batchResults[j];
+
+      if (result.status !== 'fulfilled' || !result.value) {
+        errors.push(`${code}: API请求失败`);
+        continue;
+      }
+
+      const data = result.value;
+      const goldCategory = classifyGoldCategory(data.name || '', data.indexName || '', data.type || '');
+      const industry = inferIndustry(data.name || '', goldCategory);
+      const rating = estimateRating(data.totalFee || 0, data.return1y, data.scale || 0);
+
+      try {
+        // 写入基金基本信息
+        await pool.query(`
+          INSERT INTO funds (
+            code, name, type, industry, index_name,
+            management_fee, custody_fee, service_fee, total_fee,
+            scale, rating, buy_suggestion, daily_limit, manager,
+            is_gold_selected, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true, NOW())
+          ON CONFLICT (code) DO UPDATE SET
+            name = COALESCE(NULLIF($2, ''), funds.name),
+            type = COALESCE(NULLIF($3, ''), funds.type),
+            industry = CASE
+              WHEN funds.industry IS NULL OR funds.industry = '' OR funds.industry = '其他'
+              THEN COALESCE(NULLIF($4, ''), funds.industry)
+              ELSE funds.industry
+            END,
+            index_name = COALESCE(NULLIF($5, ''), funds.index_name),
+            management_fee = COALESCE($6, funds.management_fee),
+            custody_fee = COALESCE($7, funds.custody_fee),
+            service_fee = COALESCE($8, funds.service_fee),
+            total_fee = COALESCE($9, funds.total_fee),
+            scale = COALESCE($10, funds.scale),
+            rating = COALESCE($11, funds.rating),
+            buy_suggestion = COALESCE(NULLIF($12, ''), funds.buy_suggestion),
+            daily_limit = COALESCE($13, funds.daily_limit),
+            manager = COALESCE(NULLIF($14, ''), funds.manager),
+            is_gold_selected = true,
+            updated_at = NOW()
+        `, [
+          code, data.name || '', data.type || '', industry, data.indexName || '',
+          data.managementFee || 0, data.custodyFee || 0, data.serviceFee || 0,
+          data.totalFee || 0, data.scale || 0, rating,
+          data.buySuggestion || '', data.dailyLimit || 0, data.manager || '',
+        ]);
+
+        // 写入净值数据
+        if (data.nav > 0 && data.navDate) {
+          await pool.query(`
+            INSERT INTO fund_nav (fund_code, nav, total_nav, nav_date, return_1w, return_1m, return_3m, return_6m, return_1y)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ON CONFLICT (fund_code, nav_date) DO UPDATE SET
+              nav = EXCLUDED.nav,
+              total_nav = EXCLUDED.total_nav,
+              return_1w = COALESCE(EXCLUDED.return_1w, fund_nav.return_1w),
+              return_1m = COALESCE(EXCLUDED.return_1m, fund_nav.return_1m),
+              return_3m = COALESCE(EXCLUDED.return_3m, fund_nav.return_3m),
+              return_6m = COALESCE(EXCLUDED.return_6m, fund_nav.return_6m),
+              return_1y = COALESCE(EXCLUDED.return_1y, fund_nav.return_1y),
+              created_at = NOW()
+          `, [
+            code, data.nav, data.totalNav || data.nav, data.navDate,
+            data.return1w, data.return1m, data.return3m, data.return6m, data.return1y,
+          ]);
+          navCount++;
+        }
+
+        successCount++;
+        results.push({ code, name: data.name, goldCategory, industry, rating });
+      } catch (e) {
+        errors.push(`${code}: 写入失败 ${e.message}`);
+      }
+    }
+
+    // 批次间延迟
+    if (i + 3 < GOLD_FUND_CODES.length) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    // 进度日志
+    if ((i + 3) % 30 === 0 || i + 3 >= GOLD_FUND_CODES.length) {
+      console.log(`[金选基金] 进度: ${Math.min(i + 3, GOLD_FUND_CODES.length)}/${GOLD_FUND_CODES.length} (成功${successCount})`);
+    }
+  }
+
+  if (errors.length > 0) {
+    console.warn(`[金选基金] 错误 (${errors.length}):`);
+    errors.slice(0, 10).forEach(e => console.warn(`  - ${e}`));
+  }
+
+  console.log(`[金选基金] 抓取完成: 成功 ${successCount}/${GOLD_FUND_CODES.length}, 净值 ${navCount}, 错误 ${errors.length}`);
+  return { total: GOLD_FUND_CODES.length, success: successCount, navUpdated: navCount, errors, results };
 }
 
 module.exports = {
@@ -815,4 +1359,7 @@ module.exports = {
   updateAllFundReturns,
   updatePortfolioPnl,
   runDailyDataUpdate,
+  fetchYiFangDaFundData,
+  fetchGoldFundData,
+  GOLD_FUND_CODES,
 };

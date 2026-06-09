@@ -47,8 +47,19 @@
 │   ├── db.cjs            # PostgreSQL 数据库初始化
 │   ├── fund-service.cjs  # 基金数据服务层
 │   ├── fund-data.cjs     # 基金种子数据
-│   ├── auth.cjs          # 认证模块
-│   └── portfolio.cjs     # 持仓管理模块
+│   ├── auth.cjs          # 认证模块（JWT + 支付宝 OAuth + 管理员权限校验）
+│   ├── admin.cjs         # 管理后台模块（用户管理、审计日志、系统监控）
+│   ├── portfolio.cjs     # 持仓管理模块
+│   ├── data-fetcher.cjs  # 数据抓取模块（东方财富/新浪 API）
+│   ├── routes/
+│   │   └── api.cjs       # API 路由
+│   └── utils/
+│       ├── rate-limiter.cjs   # 速率限制器
+│       ├── scheduler.cjs      # 定时任务调度器
+│       ├── trading-hours.cjs  # 交易时间判断
+│       ├── crypto.cjs         # AES-256-GCM 加密工具
+│       ├── alipay.cjs         # 支付宝 SDK 封装
+│       └── logger.cjs         # 结构化日志（winston）
 ├── .env                  # 环境变量（不上传到仓库）
 ├── package.json
 └── node_modules/
@@ -72,9 +83,10 @@
 - **磁盘**: ≥ 2GB 可用空间
 - **端口**: 8688 需开放（阿里云安全组需放行）
 - **数据库**: PostgreSQL 14+
+- **Python**: Python 3.8+（招行理财产品数据爬取需要，可选）
 
 ### 本地环境
-- Node.js ≥ 18
+- Node.js ≥ 20（推荐 LTS）
 - npm ≥ 9
 - SSH 可连接到目标服务器
 - rsync 已安装
@@ -204,6 +216,13 @@ server {
     listen 8688;
     server_name 47.116.77.67;
 
+    # 安全响应头
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
     gzip on;
     gzip_types text/plain text/css application/json application/javascript
                text/xml application/xml text/javascript image/svg+xml;
@@ -308,16 +327,23 @@ ssh root@47.116.77.67 "cd /var/www/jijin && pm2 restart fund-server"
 chmod 600 /var/www/jijin/.env
 ```
 
-### Nginx 安全头
+### 安全响应头（双层防护）
 
-后端使用 helmet 中间件自动管理安全响应头：
+**Nginx 层**（静态资源 + API 响应）：
 - `X-Content-Type-Options: nosniff` — 防止 MIME 类型嗅探
-- `X-Frame-Options: DENY` — 防止点击劫持
+- `X-Frame-Options: SAMEORIGIN` — 防止点击劫持
+- `Referrer-Policy: strict-origin-when-cross-origin` — 控制 Referer 信息泄露
+- `Permissions-Policy` — 禁用摄像头、麦克风、地理位置等浏览器 API
+
+**Express helmet 中间件层**（API 响应）：
 - `Content-Security-Policy` — 限制资源加载来源
 - `Strict-Transport-Security` — 强制 HTTPS（需配合 SSL 证书）
 - `X-DNS-Prefetch-Control` — 控制 DNS 预获取
-- `X-Download-Options` — 防止 IE 执行下载
-- `X-Permitted-Cross-Domain-Policies` — 限制跨域策略
+
+**用户认证与权限校验**：
+- `authMiddleware` 实时查询数据库用户状态（30 秒 TTL 缓存），被禁用用户的 JWT 令牌立即失效
+- `adminMiddleware` 实时查询数据库 role/status，不信任 JWT 缓存的 role
+- 管理员降权后旧 token 立即失效（无需等待 7 天过期）
 
 ### 网络安全
 
@@ -354,16 +380,27 @@ sudo -u postgres psql -c "SELECT count(*) FROM pg_stat_activity;"
 
 ## 回滚方案
 
+### 方式一：从备份恢复（推荐）
 ```bash
-# 如果新版本有问题，回滚到上一个版本
 ssh root@47.116.77.67
-cd /var/www/jijin
+cd /var/www
 
-# 查看 git 历史
-git log --oneline -5
-git checkout <上一个稳定 commit>
+# 查看备份列表
+ls -la backups/
+
+# 恢复最近的备份
+tar -xzf backups/jijin_XXXXXXXX_XXXXXX.tar.gz -C /var/www/
+cd /var/www/jijin
 npm install --omit=dev
 pm2 restart fund-server
+```
+
+### 方式二：重新部署旧版本
+```bash
+# 本地打包旧版本代码为 fund-recommender.zip
+# 上传到服务器 /tmp/ 目录
+scp fund-recommender.zip root@47.116.77.67:/tmp/
+ssh root@47.116.77.67 "bash /tmp/deploy-full.sh"
 ```
 
 ## 监控

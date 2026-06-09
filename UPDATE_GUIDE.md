@@ -161,9 +161,44 @@ pm2 restart fund-server
 ## 首次部署检查清单
 
 - [ ] 上传项目zip到服务器
-- [ ] 运行 `deploy-full.sh`
+- [ ] 运行 `deploy-full.sh`（JWT_SECRET 会自动生成）
 - [ ] 上传密钥文件到 `keys/` 目录
 - [ ] 确认 `.env` 文件配置正确（PG_HOST=localhost）
 - [ ] 上传前端构建产物 `dist/`（如果服务器构建失败）
+- [ ] 确认 Python 3.8+ 已安装（招行理财产品数据爬取需要，可选）
 - [ ] 测试访问 http://47.116.77.67:8688/web
 - [ ] 测试支付宝登录功能
+- [ ] 运行 `pm2 startup` 确保开机自启已配置
+
+## 更新后验证
+
+每次更新后建议检查：
+```bash
+# 1. 确认 .env 包含所有必需变量（新版可能新增变量）
+cat /var/www/jijin/.env | grep -v "^#" | grep -v "^$"
+
+# 2. 确认后端正常启动
+pm2 logs fund-server --lines 20
+
+# 3. 确认 API 正常响应
+curl http://localhost:3003/api/funds | head -c 200
+
+# 4. 确认前端可访问
+curl -I http://localhost:8688/web/
+```
+
+---
+
+## 安全说明
+
+### 禁用用户即时失效（v0.6+）
+管理员在后台禁用用户后，该用户的现有 JWT 令牌将**立即失效**，无需等待 7 天过期。
+
+技术实现：
+- `authMiddleware` 在验证 JWT 签名后，会查询数据库检查用户状态
+- 使用 30 秒 TTL 缓存避免每次请求都查询数据库
+- 被禁用用户的所有请求将返回 403 错误
+
+### 管理员权限校验
+- `adminMiddleware` 实时查询数据库 role/status，不信任 JWT 缓存的 role
+- 管理员降权后旧 token 立即失效

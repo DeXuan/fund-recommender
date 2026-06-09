@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Card, InputNumber, Button, Table, Space, Statistic, Row, Col, Tag, Alert, Segmented } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import { formatCurrency } from '../utils/format';
+import { useTheme } from '../contexts/ThemeContext';
+import { getEchartsTheme } from '../utils/echarts-theme';
 
 type Frequency = 'daily' | 'weekly' | 'monthly';
 
@@ -72,6 +74,7 @@ function calculateDCA(amount: number, months: number, annualRate: number, freq: 
 }
 
 export default function DCACalculator() {
+  const { isDark } = useTheme();
   const [frequency, setFrequency] = useState<Frequency>('monthly');
   const [amount, setAmount] = useState(1000);
   const [period, setPeriod] = useState(36);
@@ -178,7 +181,7 @@ export default function DCACalculator() {
       title: '收益率',
       dataIndex: 'returnRate',
       key: 'returnRate',
-      render: (v: number) => <span style={{ color: v >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 600 }}>{v >= 0 ? '+' : ''}{v.toFixed(2)}%</span>,
+      render: (v: number) => <span style={{ color: v >= 0 ? '#ff4d4f' : '#52c41a', fontWeight: 600 }}>{v >= 0 ? '+' : ''}{v.toFixed(2)}%</span>,
     },
   ];
 
@@ -252,13 +255,13 @@ export default function DCACalculator() {
                 <Statistic title="总资产" value={result.totalValue} precision={2} prefix="¥" valueStyle={{ color: '#1677ff' }} />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="总收益" value={result.totalValue - result.totalInvestment} precision={2} prefix="¥" valueStyle={{ color: '#52c41a' }} />
+                <Statistic title="总收益" value={result.totalValue - result.totalInvestment} precision={2} prefix="¥" valueStyle={{ color: '#ff4d4f' }} />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="总收益率" value={result.totalReturn} precision={2} suffix="%" valueStyle={{ color: '#52c41a' }} />
+                <Statistic title="总收益率" value={result.totalReturn} precision={2} suffix="%" valueStyle={{ color: '#ff4d4f' }} />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="年化收益率" value={result.annualizedReturn} precision={2} suffix="%" valueStyle={{ color: '#52c41a' }} />
+                <Statistic title="年化收益率" value={result.annualizedReturn} precision={2} suffix="%" valueStyle={{ color: '#ff4d4f' }} />
               </Col>
               <Col xs={12} sm={6}>
                 <Statistic title="定投期数" value={result.totalPeriods} suffix={frequency === 'daily' ? '天' : frequency === 'weekly' ? '周' : '个月'} />
@@ -274,7 +277,7 @@ export default function DCACalculator() {
 
           {chartOption && (
             <Card title="收益曲线（按月采样）" style={{ marginBottom: 16 }}>
-              <ReactECharts option={chartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
+              <ReactECharts theme={getEchartsTheme(isDark)} option={chartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
             </Card>
           )}
 
@@ -292,7 +295,7 @@ export default function DCACalculator() {
                   <Table.Summary.Cell index={2}>{formatCurrency(result.totalInvestment)}</Table.Summary.Cell>
                   <Table.Summary.Cell index={3}>{formatCurrency(result.totalValue)}</Table.Summary.Cell>
                   <Table.Summary.Cell index={4}>
-                    <span style={{ color: result.totalReturn >= 0 ? '#52c41a' : '#ff4d4f' }}>
+                    <span style={{ color: result.totalReturn >= 0 ? '#ff4d4f' : '#52c41a' }}>
                       {result.totalReturn >= 0 ? '+' : ''}{result.totalReturn.toFixed(2)}%
                     </span>
                   </Table.Summary.Cell>

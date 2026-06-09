@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Tag, Button, Space, Tooltip, Spin } from 'antd';
+import { Tag, Button, Space, Tooltip, Spin, message } from 'antd';
 import { SyncOutlined, CheckCircleOutlined, StockOutlined, PauseCircleOutlined, RestOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { fundApi } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const MARKET_STATE_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   trading: { label: '交易中', color: 'success', icon: <StockOutlined /> },
@@ -10,9 +11,11 @@ const MARKET_STATE_CONFIG: Record<string, { label: string; color: string; icon: 
 };
 
 export default function DataStatus() {
+  const { user } = useAuth();
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState('');
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     loadStatus();
@@ -57,15 +60,20 @@ export default function DataStatus() {
   };
 
   const handleRefresh = async () => {
+    if (!isAdmin) {
+      message.warning('仅管理员可手动触发数据更新');
+      return;
+    }
     setLoading(true);
     try {
       await fundApi.triggerUpdate();
+      message.success('数据更新已启动');
       setTimeout(() => {
         loadStatus();
         setLoading(false);
       }, 2000);
-    } catch (error) {
-      console.error('触发更新失败:', error);
+    } catch (error: any) {
+      message.error(error?.message || '触发更新失败');
       setLoading(false);
     }
   };
@@ -100,14 +108,14 @@ export default function DataStatus() {
       alignItems: 'center',
       gap: 12,
       padding: '8px 16px',
-      background: 'rgba(255, 255, 255, 0.8)',
+      background: 'var(--bg-container)',
       backdropFilter: 'blur(10px)',
       borderRadius: 12,
       fontSize: 12,
-      border: '1px solid rgba(0, 0, 0, 0.06)',
-      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+      border: '1px solid var(--border-color-light)',
+      boxShadow: 'var(--shadow-sm)',
     }}>
-      <Space size={12} split={<span style={{ color: '#e8e8e8' }}>|</span>}>
+      <Space size={12} split={<span style={{ color: 'var(--border-color)' }}>|</span>}>
         {status?.isUpdating ? (
           <Tag icon={<SyncOutlined spin />} color="processing" style={{ margin: 0, borderRadius: 6 }}>
             数据更新中
@@ -124,29 +132,31 @@ export default function DataStatus() {
 
         {status?.lastUpdateTime && (
           <Tooltip title={new Date(status.lastUpdateTime).toLocaleString('zh-CN')}>
-            <span style={{ color: '#595959', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <ClockCircleOutlined style={{ color: '#8c8c8c' }} />
+            <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <ClockCircleOutlined style={{ color: 'var(--text-tertiary)' }} />
               数据截至 {formatDateTime(status.lastUpdateTime)}
             </span>
           </Tooltip>
         )}
 
         {countdown && (
-          <span style={{ color: '#1677ff', fontWeight: 500 }}>
+          <span style={{ color: 'var(--primary)', fontWeight: 500 }}>
             {nextLabel}: {countdown}
           </span>
         )}
       </Space>
 
-      <Button
-        size="small"
-        icon={<SyncOutlined />}
-        loading={loading || status?.isUpdating}
-        onClick={handleRefresh}
-        style={{ marginLeft: 'auto', borderRadius: 6 }}
-      >
-        刷新
-      </Button>
+      {isAdmin && (
+        <Button
+          size="small"
+          icon={<SyncOutlined />}
+          loading={loading || status?.isUpdating}
+          onClick={handleRefresh}
+          style={{ marginLeft: 'auto', borderRadius: 6 }}
+        >
+          刷新
+        </Button>
+      )}
     </div>
   );
 }

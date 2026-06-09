@@ -3,9 +3,8 @@
  */
 
 const express = require('express');
-const axios = require('axios');
 const fundService = require('../fund-service.cjs');
-const { authMiddleware } = require('../auth.cjs');
+const { authMiddleware, adminMiddleware } = require('../auth.cjs');
 const { getPool } = require('../db.cjs');
 const { isTradingHours, isTradingDay, getMarketState } = require('../utils/trading-hours.cjs');
 const { getCachedCapitalFlow } = require('../data-fetcher.cjs');
@@ -44,9 +43,9 @@ function createStatusRoute(dataUpdateStatus) {
   });
 }
 
-// 手动触发数据更新（需要认证）
+// 手动触发数据更新（需要管理员权限）
 function createUpdateRoute(updateAllFundData) {
-  router.post('/api/update', authMiddleware, async (req, res) => {
+  router.post('/api/update', authMiddleware, adminMiddleware, async (req, res) => {
     if (req.app.locals.dataUpdateStatus?.isUpdating) {
       return res.json({ success: false, message: '数据更新正在进行中' });
     }
@@ -158,45 +157,26 @@ router.get('/api/market/capital-flow', (req, res) => {
 // 获取行业推荐
 router.get('/api/recommendations/industry', async (req, res) => {
   try {
-    const result = await fundService.getAllFundsWithNav();
-    const allFundsData = result.data || result;
-    const recommendations = [
-      {
-        industry: '人工智能/AI', trend: '强势上涨', valuation: '合理偏高',
-        buySuggestion: '优先配置', logic: 'AI算力+应用双轮驱动，年度核心主线',
-        funds: allFundsData.filter(f => f.industry === '人工智能').slice(0, 3),
-      },
-      {
-        industry: '半导体/芯片', trend: '震荡上行', valuation: '合理',
-        buySuggestion: '优先配置', logic: '半导体国产替代+AI芯片需求爆发',
-        funds: allFundsData.filter(f => f.industry === '半导体/芯片').slice(0, 3),
-      },
-      {
-        industry: '纳斯达克100', trend: '强势上涨', valuation: '合理偏高',
-        buySuggestion: '限大额配置', logic: '美股科技龙头，QDII额度紧张',
-        funds: allFundsData.filter(f => f.industry === '纳斯达克100').slice(0, 3),
-      },
-      {
-        industry: '医药', trend: '底部反弹', valuation: '极低',
-        buySuggestion: '左侧布局', logic: '估值历史极低，长期配置价值凸显',
-        funds: allFundsData.filter(f => f.industry === '医药').slice(0, 3),
-      },
-      {
-        industry: '煤炭', trend: '震荡上行', valuation: '低估',
-        buySuggestion: '分批建仓', logic: '高股息(5-8%)+低估值(PE 8-10倍)+供需偏紧，防御属性强',
-        funds: allFundsData.filter(f => f.industry === '煤炭').slice(0, 3),
-      },
-      {
-        industry: '陶瓷/建材', trend: '底部企稳', valuation: '低估',
-        buySuggestion: '逢低布局', logic: '房地产政策优化+基建稳增长，建材需求触底反弹；陶瓷行业集中度提升，龙头企业受益',
-        funds: allFundsData.filter(f => f.industry === '陶瓷/建材').slice(0, 3),
-      },
-      {
-        industry: '证券', trend: '底部反弹', valuation: '低估',
-        buySuggestion: '逢低布局', logic: '资本市场改革持续推进，券商行业整合加速；市场回暖带动交易量提升，券商盈利有望改善',
-        funds: allFundsData.filter(f => f.industry === '证券').slice(0, 3),
-      },
+    const industryConfigs = [
+      { industry: '人工智能/AI', match: '人工智能', trend: '强势上涨', valuation: '合理偏高', buySuggestion: '优先配置', logic: 'AI算力+应用双轮驱动，年度核心主线' },
+      { industry: '半导体/芯片', match: '半导体/芯片', trend: '震荡上行', valuation: '合理', buySuggestion: '优先配置', logic: '半导体国产替代+AI芯片需求爆发' },
+      { industry: '纳斯达克100', match: '纳斯达克100', trend: '强势上涨', valuation: '合理偏高', buySuggestion: '限大额配置', logic: '美股科技龙头，QDII额度紧张' },
+      { industry: '医药', match: '医药', trend: '底部反弹', valuation: '极低', buySuggestion: '左侧布局', logic: '估值历史极低，长期配置价值凸显' },
+      { industry: '煤炭', match: '煤炭', trend: '震荡上行', valuation: '低估', buySuggestion: '分批建仓', logic: '高股息(5-8%)+低估值(PE 8-10倍)+供需偏紧，防御属性强' },
+      { industry: '陶瓷/建材', match: '陶瓷/建材', trend: '底部企稳', valuation: '低估', buySuggestion: '逢低布局', logic: '房地产政策优化+基建稳增长，建材需求触底反弹；陶瓷行业集中度提升，龙头企业受益' },
+      { industry: '证券', match: '证券', trend: '底部反弹', valuation: '低估', buySuggestion: '逢低布局', logic: '资本市场改革持续推进，券商行业整合加速；市场回暖带动交易量提升，券商盈利有望改善' },
     ];
+
+    const recommendations = await Promise.all(
+      industryConfigs.map(async (cfg) => {
+        const result = await fundService.getAllFundsWithNav({ industry: cfg.match, pageSize: 3 });
+        return {
+          industry: cfg.industry, trend: cfg.trend, valuation: cfg.valuation,
+          buySuggestion: cfg.buySuggestion, logic: cfg.logic,
+          funds: (result.data || result).slice(0, 3),
+        };
+      })
+    );
     res.json(recommendations);
   } catch (error) {
     res.status(500).json({ error: '获取推荐失败' });
@@ -365,19 +345,13 @@ router.post('/api/tools/compare', async (req, res) => {
       return res.status(400).json({ error: '基金代码格式不正确' });
     }
 
-    const result = await fundService.getAllFundsWithNav();
-    const allFundsData = result.data || result;
-    const funds = codes
-      .map(code => {
-        try {
-          const fund = allFundsData.find(f => f.code === code);
-          if (fund) return generateFundDetail(fund);
-          return null;
-        } catch (e) {
-          return null;
-        }
-      })
-      .filter(Boolean);
+    const funds = [];
+    for (const code of codes) {
+      const result = await fundService.getAllFundsWithNav({ search: code, pageSize: 5 });
+      const list = result.data || result;
+      const fund = list.find(f => f.code === code);
+      if (fund) funds.push(generateFundDetail(fund));
+    }
 
     res.json(funds);
   } catch (error) {
@@ -503,20 +477,22 @@ router.get('/api/hs300/analysis', async (req, res) => {
       roe: 10.0, dividendYield: 2.8,
     };
 
+    // 从数据库读取沪深300估值数据
     try {
-      const valRes = await axios.get(
-        'https://push2.eastmoney.com/api/qt/stock/get?secid=1.000300&fields=f43,f44,f45,f46,f47,f48,f50,f51,f52,f55,f57,f58,f116,f117,f162,f163,f167,f170',
-        { timeout: 5000 }
-      );
-      if (valRes.data && valRes.data.data) {
-        const d = valRes.data.data;
-        indexValuation.pe = d.f162 ? (d.f162 / 100).toFixed(2) : indexValuation.pe;
-        indexValuation.pb = d.f167 ? (d.f167 / 100).toFixed(2) : indexValuation.pb;
+      const dbIndices = await fundService.getMarketIndices();
+      const hs300Idx = dbIndices.find(i => i.code === '000300');
+      if (hs300Idx) {
+        if (hs300Idx.pe) indexValuation.pe = hs300Idx.pe;
+        if (hs300Idx.pb) indexValuation.pb = hs300Idx.pb;
+        if (hs300Idx.pePercentile) indexValuation.pePercentile = hs300Idx.pePercentile;
+        if (hs300Idx.pbPercentile) indexValuation.pbPercentile = hs300Idx.pbPercentile;
+        if (hs300Idx.valuation) indexValuation.valuation = hs300Idx.valuation;
+        if (hs300Idx.suggestion) indexValuation.suggestion = hs300Idx.suggestion;
       }
     } catch (e) { /* 使用默认估值数据 */ }
 
-    const result = await fundService.getAllFundsWithNav({ pageSize: 500 });
-    const allFundsData = result.data || result;
+    const hs300Result = await fundService.getAllFundsWithNav({ industry: '沪深300', pageSize: 500 });
+    const hs300Data = hs300Result.data || hs300Result;
 
     let hs300DetailsMap = {};
     try {
@@ -526,7 +502,7 @@ router.get('/api/hs300/analysis', async (req, res) => {
       console.warn('[HS300] 获取基金详情失败，使用默认值:', e.message);
     }
 
-    const hs300Funds = allFundsData.filter(f => f.industry === '沪深300').map(f => {
+    const hs300Funds = hs300Data.map(f => {
       const detail = hs300DetailsMap[f.code] || {};
       return {
         code: f.code, name: f.name, type: f.type,
@@ -612,10 +588,10 @@ router.get('/api/sp500/analysis', async (req, res) => {
       currentPrice: 5350,
     };
 
-    const result = await fundService.getAllFundsWithNav({ pageSize: 500 });
-    const allFundsData = result.data || result;
+    const sp500Result = await fundService.getAllFundsWithNav({ industry: '标普500', pageSize: 500 });
+    const sp500Data = sp500Result.data || sp500Result;
 
-    const sp500Funds = allFundsData.filter(f => f.industry === '标普500').map(f => ({
+    const sp500Funds = sp500Data.map(f => ({
       code: f.code, name: f.name, type: f.type,
       managementFee: f.managementFee, custodyFee: f.custodyFee,
       totalFee: f.totalFee, scale: f.scale,
@@ -1143,6 +1119,251 @@ router.get('/api/alerts', authMiddleware, async (req, res) => {
   }
 });
 
+// ========== 招商银行持仓理财产品 API ==========
+router.get('/api/cmb-products', async (req, res) => {
+  try {
+    const pool = getPool();
+
+    // 从 cmb_products 获取所有持仓产品基础信息
+    const prodResult = await pool.query(
+      `SELECT product_code, product_name, risk_level, product_status, investment_period, nav, nav_date, return_1m, return_3m, return_6m, return_1y, updated_at
+       FROM cmb_products ORDER BY product_code`
+    );
+
+    // 获取每个产品的最新净值和区间涨跌幅（从 cmb_zhaoyin_nav）
+    const navResult = await pool.query(`
+      SELECT DISTINCT ON (product_code)
+        product_code, unit_nav, cumulative_nav, nav_date,
+        return_1m_annualized, return_3m_annualized, return_6m_annualized,
+        return_ytd_annualized, return_since_annualized
+      FROM cmb_zhaoyin_nav
+      ORDER BY product_code, nav_date DESC
+    `);
+    const navMap = {};
+    for (const r of navResult.rows) {
+      navMap[r.product_code] = r;
+    }
+
+    const enriched = prodResult.rows.map(r => {
+      const code = r.product_code;
+      const nav = navMap[code] || {};
+
+      // 优先用 cmb_zhaoyin_nav 数据，没有则回退到 cmb_products 数据
+      const unitNav = nav.unit_nav ? parseFloat(nav.unit_nav) : (r.nav ? parseFloat(r.nav) : null);
+      const navDate = nav.nav_date
+        ? (nav.nav_date instanceof Date ? nav.nav_date.toISOString().slice(0, 10) : nav.nav_date)
+        : (r.nav_date instanceof Date ? r.nav_date.toISOString().slice(0, 10) : (r.nav_date || null));
+      const return1m = nav.return_1m_annualized ? parseFloat(nav.return_1m_annualized) : (r.return_1m ? parseFloat(r.return_1m) : null);
+      const return3m = nav.return_3m_annualized ? parseFloat(nav.return_3m_annualized) : (r.return_3m ? parseFloat(r.return_3m) : null);
+      const return6m = nav.return_6m_annualized ? parseFloat(nav.return_6m_annualized) : (r.return_6m ? parseFloat(r.return_6m) : null);
+      const returnYtd = nav.return_ytd_annualized ? parseFloat(nav.return_ytd_annualized) : null;
+      const returnSince = nav.return_since_annualized ? parseFloat(nav.return_since_annualized) : (r.return_1y ? parseFloat(r.return_1y) : null);
+
+      return {
+        product_code: code,
+        product_name: r.product_name,
+        risk_level: r.risk_level || '',
+        product_status: r.product_status || '',
+        investment_period: r.investment_period || '',
+        unit_nav: unitNav,
+        nav_date: navDate,
+        return_1m: return1m,
+        return_3m: return3m,
+        return_6m: return6m,
+        return_ytd: returnYtd,
+        return_since: returnSince,
+        updated_at: r.updated_at || null,
+      };
+    });
+
+    res.json(enriched);
+  } catch (error) {
+    console.error('获取招行理财产品数据失败:', error.message);
+    res.status(500).json({ error: '获取招行理财产品数据失败' });
+  }
+});
+
+// 手动触发招行理财产品数据更新（需要管理员权限）
+router.post('/api/cmb-products/update', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { spawn } = require('child_process');
+    const path = require('path');
+    const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'fetch_cmb_personal_nav.py');
+
+    // 先运行 weekly 模式更新原有54只产品
+    const proc1 = spawn('python', [scriptPath, 'weekly'], {
+      env: { ...process.env },
+      cwd: path.join(__dirname, '..', '..'),
+      stdio: 'pipe',
+    });
+    proc1.stdout.on('data', (data) => console.log(`[CMB-WEEKLY] ${data.toString().trim()}`));
+    proc1.stderr.on('data', (data) => console.error(`[CMB-WEEKLY] ${data.toString().trim()}`));
+    proc1.on('close', (code) => {
+      console.log(`[CMB-WEEKLY] 完成，退出码: ${code}`);
+      // weekly 完成后运行 target 模式更新25只目标产品
+      const proc2 = spawn('python', [scriptPath, 'target'], {
+        env: { ...process.env },
+        cwd: path.join(__dirname, '..', '..'),
+        stdio: 'pipe',
+      });
+      proc2.stdout.on('data', (data) => console.log(`[CMB-TARGET] ${data.toString().trim()}`));
+      proc2.stderr.on('data', (data) => console.error(`[CMB-TARGET] ${data.toString().trim()}`));
+      proc2.on('close', (code2) => console.log(`[CMB-TARGET] 完成，退出码: ${code2}`));
+      proc2.on('error', (err) => console.error('[CMB-TARGET] 启动失败:', err.message));
+    });
+    proc1.on('error', (err) => console.error('[CMB-WEEKLY] 启动失败:', err.message));
+
+    res.json({ success: true, message: '招行理财产品数据更新已启动（全量+目标产品）' });
+  } catch (error) {
+    console.error('触发招行理财产品更新失败:', error.message);
+    res.status(500).json({ error: '触发更新失败' });
+  }
+});
+
+// 获取单个招行理财产品的净值历史
+router.get('/api/cmb-products/:code/nav-history', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const pool = getPool();
+
+    const prodResult = await pool.query(
+      'SELECT product_code, product_name, risk_level, product_status FROM cmb_products WHERE product_code = $1',
+      [code]
+    );
+    if (prodResult.rows.length === 0) {
+      return res.status(404).json({ error: '产品不存在' });
+    }
+
+    const navResult = await pool.query(
+      `SELECT unit_nav, cumulative_nav, nav_date
+       FROM cmb_zhaoyin_nav
+       WHERE product_code = $1
+       ORDER BY nav_date ASC`,
+      [code]
+    );
+
+    const product = prodResult.rows[0];
+    const navHistory = navResult.rows.map(r => ({
+      unit_nav: parseFloat(r.unit_nav),
+      cumulative_nav: r.cumulative_nav ? parseFloat(r.cumulative_nav) : null,
+      nav_date: r.nav_date instanceof Date ? r.nav_date.toISOString().slice(0, 10) : r.nav_date,
+    }));
+
+    // 计算每个日期的累计收益率（基于首个净值）
+    if (navHistory.length > 0) {
+      const firstNav = navHistory[0].unit_nav;
+      for (const item of navHistory) {
+        item.cumulative_return = parseFloat(((item.unit_nav - firstNav) / firstNav * 100).toFixed(4));
+      }
+    }
+
+    res.json({
+      product_code: product.product_code,
+      product_name: product.product_name,
+      risk_level: product.risk_level,
+      product_status: product.product_status,
+      nav_history: navHistory,
+    });
+  } catch (error) {
+    console.error('获取招行理财产品净值历史失败:', error.message);
+    res.status(500).json({ error: '获取净值历史失败' });
+  }
+});
+
+// ========== 招银理财净值 API ==========
+router.get('/api/cmb-zhaoyin-nav', async (req, res) => {
+  try {
+    const pool = getPool();
+    const { search, sort, order, page = 1, pageSize = 50 } = req.query;
+
+    let where = '';
+    const params = [];
+    let idx = 1;
+
+    if (search) {
+      where = `WHERE n.product_code ILIKE $${idx} OR n.product_name ILIKE $${idx}`;
+      params.push(`%${search}%`);
+      idx++;
+    }
+
+    const countSql = `SELECT COUNT(DISTINCT n.product_code) FROM cmb_zhaoyin_nav n ${where}`;
+    const countResult = await pool.query(countSql, params);
+    const total = parseInt(countResult.rows[0].count);
+
+    const sortMap = {
+      'product_code': 'n.product_code',
+      'product_name': 'n.product_name',
+      'unit_nav': 'n.unit_nav',
+      'cumulative_nav': 'n.cumulative_nav',
+      'nav_date': 'n.nav_date',
+    };
+    const sortCol = sortMap[sort] || 'n.nav_date';
+    const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
+
+    const offset = (parseInt(page) - 1) * parseInt(pageSize);
+
+    const dataSql = `
+      SELECT DISTINCT ON (n.product_code)
+        n.product_code,
+        n.product_name,
+        n.unit_nav,
+        n.cumulative_nav,
+        n.nav_date,
+        n.return_1m_annualized, n.return_3m_annualized, n.return_6m_annualized,
+        n.return_ytd_annualized, n.return_since_annualized
+      FROM cmb_zhaoyin_nav n
+      ${where}
+      ORDER BY n.product_code, n.nav_date DESC
+      LIMIT $${idx++} OFFSET $${idx++}
+    `;
+    const dataResult = await pool.query(dataSql, [...params, parseInt(pageSize), offset]);
+
+    res.json({
+      data: dataResult.rows.map(r => ({
+        product_code: r.product_code,
+        product_name: r.product_name,
+        unit_nav: r.unit_nav ? parseFloat(r.unit_nav) : null,
+        cumulative_nav: r.cumulative_nav ? parseFloat(r.cumulative_nav) : null,
+        nav_date: r.nav_date,
+        return_1m_annualized: r.return_1m_annualized ? parseFloat(r.return_1m_annualized) : null,
+        return_3m_annualized: r.return_3m_annualized ? parseFloat(r.return_3m_annualized) : null,
+        return_6m_annualized: r.return_6m_annualized ? parseFloat(r.return_6m_annualized) : null,
+        return_ytd_annualized: r.return_ytd_annualized ? parseFloat(r.return_ytd_annualized) : null,
+        return_since_inception_annualized: r.return_since_annualized ? parseFloat(r.return_since_annualized) : null,
+      })),
+      total,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize),
+      totalPages: Math.ceil(total / parseInt(pageSize)),
+    });
+  } catch (error) {
+    console.error('获取招银理财净值数据失败:', error.message);
+    res.status(500).json({ error: '获取招银理财净值数据失败' });
+  }
+});
+
+// 手动触发招银理财净值数据更新（需要管理员权限）
+router.post('/api/cmb-zhaoyin-nav/update', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { spawn } = require('child_process');
+    const scriptPath = require('path').join(__dirname, '..', '..', 'scripts', 'fetch_cmb_personal_nav.py');
+    const python = spawn('python', [scriptPath], {
+      env: { ...process.env },
+      cwd: require('path').join(__dirname, '..', '..'),
+    });
+    let output = '';
+    python.stdout.on('data', (data) => { output += data.toString(); });
+    python.stderr.on('data', (data) => { output += data.toString(); });
+    python.on('close', (code) => {
+      console.log(`[招银理财NAV] 爬取脚本退出，code=${code}`);
+    });
+    res.json({ success: true, message: '招银理财净值数据更新已启动' });
+  } catch (error) {
+    console.error('触发招银理财净值更新失败:', error.message);
+    res.status(500).json({ error: '触发更新失败' });
+  }
+});
+
 // ========== 估值历史趋势 API ==========
 router.get('/api/market/valuation-trend', async (req, res) => {
   try {
@@ -1177,4 +1398,354 @@ router.get('/api/market/valuation-trend', async (req, res) => {
   }
 });
 
-module.exports = { router, createStatusRoute, createUpdateRoute };
+// GET /api/yifangda-funds — 获取易方达基金数据
+router.get('/api/yifangda-funds', async (req, res) => {
+  try {
+    const pool = getPool();
+    const { search, sort = 'return_1y', order = 'desc', manager, page = 1, pageSize = 50 } = req.query;
+
+    const conditions = [];
+    const params = [];
+    let idx = 1;
+
+    if (search) {
+      conditions.push(`(fund_code ILIKE $${idx} OR fund_name ILIKE $${idx})`);
+      params.push(`%${search}%`);
+      idx++;
+    }
+    if (manager) {
+      conditions.push(`fund_manager = $${idx}`);
+      params.push(manager);
+      idx++;
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // 总数
+    const countResult = await pool.query(`SELECT COUNT(*) FROM yifangda_funds ${where}`, params);
+    const total = parseInt(countResult.rows[0].count);
+
+    // 排序
+    const sortMap = {
+      'fund_code': 'fund_code',
+      'fund_name': 'fund_name',
+      'unit_nav': 'unit_nav',
+      'return_1m': 'return_1m',
+      'return_3m': 'return_3m',
+      'return_6m': 'return_6m',
+      'return_1y': 'return_1y',
+      'scale': 'scale',
+      'fund_manager': 'fund_manager',
+    };
+    const sortCol = sortMap[sort] || 'return_1y';
+    const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
+
+    const offset = (parseInt(page) - 1) * parseInt(pageSize);
+
+    // 数据
+    const dataResult = await pool.query(
+      `SELECT fund_code, fund_name, fund_manager, unit_nav, nav_date,
+              return_1w, return_1m, return_3m, return_6m, return_1y, scale, updated_at
+       FROM yifangda_funds ${where}
+       ORDER BY ${sortCol} ${sortOrder} NULLS LAST
+       LIMIT $${idx++} OFFSET $${idx++}`,
+      [...params, parseInt(pageSize), offset]
+    );
+
+    // 经理列表（用于筛选）
+    const managersResult = await pool.query(
+      `SELECT DISTINCT fund_manager, COUNT(*) as cnt
+       FROM yifangda_funds WHERE fund_manager != ''
+       GROUP BY fund_manager ORDER BY cnt DESC LIMIT 30`
+    );
+
+    res.json({
+      data: dataResult.rows.map(r => ({
+        fund_code: r.fund_code,
+        fund_name: r.fund_name,
+        fund_manager: r.fund_manager,
+        unit_nav: r.unit_nav ? parseFloat(r.unit_nav) : null,
+        nav_date: r.nav_date,
+        return_1w: r.return_1w ? parseFloat(r.return_1w) : null,
+        return_1m: r.return_1m ? parseFloat(r.return_1m) : null,
+        return_3m: r.return_3m ? parseFloat(r.return_3m) : null,
+        return_6m: r.return_6m ? parseFloat(r.return_6m) : null,
+        return_1y: r.return_1y ? parseFloat(r.return_1y) : null,
+        scale: r.scale ? parseFloat(r.scale) : null,
+        updated_at: r.updated_at,
+      })),
+      total,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize),
+      totalPages: Math.ceil(total / parseInt(pageSize)),
+      managers: managersResult.rows.map(r => ({
+        name: r.fund_manager,
+        count: parseInt(r.cnt),
+      })),
+    });
+  } catch (error) {
+    console.error('获取易方达基金数据失败:', error.message);
+    res.status(500).json({ error: '获取易方达基金数据失败' });
+  }
+});
+
+// POST /api/funds/fetch-yifangda — 从支付宝获取易方达基金的经理、净值等数据（管理员）
+function createYiFangDaRoute(fetchYiFangDaFundData) {
+  router.post('/api/funds/fetch-yifangda', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+      const result = await fetchYiFangDaFundData();
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error('获取易方达基金数据失败:', error.message);
+      res.status(500).json({ error: '获取失败: ' + error.message });
+    }
+  });
+}
+
+// ========== 金选基金 API ==========
+
+// GET /api/gold-funds — 获取金选基金列表（支持筛选和排序）
+router.get('/api/gold-funds', async (req, res) => {
+  try {
+    const pool = getPool();
+    const {
+      category, industry, search, manager,
+      sort = 'return_1y', order = 'desc',
+      page = 1, pageSize = 100,
+      minReturn, maxFee, minScale,
+    } = req.query;
+
+    const conditions = ['f.is_gold_selected = true'];
+    const params = [];
+    let idx = 1;
+
+    if (category) {
+      conditions.push(`f.industry = $${idx++}`);
+      params.push(category);
+    }
+    if (industry) {
+      conditions.push(`f.industry = $${idx++}`);
+      params.push(industry);
+    }
+    if (search) {
+      conditions.push(`(f.code ILIKE $${idx} OR f.name ILIKE $${idx})`);
+      params.push(`%${search}%`);
+      idx++;
+    }
+    if (manager) {
+      conditions.push(`f.manager = $${idx++}`);
+      params.push(manager);
+    }
+    if (minReturn) {
+      conditions.push(`n.return_1y >= $${idx++}`);
+      params.push(parseFloat(minReturn));
+    }
+    if (maxFee) {
+      conditions.push(`f.total_fee <= $${idx++}`);
+      params.push(parseFloat(maxFee));
+    }
+    if (minScale) {
+      conditions.push(`f.scale >= $${idx++}`);
+      params.push(parseFloat(minScale));
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // 排序映射
+    const sortMap = {
+      'return_1y': 'n.return_1y', 'return_6m': 'n.return_6m',
+      'return_3m': 'n.return_3m', 'return_1m': 'n.return_1m', 'return_1w': 'n.return_1w',
+      'total_fee': 'f.total_fee', 'scale': 'f.scale', 'rating': 'f.rating',
+      'nav': 'n.nav', 'name': 'f.name', 'code': 'f.code',
+    };
+    const sortCol = sortMap[sort] || 'n.return_1y';
+    const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
+
+    // 总数
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM funds f LEFT JOIN LATERAL (
+        SELECT return_1y FROM fund_nav WHERE fund_code = f.code ORDER BY nav_date DESC LIMIT 1
+      ) n ON true ${where}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count);
+
+    // 分页
+    const offset = (parseInt(page) - 1) * parseInt(pageSize);
+
+    // 数据查询
+    const dataResult = await pool.query(
+      `SELECT f.code, f.name, f.type, f.industry, f.index_name,
+              f.management_fee, f.custody_fee, f.service_fee, f.total_fee,
+              f.scale, f.rating, f.buy_suggestion, f.daily_limit, f.manager,
+              f.valuation, f.trend, f.logic,
+              n.nav, n.total_nav, n.nav_date,
+              n.return_1w, n.return_1m, n.return_3m, n.return_6m, n.return_1y
+       FROM funds f
+       LEFT JOIN LATERAL (
+         SELECT nav, total_nav, nav_date, return_1w, return_1m, return_3m, return_6m, return_1y
+         FROM fund_nav WHERE fund_code = f.code
+         ORDER BY return_1y IS NOT NULL DESC, nav_date DESC LIMIT 1
+       ) n ON true
+       ${where}
+       ORDER BY ${sortCol} ${sortOrder} NULLS LAST
+       LIMIT $${idx++} OFFSET $${idx++}`,
+      [...params, parseInt(pageSize), offset]
+    );
+
+    // 统计分类分布
+    const categoryResult = await pool.query(
+      `SELECT industry, COUNT(*) as cnt FROM funds WHERE is_gold_selected = true GROUP BY industry ORDER BY cnt DESC`
+    );
+
+    // 统计经理分布
+    const managerResult = await pool.query(
+      `SELECT manager, COUNT(*) as cnt FROM funds
+       WHERE is_gold_selected = true AND manager IS NOT NULL AND manager != ''
+       GROUP BY manager ORDER BY cnt DESC LIMIT 20`
+    );
+
+    res.json({
+      data: dataResult.rows.map(r => ({
+        code: r.code,
+        name: r.name,
+        type: r.type,
+        industry: r.industry,
+        index: r.index_name,
+        managementFee: parseFloat(r.management_fee) || 0,
+        custodyFee: parseFloat(r.custody_fee) || 0,
+        serviceFee: parseFloat(r.service_fee) || 0,
+        totalFee: parseFloat(r.total_fee) || 0,
+        scale: parseFloat(r.scale) || 0,
+        rating: r.rating,
+        buySuggestion: r.buy_suggestion,
+        dailyLimit: r.daily_limit,
+        manager: r.manager,
+        valuation: r.valuation,
+        trend: r.trend,
+        logic: r.logic,
+        isGoldSelected: true,
+        nav: r.nav ? parseFloat(r.nav) : null,
+        navDate: r.nav_date,
+        return1w: r.return_1w ? parseFloat(r.return_1w) : null,
+        return1m: r.return_1m ? parseFloat(r.return_1m) : null,
+        return3m: r.return_3m ? parseFloat(r.return_3m) : null,
+        return6m: r.return_6m ? parseFloat(r.return_6m) : null,
+        return1y: r.return_1y ? parseFloat(r.return_1y) : null,
+      })),
+      total,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize),
+      totalPages: Math.ceil(total / parseInt(pageSize)),
+      categories: categoryResult.rows.map(r => ({ name: r.industry, count: parseInt(r.cnt) })),
+      managers: managerResult.rows.map(r => ({ name: r.manager, count: parseInt(r.cnt) })),
+    });
+  } catch (error) {
+    console.error('获取金选基金失败:', error.message);
+    res.status(500).json({ error: '获取金选基金失败' });
+  }
+});
+
+// GET /api/gold-funds/stats — 金选基金统计概览
+router.get('/api/gold-funds/stats', async (req, res) => {
+  try {
+    const pool = getPool();
+
+    // 总数
+    const countResult = await pool.query(
+      "SELECT COUNT(*) as total FROM funds WHERE is_gold_selected = true"
+    );
+
+    // 分类统计
+    const categoryResult = await pool.query(
+      `SELECT industry, COUNT(*) as cnt,
+              AVG(f.scale) as avg_scale,
+              AVG(f.total_fee) as avg_fee
+       FROM funds f WHERE f.is_gold_selected = true
+       GROUP BY industry ORDER BY cnt DESC`
+    );
+
+    // 收益统计
+    const returnResult = await pool.query(
+      `SELECT
+         AVG(n.return_1y) as avg_return_1y,
+         AVG(n.return_6m) as avg_return_6m,
+         AVG(n.return_3m) as avg_return_3m,
+         MAX(n.return_1y) as max_return_1y,
+         MIN(n.return_1y) as min_return_1y
+       FROM funds f
+       LEFT JOIN LATERAL (
+         SELECT return_1y, return_6m, return_3m FROM fund_nav
+         WHERE fund_code = f.code ORDER BY nav_date DESC LIMIT 1
+       ) n ON true
+       WHERE f.is_gold_selected = true`
+    );
+
+    // 费率统计
+    const feeResult = await pool.query(
+      `SELECT
+         AVG(total_fee) as avg_fee,
+         MIN(total_fee) as min_fee,
+         MAX(total_fee) as max_fee
+       FROM funds WHERE is_gold_selected = true`
+    );
+
+    // 规模统计
+    const scaleResult = await pool.query(
+      `SELECT
+         SUM(scale) as total_scale,
+         AVG(scale) as avg_scale,
+         MAX(scale) as max_scale
+       FROM funds WHERE is_gold_selected = true`
+    );
+
+    const stats = returnResult.rows[0];
+    const fee = feeResult.rows[0];
+    const scale = scaleResult.rows[0];
+
+    res.json({
+      total: parseInt(countResult.rows[0].total),
+      categories: categoryResult.rows.map(r => ({
+        name: r.industry,
+        count: parseInt(r.cnt),
+        avgScale: r.avg_scale ? parseFloat(r.avg_scale).toFixed(2) : '0',
+        avgFee: r.avg_fee ? parseFloat(r.avg_fee).toFixed(4) : '0',
+      })),
+      returns: {
+        avg1y: stats.avg_return_1y ? parseFloat(stats.avg_return_1y).toFixed(2) : null,
+        avg6m: stats.avg_return_6m ? parseFloat(stats.avg_return_6m).toFixed(2) : null,
+        avg3m: stats.avg_return_3m ? parseFloat(stats.avg_return_3m).toFixed(2) : null,
+        max1y: stats.max_return_1y ? parseFloat(stats.max_return_1y).toFixed(2) : null,
+        min1y: stats.min_return_1y ? parseFloat(stats.min_return_1y).toFixed(2) : null,
+      },
+      fees: {
+        avg: fee.avg_fee ? parseFloat(fee.avg_fee).toFixed(4) : null,
+        min: fee.min_fee ? parseFloat(fee.min_fee).toFixed(4) : null,
+        max: fee.max_fee ? parseFloat(fee.max_fee).toFixed(4) : null,
+      },
+      scale: {
+        total: scale.total_scale ? parseFloat(scale.total_scale).toFixed(2) : '0',
+        avg: scale.avg_scale ? parseFloat(scale.avg_scale).toFixed(2) : '0',
+        max: scale.max_scale ? parseFloat(scale.max_scale).toFixed(2) : '0',
+      },
+    });
+  } catch (error) {
+    console.error('获取金选基金统计失败:', error.message);
+    res.status(500).json({ error: '获取金选基金统计失败' });
+  }
+});
+
+// POST /api/funds/fetch-gold — 抓取金选基金数据（管理员）
+function createGoldFundRoute(fetchGoldFundData) {
+  router.post('/api/funds/fetch-gold', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+      const result = await fetchGoldFundData();
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error('抓取金选基金数据失败:', error.message);
+      res.status(500).json({ error: '抓取失败: ' + error.message });
+    }
+  });
+}
+
+module.exports = { router, createStatusRoute, createUpdateRoute, createYiFangDaRoute, createGoldFundRoute };

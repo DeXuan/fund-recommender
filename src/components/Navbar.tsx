@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Layout, Menu, Button, Drawer, Grid, Dropdown, Avatar, Space, Badge, List, Tag, Empty, Modal, Input, Form, message } from 'antd';
+import { Layout, Menu, Button, Drawer, Grid, Dropdown, Avatar, Space, Badge, List, Tag, Empty, Modal, Input, Form, message, Tooltip } from 'antd';
 import {
   HomeOutlined,
   FundOutlined,
   GlobalOutlined,
   SafetyOutlined,
   CalculatorOutlined,
-  LineChartOutlined,
   MenuOutlined,
   StockOutlined,
   BarChartOutlined,
@@ -23,8 +22,13 @@ import {
   FallOutlined,
   ExclamationCircleOutlined,
   KeyOutlined,
+  BankOutlined,
+  DashboardOutlined,
+  TeamOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { alertsApi, authApi } from '../services/api';
 
 const { useBreakpoint } = Grid;
@@ -33,11 +37,9 @@ const navItems = [
   { key: '/', label: '首页', icon: <HomeOutlined /> },
   { key: '/funds', label: '基金列表', icon: <FundOutlined /> },
   { key: '/industry', label: '行业分析', icon: <BarChartOutlined /> },
-  { key: '/market', label: '市场分析', icon: <LineChartOutlined /> },
   { key: '/hs300', label: '沪深300', icon: <StockOutlined /> },
   { key: '/qdii', label: 'QDII基金', icon: <GlobalOutlined /> },
-  { key: '/risk-assessment', label: '风险评估', icon: <SafetyOutlined /> },
-  { key: '/dca-calculator', label: '定投计算器', icon: <CalculatorOutlined /> },
+  { key: '/cmb-products', label: '招行理财', icon: <BankOutlined /> },
 ];
 
 const DISMISSED_KEY = 'dismissed_alerts';
@@ -66,6 +68,7 @@ export default function Navbar() {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const { user, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const [alerts, setAlerts] = useState<any[]>([]);
   const [pwdModalOpen, setPwdModalOpen] = useState(false);
   const [pwdLoading, setPwdLoading] = useState(false);
@@ -101,7 +104,7 @@ export default function Navbar() {
     dismissAlert(key);
     setAlerts(prev => prev.filter(a => alertKey(a) !== key));
     if (item.fund_code) navigate(`/funds/${item.fund_code}`);
-    else navigate('/market');
+    else navigate('/industry');
   };
 
   const allNavItems = [
@@ -109,6 +112,10 @@ export default function Navbar() {
     ...(user ? [
       { key: '/watchlist', label: '自选基金', icon: <StarOutlined /> },
       { key: '/portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
+    ] : []),
+    ...(user?.role === 'admin' ? [
+      { key: '/admin/users', label: '用户管理', icon: <TeamOutlined /> },
+      { key: '/admin/monitor', label: '系统监控', icon: <DashboardOutlined /> },
     ] : []),
   ];
 
@@ -124,16 +131,16 @@ export default function Navbar() {
   return (
     <Layout.Header
       style={{
-        background: 'rgba(255, 255, 255, 0.95)',
+        background: isDark ? 'rgba(26, 26, 26, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(10px)',
-        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02)',
+        boxShadow: 'var(--shadow-sm)',
         position: 'sticky',
         top: 0,
         zIndex: 1000,
         padding: '0 24px',
         height: 64,
         lineHeight: '64px',
-        borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+        borderBottom: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)'}`,
       }}
     >
       <div style={{ maxWidth: 1800, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%' }}>
@@ -151,8 +158,8 @@ export default function Navbar() {
             <StockOutlined style={{ fontSize: 20, color: '#fff' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontWeight: 700, fontSize: 17, color: '#1677ff', lineHeight: 1.2, whiteSpace: 'nowrap' }}>基金推荐助手</span>
-            <span style={{ fontSize: 11, color: '#8c8c8c', lineHeight: 1.2 }}>智能投资分析平台</span>
+            <span style={{ fontWeight: 700, fontSize: 17, color: 'var(--primary)', lineHeight: 1.2, whiteSpace: 'nowrap' }}>基金推荐助手</span>
+            <span style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.2 }}>智能投资分析平台</span>
           </div>
         </Link>
 
@@ -163,7 +170,7 @@ export default function Navbar() {
               <Dropdown
                 trigger={['click']}
                 dropdownRender={() => (
-                  <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 6px 16px rgba(0,0,0,0.12)', padding: 12, width: 300, maxHeight: 360, overflow: 'auto' }}>
+                  <div style={{ background: 'var(--bg-container)', borderRadius: 8, boxShadow: 'var(--shadow-md)', padding: 12, width: 300, maxHeight: 360, overflow: 'auto' }}>
                     <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, padding: '0 4px' }}>消息提醒</div>
                     {alerts.length === 0 ? (
                       <Empty description="暂无提醒" image={Empty.PRESENTED_IMAGE_SIMPLE} />
@@ -183,7 +190,7 @@ export default function Navbar() {
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ fontWeight: 500, fontSize: 13 }}>{item.title}</div>
-                              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>{item.message}</div>
+                              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>{item.message}</div>
                             </div>
                           </List.Item>
                         )}
@@ -193,13 +200,18 @@ export default function Navbar() {
                 )}
               >
                 <Badge count={alerts.length} size="small" offset={[-2, 2]}>
-                  <Button type="text" icon={<BellOutlined />} style={{ color: '#595959', fontSize: 16 }} />
+                  <Button type="text" icon={<BellOutlined />} style={{ color: 'var(--text-secondary)', fontSize: 16 }} />
                 </Badge>
               </Dropdown>
               <Dropdown menu={{
                 items: [
                   { key: 'portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
                   { key: 'watchlist', label: '自选基金', icon: <StarOutlined /> },
+                  ...(user?.role === 'admin' ? [
+                    { type: 'divider' as const },
+                    { key: '/admin/users', label: '用户管理', icon: <TeamOutlined /> },
+                    { key: '/admin/monitor', label: '系统监控', icon: <DashboardOutlined /> },
+                  ] : []),
                   { type: 'divider' as const },
                   { key: 'changePassword', label: '修改密码', icon: <KeyOutlined /> },
                   { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
@@ -208,20 +220,30 @@ export default function Navbar() {
                   if (key === 'logout') { logout(); navigate('/'); }
                   if (key === 'portfolio') navigate('/portfolio');
                   if (key === 'watchlist') navigate('/watchlist');
+                  if (key === '/admin/users' || key === '/admin/monitor') navigate(key);
                   if (key === 'changePassword') setPwdModalOpen(true);
                 },
               }}>
-                <Avatar size="small" icon={<UserOutlined />} src={user.avatar_url} style={{ cursor: 'pointer', background: '#1677ff' }} />
+                <Avatar size="small" icon={<UserOutlined />} src={user.avatar_url} style={{ cursor: 'pointer', background: user?.role === 'admin' ? '#722ed1' : '#1677ff' }} />
               </Dropdown>
               </>
             ) : (
               <Link to="/login"><Button type="primary" size="small" icon={<UserOutlined />}>登录</Button></Link>
             )}
+            <Tooltip title={isDark ? '浅色模式' : '深色模式'}>
+              <Button
+                type="text"
+                onClick={toggleTheme}
+                style={{ fontSize: 18, color: 'var(--text-secondary)' }}
+              >
+                {isDark ? '☀️' : '🌙'}
+              </Button>
+            </Tooltip>
             <Button
               type="text"
               icon={<MenuOutlined />}
               onClick={() => setDrawerOpen(true)}
-              style={{ fontSize: 18, color: '#595959' }}
+              style={{ fontSize: 18, color: 'var(--text-secondary)' }}
             />
           </Space>
         ) : (
@@ -239,12 +261,21 @@ export default function Navbar() {
               }}
             />
             <Space size={16} style={{ marginLeft: 16 }}>
+              <Tooltip title={isDark ? '浅色模式' : '深色模式'}>
+                <Button
+                  type="text"
+                  onClick={toggleTheme}
+                  style={{ fontSize: 18, color: 'var(--text-secondary)' }}
+                >
+                  {isDark ? '☀️' : '🌙'}
+                </Button>
+              </Tooltip>
               {user ? (
                 <>
                 <Dropdown
                   trigger={['click']}
                   dropdownRender={() => (
-                    <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 6px 16px rgba(0,0,0,0.12)', padding: 12, width: 320, maxHeight: 400, overflow: 'auto' }}>
+                    <div style={{ background: 'var(--bg-container)', borderRadius: 8, boxShadow: 'var(--shadow-md)', padding: 12, width: 320, maxHeight: 400, overflow: 'auto' }}>
                       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, padding: '0 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>消息提醒</span>
                         {alerts.length > 0 && <Tag color="red" style={{ margin: 0 }}>{alerts.length} 条</Tag>}
@@ -271,7 +302,7 @@ export default function Navbar() {
                               </div>
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontWeight: 500, fontSize: 13 }}>{item.title}</div>
-                                <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>{item.message}</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>{item.message}</div>
                               </div>
                             </List.Item>
                           )}
@@ -281,13 +312,18 @@ export default function Navbar() {
                   )}
                 >
                   <Badge count={alerts.length} size="small" offset={[-2, 2]}>
-                    <Button type="text" icon={<BellOutlined />} style={{ color: '#595959', fontSize: 16 }} />
+                    <Button type="text" icon={<BellOutlined />} style={{ color: 'var(--text-secondary)', fontSize: 16 }} />
                   </Badge>
                 </Dropdown>
                 <Dropdown menu={{
                   items: [
                     { key: 'portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
                     { key: 'watchlist', label: '自选基金', icon: <StarOutlined /> },
+                    ...(user?.role === 'admin' ? [
+                      { type: 'divider' as const },
+                      { key: '/admin/users', label: '用户管理', icon: <TeamOutlined /> },
+                      { key: '/admin/monitor', label: '系统监控', icon: <DashboardOutlined /> },
+                    ] : []),
                     { type: 'divider' as const },
                     { key: 'changePassword', label: '修改密码', icon: <KeyOutlined /> },
                     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
@@ -296,12 +332,14 @@ export default function Navbar() {
                     if (key === 'logout') { logout(); navigate('/'); }
                     if (key === 'portfolio') navigate('/portfolio');
                     if (key === 'watchlist') navigate('/watchlist');
+                    if (key === '/admin/users' || key === '/admin/monitor') navigate(key);
                     if (key === 'changePassword') setPwdModalOpen(true);
                   },
                 }}>
                   <Space style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 8, transition: 'background 0.2s' }}>
-                    <Avatar size="small" icon={<UserOutlined />} src={user.avatar_url} style={{ background: '#1677ff' }} />
-                    <span style={{ color: '#1f1f1f', fontWeight: 500, fontSize: 14 }}>{user.nickname || user.username}</span>
+                    <Avatar size="small" icon={<UserOutlined />} src={user.avatar_url} style={{ background: user?.role === 'admin' ? '#722ed1' : '#1677ff' }} />
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 500, fontSize: 14 }}>{user.nickname || user.username}</span>
+                    {user?.role === 'admin' && <Tag color="purple" style={{ marginLeft: 4, fontSize: 11, lineHeight: '18px' }}>管理员</Tag>}
                   </Space>
                 </Dropdown>
                 </>
@@ -329,7 +367,7 @@ export default function Navbar() {
         open={drawerOpen}
         width={280}
         styles={{
-          header: { borderBottom: '1px solid #f0f0f0' },
+          header: { borderBottom: '1px solid var(--border-color-light)' },
           body: { padding: 0 },
         }}
       >
@@ -343,12 +381,17 @@ export default function Navbar() {
           style={{ border: 'none' }}
         />
         {user && (
-          <div style={{ padding: '16px 24px', borderTop: '1px solid #f0f0f0' }}>
+          <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-color)' }}>
             <Button block icon={<LogoutOutlined />} onClick={() => { logout(); navigate('/'); setDrawerOpen(false); }} danger>
               退出登录
             </Button>
           </div>
         )}
+        <div style={{ padding: '8px 24px', borderTop: '1px solid var(--border-color)' }}>
+          <Button block onClick={() => { toggleTheme(); setDrawerOpen(false); }}>
+            {isDark ? '☀️ 切换浅色模式' : '🌙 切换深色模式'}
+          </Button>
+        </div>
       </Drawer>
 
       <Modal

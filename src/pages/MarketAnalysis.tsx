@@ -3,6 +3,8 @@ import { Card, Tabs, Table, Tag, Progress, Timeline, Spin, Alert, Row, Col } fro
 import { fundApi } from '../services/api';
 import { formatReturn, getReturnColor, getValuationColor } from '../utils/format';
 import ReactECharts from 'echarts-for-react';
+import { useTheme } from '../contexts/ThemeContext';
+import { getEchartsTheme } from '../utils/echarts-theme';
 
 interface MarketIndex {
   name: string;
@@ -45,6 +47,7 @@ interface BatchPlan {
 }
 
 export default function MarketAnalysis() {
+  const { isDark } = useTheme();
   const [indices, setIndices] = useState<MarketIndex[]>([]);
   const [recommendations, setRecommendations] = useState<IndustryRecommendation[]>([]);
   const [batchPlans, setBatchPlans] = useState<BatchPlan[]>([]);
@@ -169,7 +172,7 @@ export default function MarketAnalysis() {
       label: '指数估值',
       children: (
         <div>
-          <ReactECharts option={valuationChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
+          <ReactECharts theme={getEchartsTheme(isDark)} option={valuationChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
           <Table columns={indexColumns} dataSource={indices} rowKey="code" pagination={false} size="small" scroll={{ x: 800 }} style={{ marginTop: 16 }} />
           <Alert
             type="info"
@@ -255,6 +258,7 @@ export default function MarketAnalysis() {
             valuationTrend.map(idx => (
               <Card key={idx.code} title={`${idx.name} 估值分位趋势（近12月）`} size="small" style={{ marginBottom: 16 }}>
                 <ReactECharts
+                  theme={getEchartsTheme(isDark)}
                   option={{
                     tooltip: {
                       trigger: 'axis',

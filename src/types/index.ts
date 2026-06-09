@@ -253,6 +253,7 @@ export interface User {
   username: string;
   nickname: string;
   avatar_url?: string;
+  role?: 'admin' | 'user';
 }
 
 // 理财记账
@@ -280,6 +281,7 @@ export interface PortfolioHolding {
   market_value: number;
   pnl: number;
   pnl_percent: number;
+  nav_updated_at?: string;
   records: FundRecord[];
 }
 

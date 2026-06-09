@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Card, Input, Select, Table, Tag, Button, Space, Spin, AutoComplete, Alert, Row, Col, Tooltip, message } from 'antd';
-import { SearchOutlined, SwapOutlined, CloseCircleOutlined, StarOutlined, StarFilled } from '@ant-design/icons';
+import { SearchOutlined, SwapOutlined, CloseCircleOutlined, StarOutlined, StarFilled, SyncOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { fundApi, watchlistApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { getEchartsTheme } from '../utils/echarts-theme';
 import { formatReturn, getReturnColor, getValuationText } from '../utils/format';
 
 interface Fund {
@@ -52,6 +54,7 @@ interface Fund {
 
 export default function FundList() {
   const { user } = useAuth();
+  const { isDark } = useTheme();
   const [searchParams] = useSearchParams();
   const initialCodes = (searchParams.get('codes')?.split(',') || [])
     .filter(code => /^\d{6}$/.test(code));
@@ -62,6 +65,9 @@ export default function FundList() {
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState('全部');
   const [goldOnly, setGoldOnly] = useState(false);
+  const [goldStats, setGoldStats] = useState<any>(null);
+  const [showGoldStats, setShowGoldStats] = useState(false);
+  const [fetchingGold, setFetchingGold] = useState(false);
   const [industries, setIndustries] = useState<string[]>([]);
 
   // 多因子筛选状态
@@ -74,6 +80,9 @@ export default function FundList() {
   // 基金经理筛选状态
   const [managers, setManagers] = useState<Array<{ name: string; fundCount: number }>>([]);
   const [selectedManager, setSelectedManager] = useState<string>('');
+
+  // 易方达数据刷新状态
+  const [fetchingYfd, setFetchingYfd] = useState(false);
   const [showStarManagers, setShowStarManagers] = useState(false);
   const [starManagers, setStarManagers] = useState<Array<{ name: string; company: string; title: string; experience: string; specialty: string; bio: string; tags: string[] }>>([]);
 
@@ -119,9 +128,9 @@ export default function FundList() {
 
   useEffect(() => {
     loadIndustries();
-    loadFunds();
     loadAllFunds();
     loadManagers();
+    loadGoldStats();
     if (user) loadWatchlist();
   }, [user]);
 
@@ -166,6 +175,51 @@ export default function FundList() {
       setStarManagers(starList);
     } catch (error) {
       console.error('加载基金经理列表失败:', error);
+    }
+  };
+
+  // 加载金选基金统计
+  const loadGoldStats = async () => {
+    try {
+      const stats = await fundApi.getGoldFundStats();
+      setGoldStats(stats);
+    } catch (error) {
+      console.error('加载金选基金统计失败:', error);
+    }
+  };
+
+  // 从支付宝抓取金选基金数据
+  const handleFetchGoldFunds = async () => {
+    setFetchingGold(true);
+    try {
+      const result = await fundApi.fetchGoldFundData();
+      message.success(`金选基金数据已更新: 成功${result.success}只, 净值${result.navUpdated}只`);
+      if (result.errors?.length > 0) {
+        message.warning(`${result.errors.length} 只基金更新失败`);
+      }
+      loadFunds();
+      loadGoldStats();
+    } catch {
+      message.error('抓取金选基金数据失败，请确认管理员权限');
+    } finally {
+      setFetchingGold(false);
+    }
+  };
+
+  // 从支付宝刷新易方达基金数据
+  const handleFetchYiFangDa = async () => {
+    setFetchingYfd(true);
+    try {
+      const result = await fundApi.fetchYiFangDaData();
+      message.success(`易方达数据已更新: 净值${result.navUpdated}只, 经理${result.detailUpdated}只`);
+      if (result.errors?.length > 0) {
+        message.warning(`${result.errors.length} 只基金更新失败`);
+      }
+      loadFunds();
+    } catch {
+      message.error('获取易方达数据失败，请确认管理员权限');
+    } finally {
+      setFetchingYfd(false);
     }
   };
 
@@ -568,7 +622,7 @@ export default function FundList() {
                 : <StarOutlined style={{ color: '#d9d9d9' }} />}
             </span>
           )}
-          <Link to={`/funds/${record.code}`} style={{ color: '#333', fontWeight: 500 }}>{name}</Link>
+          <Link to={`/funds/${record.code}`} style={{ color: '#1677ff', fontWeight: 500 }}>{name}</Link>
           {record.isGoldSelected && <Tag color="gold" style={{ fontSize: 11 }}>金选</Tag>}
         </Space>
       ),
@@ -697,11 +751,37 @@ export default function FundList() {
             {goldOnly ? '★ 仅看金选' : '☆ 金选基金'}
           </Button>
           <Button
+            type={showGoldStats ? 'primary' : 'default'}
+            style={showGoldStats ? { background: '#faad14', borderColor: '#faad14' } : {}}
+            onClick={() => setShowGoldStats(!showGoldStats)}
+          >
+            金选统计
+          </Button>
+          <Button
             type={showFilters ? 'primary' : 'default'}
             onClick={() => setShowFilters(!showFilters)}
           >
             多因子筛选
           </Button>
+          <Tooltip title="从支付宝抓取金选基金数据（经理、净值、收益率）">
+            <Button
+              icon={<SyncOutlined spin={fetchingGold} />}
+              onClick={handleFetchGoldFunds}
+              loading={fetchingGold}
+              style={{ background: '#faad14', borderColor: '#faad14', color: 'white' }}
+            >
+              金选数据
+            </Button>
+          </Tooltip>
+          <Tooltip title="从支付宝获取易方达基金的经理、净值等数据">
+            <Button
+              icon={<SyncOutlined spin={fetchingYfd} />}
+              onClick={handleFetchYiFangDa}
+              loading={fetchingYfd}
+            >
+              易方达数据
+            </Button>
+          </Tooltip>
           {(selectedManager || filterReturn1y || filterScaleMin || filterScaleMax || filterFeeMax) && (
             <Button
               type="link"
@@ -775,6 +855,59 @@ export default function FundList() {
               </Col>
             ))}
           </Row>
+        </Card>
+      )}
+
+      {/* 金选基金统计 */}
+      {showGoldStats && goldStats && (
+        <Card
+          title={
+            <Space>
+              <span style={{ fontSize: 18, color: '#faad14' }}>★</span>
+              <span style={{ fontWeight: 600 }}>金选基金统计概览</span>
+            </Space>
+          }
+          extra={<span style={{ fontSize: 12, color: '#8c8c8c' }}>来自支付宝精选基金池</span>}
+          style={{ marginBottom: 16, border: '1px solid #faad14' }}
+        >
+          <Row gutter={[16, 16]}>
+            <Col xs={12} sm={6}>
+              <div style={{ textAlign: 'center', padding: 16, background: '#fffbe6', borderRadius: 8 }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: '#faad14' }}>{goldStats.total}</div>
+                <div style={{ fontSize: 12, color: '#666' }}>金选基金总数</div>
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div style={{ textAlign: 'center', padding: 16, background: '#f6ffed', borderRadius: 8 }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: '#52c41a' }}>{goldStats.returns?.avg1y || '-'}%</div>
+                <div style={{ fontSize: 12, color: '#666' }}>平均近1年收益</div>
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div style={{ textAlign: 'center', padding: 16, background: '#e6f4ff', borderRadius: 8 }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: '#1677ff' }}>{goldStats.fees?.avg ? (goldStats.fees.avg * 100).toFixed(2) : '-'}%</div>
+                <div style={{ fontSize: 12, color: '#666' }}>平均综合费率</div>
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div style={{ textAlign: 'center', padding: 16, background: '#fff2f0', borderRadius: 8 }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: '#ff4d4f' }}>{goldStats.scale?.total || '-'}亿</div>
+                <div style={{ fontSize: 12, color: '#666' }}>总规模</div>
+              </div>
+            </Col>
+          </Row>
+          {goldStats.categories && goldStats.categories.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>分类分布</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {goldStats.categories.slice(0, 10).map((cat: any) => (
+                  <Tag key={cat.name} color="gold">
+                    {cat.name}: {cat.count}只
+                  </Tag>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
@@ -932,7 +1065,7 @@ export default function FundList() {
             <>
               {compareChartOption && (
                 <Card title="收益对比" style={{ marginBottom: 16 }}>
-                  <ReactECharts option={compareChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
+                  <ReactECharts theme={getEchartsTheme(isDark)} option={compareChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
                 </Card>
               )}
 
@@ -942,7 +1075,7 @@ export default function FundList() {
                   style={{ marginBottom: 16 }}
                   extra={navHistoryLoading ? <Spin size="small" /> : null}
                 >
-                  <ReactECharts option={navChartOption} style={{ height: 350 }} opts={{ renderer: 'svg' }} />
+                  <ReactECharts theme={getEchartsTheme(isDark)} option={navChartOption} style={{ height: 350 }} opts={{ renderer: 'svg' }} />
                   <div style={{ textAlign: 'center', fontSize: 12, color: '#8c8c8c' }}>
                     起点归一化为0%，展示各基金相对收益走势
                   </div>

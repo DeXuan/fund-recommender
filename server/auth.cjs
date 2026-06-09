@@ -48,8 +48,22 @@ setInterval(() => {
 
 const strictLimit = authRateLimit(60 * 1000, 10);
 
-// JWT middleware
-function authMiddleware(req, res, next) {
+// User status cache (userId -> { status, expiresAt }) to avoid DB query on every request
+const userStatusCache = new Map();
+const STATUS_CACHE_TTL = 30 * 1000; // 30 seconds
+
+// Evict stale user status cache entries every 2 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, entry] of userStatusCache) {
+    if (now > entry.expiresAt) {
+      userStatusCache.delete(userId);
+    }
+  }
+}, 2 * 60 * 1000);
+
+// JWT middleware — verifies token AND checks user status from database
+async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: '未登录' });
@@ -58,10 +72,62 @@ function authMiddleware(req, res, next) {
   const token = authHeader.slice(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = { id: decoded.id, username: decoded.username, nickname: decoded.nickname };
+
+    // Check user status from DB (with short TTL cache to avoid per-request query)
+    const cached = userStatusCache.get(decoded.id);
+    const now = Date.now();
+    let userStatus = 'active';
+
+    if (cached && now < cached.expiresAt) {
+      userStatus = cached.status;
+    } else {
+      try {
+        const pool = getPool();
+        const result = await pool.query('SELECT status FROM users WHERE id = $1', [decoded.id]);
+        if (result.rows.length === 0) {
+          return res.status(401).json({ error: '用户不存在' });
+        }
+        userStatus = result.rows[0].status || 'active';
+        userStatusCache.set(decoded.id, { status: userStatus, expiresAt: now + STATUS_CACHE_TTL });
+      } catch (dbErr) {
+        // If DB check fails, allow the request but log the error
+        console.warn('[authMiddleware] 用户状态检查失败:', dbErr.message);
+      }
+    }
+
+    if (userStatus === 'disabled') {
+      return res.status(403).json({ error: '该账户已被禁用，请联系管理员' });
+    }
+
+    req.user = { id: decoded.id, username: decoded.username, nickname: decoded.nickname, role: decoded.role || 'user' };
     next();
   } catch (e) {
     return res.status(401).json({ error: '登录已过期，请重新登录' });
+  }
+}
+
+// Admin-only middleware (must be used after authMiddleware)
+// Queries the database for the current role to prevent stale JWT privilege retention
+async function adminMiddleware(req, res, next) {
+  if (!req.user || !req.user.id) {
+    console.warn('[adminMiddleware] No req.user:', req.user);
+    return res.status(403).json({ error: '需要管理员权限' });
+  }
+  try {
+    const pool = getPool();
+    const result = await pool.query('SELECT role, status FROM users WHERE id = $1', [req.user.id]);
+    if (result.rows.length === 0 || result.rows[0].status === 'disabled') {
+      return res.status(403).json({ error: '需要管理员权限' });
+    }
+    const currentRole = result.rows[0].role || 'user';
+    if (currentRole !== 'admin') {
+      return res.status(403).json({ error: '需要管理员权限' });
+    }
+    req.user.role = currentRole;
+    next();
+  } catch (error) {
+    console.error('adminMiddleware 权限校验失败:', error.message);
+    return res.status(500).json({ error: '权限校验失败' });
   }
 }
 
@@ -99,12 +165,12 @@ router.post('/register', strictLimit, async (req, res) => {
     const userId = result.rows[0].id;
 
     const token = jwt.sign(
-      { id: userId, username, nickname: displayName },
+      { id: userId, username, nickname: displayName, role: 'user' },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    res.json({ token, user: { id: userId, username, nickname: displayName } });
+    res.json({ token, user: { id: userId, username, nickname: displayName, role: 'user' } });
   } catch (error) {
     console.error('注册失败:', error.message);
     res.status(500).json({ error: '注册失败' });
@@ -122,7 +188,7 @@ router.post('/login', strictLimit, async (req, res) => {
 
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, username, password_hash, nickname, avatar_url FROM users WHERE username = $1',
+      'SELECT id, username, password_hash, nickname, avatar_url, role, status FROM users WHERE username = $1',
       [username]
     );
 
@@ -130,21 +196,27 @@ router.post('/login', strictLimit, async (req, res) => {
       return res.status(400).json({ error: '用户名或密码错误' });
     }
 
-    const { id, username: uname, password_hash: hash, nickname, avatar_url: avatarUrl } = result.rows[0];
+    const { id, username: uname, password_hash: hash, nickname, avatar_url: avatarUrl, role, status } = result.rows[0];
+    if (status === 'disabled') {
+      return res.status(403).json({ error: '该账户已被禁用，请联系管理员' });
+    }
     const valid = await bcrypt.compare(password, hash);
     if (!valid) {
       return res.status(400).json({ error: '用户名或密码错误' });
     }
 
+    // Update last login time
+    pool.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [id]).catch(() => {});
+
     const token = jwt.sign(
-      { id, username: uname, nickname },
+      { id, username: uname, nickname, role: role || 'user' },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
     res.json({
       token,
-      user: { id, username: uname, nickname, avatar_url: avatarUrl || '' },
+      user: { id, username: uname, nickname, avatar_url: avatarUrl || '', role: role || 'user' },
     });
   } catch (error) {
     console.error('登录失败:', error.message);
@@ -157,7 +229,7 @@ router.get('/me', authMiddleware, async (req, res) => {
   try {
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, username, nickname, avatar_url, created_at FROM users WHERE id = $1',
+      'SELECT id, username, nickname, avatar_url, role, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
 
@@ -173,7 +245,7 @@ router.get('/me', authMiddleware, async (req, res) => {
     );
 
     res.json({
-      user: { id: user.id, username: user.username, nickname: user.nickname, avatar_url: user.avatar_url || '', created_at: user.created_at },
+      user: { id: user.id, username: user.username, nickname: user.nickname, avatar_url: user.avatar_url || '', role: user.role || 'user', created_at: user.created_at },
       oauthAccounts: oauthResult.rows,
     });
   } catch (error) {
@@ -276,15 +348,16 @@ router.post('/alipay/mock-login', strictLimit, async (req, res) => {
       );
     }
 
+    const userRole = 'user';
     const token = jwt.sign(
-      { id: userId, username, nickname },
+      { id: userId, username, nickname, role: userRole },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
     res.json({
       token,
-      user: { id: userId, username, nickname, avatar_url: avatarUrl },
+      user: { id: userId, username, nickname, avatar_url: avatarUrl, role: userRole },
       mock: true,
     });
   } catch (error) {
@@ -374,12 +447,13 @@ router.get('/alipay/callback', async (req, res) => {
       );
     }
 
-    const token = jwt.sign({ id: userId, username, nickname }, JWT_SECRET, { expiresIn: '7d' });
+    const oauthRole = 'user';
+    const token = jwt.sign({ id: userId, username, nickname, role: oauthRole }, JWT_SECRET, { expiresIn: '7d' });
 
     // Store the result so the PC frontend can poll for it
     pendingAuth.set(state, {
       token,
-      user: { id: userId, username, nickname, avatar_url: avatarUrl || '' },
+      user: { id: userId, username, nickname, avatar_url: avatarUrl || '', role: oauthRole },
       createdAt: Date.now(),
     });
 
@@ -430,3 +504,4 @@ router.get('/alipay/check', (req, res) => {
 
 module.exports = router;
 module.exports.authMiddleware = authMiddleware;
+module.exports.adminMiddleware = adminMiddleware;

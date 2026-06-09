@@ -144,7 +144,8 @@ fund-recommender/
 │   ├── db.cjs               # PostgreSQL 数据库初始化（11 张表）
 │   ├── fund-service.cjs     # 基金数据服务层（含分页 + 收益率缓存）
 │   ├── fund-data.cjs        # 基金种子数据（200+ 只，覆盖 14 个行业）
-│   ├── auth.cjs             # 认证模块（JWT + 支付宝 OAuth + 修改密码）
+│   ├── auth.cjs             # 认证模块（JWT + 支付宝 OAuth + 修改密码 + 管理员权限校验）
+│   ├── admin.cjs            # 管理后台模块（用户管理、审计日志、系统监控）
 │   ├── portfolio.cjs        # 持仓管理模块（含定投、收益地图、组合洞察）
 │   ├── data-fetcher.cjs     # 数据抓取模块（腾讯/新浪/东方财富 API）
 │   ├── routes/
@@ -154,7 +155,8 @@ fund-recommender/
 │       ├── scheduler.cjs    # 共享调度器（每日任务、交易时间任务）
 │       ├── trading-hours.cjs # 交易时间判断（含中国法定节假日）
 │       ├── crypto.cjs       # 加密工具（AES-256-GCM）
-│       └── alipay.cjs       # 支付宝SDK封装
+│       ├── alipay.cjs       # 支付宝SDK封装
+│       └── logger.cjs       # 结构化日志（winston）
 ├── src/
 │   ├── App.tsx              # 路由配置
 │   ├── main.tsx             # 入口，Ant Design 全局配置
@@ -289,6 +291,8 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 
 - CORS 白名单限制（仅允许指定域名）
 - JWT 认证（7 天有效期，JWT_SECRET 启动时强制校验）
+- 用户状态实时数据库校验（authMiddleware 检查用户是否被禁用，30 秒 TTL 缓存避免性能损耗）
+- 管理员权限实时数据库校验（adminMiddleware 不信任 JWT 缓存的 role，每次查询数据库确认）
 - OAuth Token 加密存储（AES-256-GCM，独立加密密钥）
 - 支付宝 OAuth CSRF 防护（state 参数 HMAC-SHA256 签名 + timingSafeEqual）
 - Mock 登录双重防护（ENABLE_MOCK_AUTH + NODE_ENV 非 production）
@@ -306,6 +310,16 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 - 404 路由兜底（未知路径重定向首页）
 
 ## 版本更新记录
+
+### v0.6 (2026-06-09)
+
+**安全加固**
+- 禁用用户即时失效：authMiddleware 新增数据库用户状态检查（30 秒 TTL 缓存），管理员禁用用户后现有 JWT 令牌立即失效，无需等待 7 天过期
+- 移除 adminMiddleware 中泄露用户敏感信息的 console.log（用户名、ID、角色、状态）
+
+**安全审查**
+- 调用 security-review skill 对服务端代码进行全面安全审查
+- 验证结果：SQL 参数化查询全覆盖、ORDER BY 白名单校验、JWT 签名验证、bcrypt 密码哈希、OAuth CSRF 防护等安全措施有效
 
 ### v0.5 (2026-06-08)
 
@@ -502,6 +516,27 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 | 2026-06-08 | MEDIUM | CSV 导入缺少基金代码格式校验 | 添加 `/^\d{6}$/` 正则校验，拒绝非法基金代码 |
 | 2026-06-08 | MEDIUM | auth.cjs 中 crypto 模块重复 require（函数内部） | 移除 mock-login 和 alipay/callback 中的重复 require，使用顶部已导入的 crypto |
 | 2026-06-08 | LOW | .env.example 缺少 ALLOWED_ORIGINS 配置说明 | 新增 ALLOWED_ORIGINS 示例，更新 ALIPAY_RETURN_URL 说明 |
+| 2026-06-09 | HIGH | adminMiddleware 仅校验 JWT 中的 role 字段，管理员降权后旧 token 仍有效（最长 7 天） | adminMiddleware 改为实时查询数据库 role/status，不信任 JWT 缓存的 role |
+| 2026-06-09 | MEDIUM | POST /api/update 手动数据更新端点仅需认证，普通用户可触发全量数据刷新 | 添加 adminMiddleware，仅管理员可触发手动数据更新 |
+| 2026-06-09 | MEDIUM | POST /api/cmb-products/update 和 /api/cmb-zhaoyin-nav/update 仅需认证，普通用户可触发 Python 爬虫进程 | 添加 adminMiddleware，仅管理员可触发招行理财产品数据更新 |
+| 2026-06-09 | MEDIUM | deploy-full.sh Nginx 配置缺少安全响应头（X-Frame-Options、X-Content-Type-Options 等） | 添加 5 项安全响应头：X-Content-Type-Options、X-Frame-Options、Referrer-Policy、Permissions-Policy |
+| 2026-06-09 | LOW | deploy-full.sh 安装 Node.js 18.x（已 EOL） | 升级为 Node.js 20.x LTS |
+| 2026-06-09 | LOW | db.cjs 连接池 max=2 过小，高并发时连接等待 | 调整为 max=10，idleTimeoutMillis=5000，添加 keepAlive |
+| 2026-06-09 | HIGH | DataStatus 组件「刷新」按钮触发 POST /api/update，普通用户点击返回 403 无提示 | 按钮仅管理员可见，非管理员点击显示 warning 提示 |
+| 2026-06-09 | MEDIUM | fetchApi 错误处理丢弃服务器返回的具体错误信息，用户只看到 "API error: 500" | 改为读取 response body 中的 error 字段，展示具体错误信息 |
+| 2026-06-09 | LOW | FundList 页面 mount 时 loadFunds() 被两个 useEffect 重复调用 | 移除第一个 useEffect 中的 loadFunds() 调用，由第二个 useEffect 统一处理 |
+| 2026-06-09 | HIGH | deploy.sh rsync 缺少 server/admin.cjs，部署后服务器启动崩溃 | 将 admin.cjs 加入 rsync 上传列表 |
+| 2026-06-09 | HIGH | deploy-full.sh 使用占位符 JWT_SECRET，管理员可能忘记修改导致安全风险 | 改为自动生成随机 JWT_SECRET（openssl rand -hex 48） |
+| 2026-06-09 | MEDIUM | deploy-full.sh 和 update.sh 缺少 pm2 startup，服务器重启后应用不会自动启动 | 添加 pm2 startup 配置 |
+| 2026-06-09 | MEDIUM | fix-server.sh 数据库测试使用硬编码占位符密码，永远连接失败 | 改为从 .env 文件读取数据库配置 |
+| 2026-06-09 | MEDIUM | DEPLOY.md 目录结构缺少 admin.cjs、data-fetcher.cjs、routes/、utils/ 等关键文件 | 更新目录结构，完整列出所有服务端模块 |
+| 2026-06-09 | MEDIUM | DEPLOY.md Nginx 配置缺少安全响应头，与 deploy-full.sh 实际配置不一致 | 同步添加 5 项 Nginx 安全响应头 |
+| 2026-06-09 | MEDIUM | DEPLOY.md 回滚方案使用 git 命令，但服务器部署基于 zip/rsync 无 git 仓库 | 改为从备份 tarball 恢复或重新部署旧版本 |
+| 2026-06-09 | LOW | DEPLOY.md Node.js 版本要求 ≥18，已 EOL | 更新为 ≥20（LTS） |
+| 2026-06-09 | LOW | DEPLOY.md 和 UPDATE_GUIDE.md 未提及 Python 依赖（招行数据爬取需要） | 添加 Python 3.8+ 依赖说明 |
+| 2026-06-09 | LOW | UPDATE_GUIDE.md 缺少更新后验证步骤 | 添加 .env 验证、后端日志、API 响应、前端访问 4 步检查 |
+| 2026-06-09 | HIGH | 禁用用户仍可使用现有 JWT 令牌访问系统（最长 7 天） | authMiddleware 新增数据库用户状态检查（30 秒 TTL 缓存），禁用用户的所有请求立即返回 403 |
+| 2026-06-09 | MEDIUM | adminMiddleware 输出用户敏感信息到控制台（用户名、ID、角色、状态） | 移除 console.log 调试输出，避免生产环境泄露用户隐私 |
 
 ## License
 

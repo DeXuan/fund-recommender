@@ -15,6 +15,8 @@ import dayjs from 'dayjs';
 import { fundApi, portfolioApi, watchlistApi } from '../services/api';
 import { formatReturn, getReturnColor, getValuationText, getValuationColor } from '../utils/format';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { getEchartsTheme } from '../utils/echarts-theme';
 
 interface FundDetailType {
   code: string;
@@ -65,6 +67,7 @@ export default function FundDetail() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isDark } = useTheme();
   const [fund, setFund] = useState<FundDetailType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -342,7 +345,7 @@ export default function FundDetail() {
         <div>
           {fund.topHoldings && fund.topHoldings.length > 0 ? (
             <div>
-              <ReactECharts option={holdingsChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
+              <ReactECharts theme={getEchartsTheme(isDark)} option={holdingsChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
               <h4 style={{ margin: '16px 0 12px' }}>前十大持仓明细</h4>
               {fund.topHoldings.map((holding, index) => (
                 <div key={index} style={{
@@ -372,7 +375,7 @@ export default function FundDetail() {
         <div>
           {fund.performanceHistory && fund.performanceHistory.length > 0 ? (
             <div>
-              <ReactECharts option={navChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
+              <ReactECharts theme={getEchartsTheme(isDark)} option={navChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
               <Alert type="info" message="历史业绩不代表未来表现，仅供参考。基金有风险，投资需谨慎。" style={{ marginTop: 16 }} />
             </div>
           ) : (

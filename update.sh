@@ -163,6 +163,7 @@ cd "$DEPLOY_DIR"
 pm2 delete "$PM2_NAME" 2>/dev/null || true
 pm2 start server/index.cjs --name "$PM2_NAME" --cwd "$DEPLOY_DIR"
 pm2 save
+pm2 startup 2>/dev/null || true
 info "后端服务已重启"
 
 # ---- 重启Nginx ----

@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Card, Progress, Tag } from 'antd';
 import { fundApi } from '../services/api';
+import ReactECharts from 'echarts-for-react';
+import { useTheme } from '../contexts/ThemeContext';
+import { getEchartsTheme } from '../utils/echarts-theme';
+import { getValuationColor } from '../utils/format';
 
 interface IndustryFund {
   code: string;
@@ -72,6 +77,37 @@ interface AnalysisData {
   investmentAdvice?: InvestmentAdvice;
 }
 
+interface MarketIndex {
+  name: string;
+  code: string;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
+  pe: string | null;
+  pb: string | null;
+  pePercentile: string | null;
+  pbPercentile: string | null;
+  valuation: string;
+  suggestion: string;
+}
+
+interface IndustryRecommendation {
+  rank: number;
+  industry: string;
+  fundName: string;
+  fundCode: string;
+  index: string;
+  rating: number;
+  return1y: number;
+  return3m: number;
+  return1m: number;
+  trend: string;
+  valuation: string;
+  buySuggestion: string;
+  positionSuggestion: string;
+  logic: string;
+}
+
 const INDUSTRIES = [
   // 夏季投资主线
   { key: '电力', icon: '💡', label: '电力', tag: '夏季' },
@@ -99,6 +135,7 @@ const INDUSTRY_NAME_MAP: Record<string, string> = {
 };
 
 export default function IndustryAnalysis() {
+  const { isDark } = useTheme();
   const [searchParams] = useSearchParams();
   const sectorParam = searchParams.get('sector');
   const initialIndustry = (() => {
@@ -115,10 +152,21 @@ export default function IndustryAnalysis() {
   const [activeTab, setActiveTab] = useState('compare');
   const [sortKey, setSortKey] = useState<string>('return1y');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [goldOnly, setGoldOnly] = useState(false);
+
+  // 市场分析数据
+  const [indices, setIndices] = useState<MarketIndex[]>([]);
+  const [recommendations, setRecommendations] = useState<IndustryRecommendation[]>([]);
+  const [valuationTrend, setValuationTrend] = useState<any[]>([]);
+  const [marketLoading, setMarketLoading] = useState(false);
 
   useEffect(() => {
     loadAnalysis(selectedIndustry);
   }, [selectedIndustry]);
+
+  useEffect(() => {
+    loadMarketData();
+  }, []);
 
   const loadAnalysis = async (industry: string) => {
     setLoading(true);
@@ -129,6 +177,24 @@ export default function IndustryAnalysis() {
       console.error('加载行业分析失败:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMarketData = async () => {
+    setMarketLoading(true);
+    try {
+      const [indicesData, recsData, trendData] = await Promise.all([
+        fundApi.getMarketIndices(),
+        fundApi.getIndustryRecommendations(),
+        fundApi.getValuationTrend().catch(() => []),
+      ]);
+      setIndices(indicesData);
+      setRecommendations(recsData);
+      setValuationTrend(trendData);
+    } catch (error) {
+      console.error('加载市场数据失败:', error);
+    } finally {
+      setMarketLoading(false);
     }
   };
 
@@ -143,7 +209,8 @@ export default function IndustryAnalysis() {
 
   const getSortedFunds = () => {
     if (!data?.funds) return [];
-    return [...data.funds].sort((a, b) => {
+    let filtered = goldOnly ? data.funds.filter(f => f.isGoldSelected) : data.funds;
+    return [...filtered].sort((a, b) => {
       const aVal = a[sortKey as keyof IndustryFund] ?? 0;
       const bVal = b[sortKey as keyof IndustryFund] ?? 0;
       if (typeof aVal === 'number' && typeof bVal === 'number') {
@@ -247,6 +314,12 @@ export default function IndustryAnalysis() {
                   <div style={{ fontSize: 12, opacity: 0.8 }}>基金数量</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: '#faad14' }}>
+                    {data.funds.filter(f => f.isGoldSelected).length}
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.8 }}>金选基金</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 16, fontWeight: 600, padding: '4px 12px', background: 'rgba(255,255,255,0.2)', borderRadius: 4 }}>
                     {data.valuation}
                   </div>
@@ -270,7 +343,7 @@ export default function IndustryAnalysis() {
 
           {/* 标签页 */}
           <div className="card" style={{ padding: 0 }}>
-            <div style={{ display: 'flex', borderBottom: '1px solid #e8e8e8' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid #e8e8e8', alignItems: 'center' }}>
               {[
                 { key: 'compare', label: '基金对比总表' },
                 { key: 'fee', label: '费率对比' },
@@ -279,6 +352,9 @@ export default function IndustryAnalysis() {
                 { key: 'batch', label: '分批建仓' },
                 ...(data.tradingVolumeAnalysis ? [{ key: 'volume', label: '交易量分析' }] : []),
                 ...(data.investmentAdvice ? [{ key: 'advice', label: '投资建议' }] : []),
+                { key: 'indices', label: '指数估值' },
+                { key: 'market-rec', label: '行业推荐' },
+                { key: 'valuation-trend', label: '估值趋势' },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -297,6 +373,23 @@ export default function IndustryAnalysis() {
                   {tab.label}
                 </button>
               ))}
+              <div style={{ marginLeft: 'auto', paddingRight: 16 }}>
+                <button
+                  onClick={() => setGoldOnly(!goldOnly)}
+                  style={{
+                    padding: '6px 16px',
+                    border: goldOnly ? '1px solid #faad14' : '1px solid #d9d9d9',
+                    background: goldOnly ? '#faad14' : 'white',
+                    color: goldOnly ? 'white' : '#666',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: goldOnly ? 600 : 400,
+                  }}
+                >
+                  {goldOnly ? '★ 仅看金选' : '☆ 金选基金'}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -307,6 +400,11 @@ export default function IndustryAnalysis() {
                 {data.industry}指数基金对比总表
                 <span className="text-muted" style={{ fontSize: 12, fontWeight: 400, marginLeft: 12 }}>
                   点击表头排序 | 申购费率按支付宝1折计算
+                  {goldOnly && (
+                    <span style={{ color: '#faad14', marginLeft: 8 }}>
+                      | ★ 仅显示 {getSortedFunds().length} 只金选基金
+                    </span>
+                  )}
                 </span>
               </h3>
               <div style={{ overflowX: 'auto' }}>
@@ -838,6 +936,229 @@ export default function IndustryAnalysis() {
                   </table>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* 指数估值 */}
+          {activeTab === 'indices' && (
+            <div className="card">
+              {marketLoading ? (
+                <div style={{ textAlign: 'center', padding: 40 }}>加载中...</div>
+              ) : (
+                <div>
+                  <h3 className="card-title">主要指数估值概览</h3>
+                  <ReactECharts
+                    theme={getEchartsTheme(isDark)}
+                    option={{
+                      tooltip: { trigger: 'axis' },
+                      xAxis: { type: 'category', data: indices.map(i => i.name), axisLabel: { rotate: 15 } },
+                      yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
+                      series: [{
+                        name: 'PE分位',
+                        type: 'bar',
+                        data: indices.map(i => ({ value: Number(i.pePercentile) || 0, itemStyle: { color: getValuationColor(i.valuation) } })),
+                        label: { show: true, position: 'top', formatter: '{c}%' },
+                      }],
+                      grid: { top: 30, right: 20, bottom: 40, left: 50 },
+                    }}
+                    style={{ height: 300 }}
+                    opts={{ renderer: 'svg' }}
+                  />
+                  <div style={{ overflowX: 'auto', marginTop: 16 }}>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>指数</th>
+                          <th>最新价</th>
+                          <th>涨跌幅</th>
+                          <th>PE(TTM)</th>
+                          <th>PE历史分位</th>
+                          <th>PB</th>
+                          <th>PB历史分位</th>
+                          <th>估值判断</th>
+                          <th>投资建议</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {indices.map((idx) => (
+                          <tr key={idx.code}>
+                            <td><strong>{idx.name}</strong></td>
+                            <td style={{ fontFamily: 'monospace' }}>{idx.price != null ? idx.price.toFixed(2) : '-'}</td>
+                            <td>
+                              {idx.changePercent != null ? (
+                                <span style={{ color: idx.changePercent >= 0 ? '#cf1322' : '#3f8600', fontWeight: 600 }}>
+                                  {idx.changePercent >= 0 ? '+' : ''}{idx.changePercent.toFixed(2)}%
+                                </span>
+                              ) : '-'}
+                            </td>
+                            <td>{idx.pe ?? '--'}</td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span>{idx.pePercentile != null ? `${idx.pePercentile}%` : '--'}</span>
+                                {idx.pePercentile != null && (
+                                  <Progress percent={Number(idx.pePercentile)} showInfo={false} size="small" strokeColor={getValuationColor(idx.valuation)} style={{ flex: 1, minWidth: 60 }} />
+                                )}
+                              </div>
+                            </td>
+                            <td>{idx.pb ?? '--'}</td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span>{idx.pbPercentile != null ? `${idx.pbPercentile}%` : '--'}</span>
+                                {idx.pbPercentile != null && (
+                                  <Progress percent={Number(idx.pbPercentile)} showInfo={false} size="small" strokeColor={getValuationColor(idx.valuation)} style={{ flex: 1, minWidth: 60 }} />
+                                )}
+                              </div>
+                            </td>
+                            <td><span style={{ color: getValuationColor(idx.valuation), fontWeight: 600 }}>{idx.valuation}</span></td>
+                            <td>{idx.suggestion}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ marginTop: 16, padding: 12, background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 6, fontSize: 13, lineHeight: 2 }}>
+                    <strong style={{ color: '#1677ff' }}>估值分位说明：</strong>
+                    20%以下=极度低估（重仓买入）| 20-40%=偏低估（定投加仓）| 40-60%=合理（正常定投）| 60-80%=偏高估（小额定投）| 80%以上=极度高估（观望减仓）
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 行业推荐 */}
+          {activeTab === 'market-rec' && (
+            <div className="card">
+              {marketLoading ? (
+                <div style={{ textAlign: 'center', padding: 40 }}>加载中...</div>
+              ) : (
+                <div>
+                  <h3 className="card-title">行业推荐排名</h3>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>排名</th>
+                          <th>行业</th>
+                          <th>走势</th>
+                          <th>估值</th>
+                          <th>买入建议</th>
+                          <th>推荐逻辑</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recommendations.map((rec) => (
+                          <tr key={rec.rank}>
+                            <td>
+                              <span style={{
+                                display: 'inline-block', width: 24, height: 24, borderRadius: '50%',
+                                textAlign: 'center', lineHeight: '24px', fontSize: 12, fontWeight: 600,
+                                background: rec.rank <= 3 ? '#faad14' : '#f0f0f0',
+                                color: rec.rank <= 3 ? 'white' : '#666',
+                              }}>
+                                {rec.rank}
+                              </span>
+                            </td>
+                            <td><Tag color="blue">{rec.industry || '--'}</Tag></td>
+                            <td>{rec.trend || '--'}</td>
+                            <td><span style={{ color: getValuationColor(rec.valuation) }}>{rec.valuation || '--'}</span></td>
+                            <td>
+                              <Tag color={rec.buySuggestion === '优先配置' ? 'green' : rec.buySuggestion === '逢低布局' ? 'orange' : 'default'}>
+                                {rec.buySuggestion || '--'}
+                              </Tag>
+                            </td>
+                            <td style={{ fontSize: 13, color: '#666', maxWidth: 300 }}>{rec.logic || '--'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <Card title="推荐逻辑" style={{ marginTop: 16 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+                      {recommendations.slice(0, 4).map((rec, i) => (
+                        <div key={rec.industry || i} style={{ padding: 12, background: '#f5f5f5', borderRadius: 6 }}>
+                          <strong>{rec.industry || '--'}</strong>
+                          <p style={{ fontSize: 13, color: '#666', margin: '8px 0 0' }}>{rec.logic || '--'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 估值趋势 */}
+          {activeTab === 'valuation-trend' && (
+            <div className="card">
+              {marketLoading ? (
+                <div style={{ textAlign: 'center', padding: 40 }}>加载中...</div>
+              ) : valuationTrend.length > 0 ? (
+                <div>
+                  <h3 className="card-title">主要指数估值分位趋势（近12月）</h3>
+                  {valuationTrend.map((idx: any) => (
+                    <Card key={idx.code} title={`${idx.name} 估值分位趋势`} size="small" style={{ marginBottom: 16 }}>
+                      <ReactECharts
+                        theme={getEchartsTheme(isDark)}
+                        option={{
+                          tooltip: {
+                            trigger: 'axis',
+                            formatter: (params: any) => {
+                              let html = `${params[0]?.axisValue}<br/>`;
+                              params.forEach((p: any) => { html += `${p.marker} ${p.seriesName}: ${p.value}%<br/>`; });
+                              return html;
+                            },
+                          },
+                          legend: { data: ['PE分位', 'PB分位'], bottom: 0 },
+                          grid: { top: 20, right: 20, bottom: 40, left: 50 },
+                          xAxis: { type: 'category', data: idx.months.map((m: any) => m.month), axisLabel: { fontSize: 10 } },
+                          yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 }, splitLine: { lineStyle: { type: 'dashed' } } },
+                          visualMap: {
+                            show: false,
+                            pieces: [
+                              { lte: 20, color: '#52c41a' },
+                              { gt: 20, lte: 40, color: '#73d13d' },
+                              { gt: 40, lte: 60, color: '#1677ff' },
+                              { gt: 60, lte: 80, color: '#ff7a45' },
+                              { gt: 80, color: '#ff4d4f' },
+                            ],
+                          },
+                          series: [
+                            {
+                              name: 'PE分位', type: 'line',
+                              data: idx.months.map((m: any) => m.pe_percentile),
+                              smooth: true, lineStyle: { width: 2 }, showSymbol: false,
+                              markLine: {
+                                silent: true,
+                                data: [
+                                  { yAxis: 20, lineStyle: { color: '#52c41a', type: 'dashed' }, label: { formatter: '极低20%', fontSize: 10 } },
+                                  { yAxis: 80, lineStyle: { color: '#ff4d4f', type: 'dashed' }, label: { formatter: '极高80%', fontSize: 10 } },
+                                ],
+                              },
+                            },
+                            {
+                              name: 'PB分位', type: 'line',
+                              data: idx.months.map((m: any) => m.pb_percentile),
+                              smooth: true, lineStyle: { width: 2, type: 'dashed' }, showSymbol: false,
+                            },
+                          ],
+                        }}
+                        style={{ height: 250 }}
+                        opts={{ renderer: 'svg' }}
+                      />
+                      <div style={{ textAlign: 'center', fontSize: 13, color: '#595959', marginTop: 8 }}>
+                        当前估值：<span style={{ fontWeight: 600, color: getValuationColor(idx.current_valuation) }}>{idx.current_valuation}</span>
+                        <span style={{ marginLeft: 16 }}>建议：{idx.current_suggestion}</span>
+                      </div>
+                    </Card>
+                  ))}
+                  <div style={{ marginTop: 16, padding: 12, background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 6, fontSize: 13, lineHeight: 2 }}>
+                    <strong style={{ color: '#1677ff' }}>估值趋势说明：</strong>
+                    PE分位越低，估值越便宜，投资价值越高。绿色区域(20%以下)=极度低估，红色区域(80%以上)=极度高估。
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>暂无估值趋势数据</div>
+              )}
             </div>
           )}
         </>

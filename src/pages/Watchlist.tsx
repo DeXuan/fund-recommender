@@ -69,7 +69,7 @@ export default function Watchlist() {
       key: 'fund_name',
       width: 200,
       render: (name: string, record: WatchlistItem) => (
-        <Link to={`/funds/${record.fund_code}`} style={{ fontWeight: 500 }}>
+        <Link to={`/funds/${record.fund_code}`} style={{ fontWeight: 500, color: '#1677ff' }}>
           {name || record.fund_code} <LinkOutlined style={{ fontSize: 11, color: '#1677ff' }} />
         </Link>
       ),

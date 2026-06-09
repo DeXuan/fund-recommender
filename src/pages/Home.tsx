@@ -21,6 +21,8 @@ import ReactECharts from 'echarts-for-react';
 import { fundApi, portfolioApi } from '../services/api';
 import { formatReturn, getReturnColor } from '../utils/format';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { getEchartsTheme } from '../utils/echarts-theme';
 
 interface MarketIndex {
   name: string;
@@ -51,6 +53,7 @@ const INDUSTRY_NAME_MAP: Record<string, string> = {
 
 export default function Home() {
   const { user } = useAuth();
+  const { isDark } = useTheme();
   const navigate = useNavigate();
   const [indices, setIndices] = useState<MarketIndex[]>([]);
   const [sectors, setSectors] = useState<SectorData[]>([]);
@@ -137,7 +140,7 @@ export default function Home() {
         index < 3 ? (
           <TrophyIcon index={index} />
         ) : (
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: '#f0f0f0', color: '#8c8c8c', fontSize: 11, fontWeight: 500 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'var(--bg-secondary)', color: 'var(--text-tertiary)', fontSize: 11, fontWeight: 500 }}>
             {index + 1}
           </span>
         )
@@ -164,8 +167,7 @@ export default function Home() {
 
   const quickEntries = [
     { to: '/funds', icon: <FundOutlined />, label: '基金列表', desc: '全市场基金筛选与对比', color: '#667eea' },
-    { to: '/industry', icon: <BarChartOutlined />, label: '行业分析', desc: '九大行业深度研究', color: '#f093fb' },
-    { to: '/market', icon: <LineChartOutlined />, label: '市场估值', desc: '指数PE/PB估值仪表盘', color: '#a18cd1' },
+    { to: '/industry', icon: <BarChartOutlined />, label: '行业分析', desc: '行业深度研究与市场估值', color: '#f093fb' },
     { to: '/hs300', icon: <StockOutlined />, label: '沪深300', desc: '核心宽基指数深度分析', color: '#fbc2eb' },
     { to: '/qdii', icon: <GlobalOutlined />, label: '标普500/QDII', desc: '美股核心指数深度分析', color: '#1890ff' },
     { to: '/portfolio', icon: <PieChartOutlined />, label: '我的持仓', desc: '投资组合与盈亏管理', color: '#36cfc9' },
@@ -195,7 +197,7 @@ export default function Home() {
       axisTick: { show: false },
       splitLine: { show: false },
       axisLabel: { show: false },
-      title: { show: true, offsetCenter: [0, '70%'], fontSize: 14, color: '#333' },
+      title: { show: true, offsetCenter: [0, '70%'], fontSize: 14, color: 'var(--text-primary)' },
       detail: {
         valueAnimation: true,
         fontSize: 28,
@@ -249,32 +251,32 @@ export default function Home() {
       {/* 持仓概览（登录用户） */}
       {user && portfolioSummary && portfolioSummary.holdings?.length > 0 && (
         <Card
-          style={{ marginBottom: 20, borderRadius: 12, border: '1px solid #e6f4ff', background: 'linear-gradient(135deg, #f0f5ff 0%, #e6f4ff 100%)' }}
+          style={{ marginBottom: 20, borderRadius: 12, border: '1px solid var(--primary-border)', background: 'var(--primary-bg)' }}
           title={
             <Space>
               <AccountBookOutlined style={{ color: '#1677ff' }} />
               <span style={{ fontWeight: 600 }}>我的持仓</span>
             </Space>
           }
-          extra={<Link to="/portfolio" style={{ color: '#1677ff', fontSize: 13 }}>查看详情 <RightOutlined /></Link>}
+          extra={<Link to="/portfolio" style={{ color: 'var(--primary)', fontSize: 13 }}>查看详情 <RightOutlined /></Link>}
         >
           <Row gutter={[16, 12]} style={{ marginBottom: 16 }}>
             <Col xs={12} sm={6}>
-              <div style={{ color: '#8c8c8c', fontSize: 12 }}>总投入</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#1f1f1f' }}>¥{(portfolioSummary.totalCost || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>总投入</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>¥{(portfolioSummary.totalCost || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </Col>
             <Col xs={12} sm={6}>
-              <div style={{ color: '#8c8c8c', fontSize: 12 }}>当前市值</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#1f1f1f' }}>¥{(portfolioSummary.totalValue || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>当前市值</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>¥{(portfolioSummary.totalValue || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </Col>
             <Col xs={12} sm={6}>
-              <div style={{ color: '#8c8c8c', fontSize: 12 }}>总盈亏</div>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>总盈亏</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: (portfolioSummary.totalPnl || 0) >= 0 ? '#cf1322' : '#3f8600' }}>
                 {(portfolioSummary.totalPnl || 0) >= 0 ? '+' : ''}¥{(portfolioSummary.totalPnl || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </div>
             </Col>
             <Col xs={12} sm={6}>
-              <div style={{ color: '#8c8c8c', fontSize: 12 }}>总收益率</div>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>总收益率</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: (portfolioSummary.totalReturn || 0) >= 0 ? '#cf1322' : '#3f8600' }}>
                 {(portfolioSummary.totalReturn || 0) >= 0 ? '+' : ''}{(portfolioSummary.totalReturn || 0).toFixed(2)}%
               </div>
@@ -285,7 +287,7 @@ export default function Home() {
               <Col xs={12} sm={6} key={h.fund_code}>
                 <Link to={`/funds/${h.fund_code}`} style={{ textDecoration: 'none' }}>
                   <Card size="small" style={{ borderRadius: 8, border: '1px solid #f0f0f0' }} hoverable>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: '#1f1f1f', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.fund_name}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: '#1677ff', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.fund_name}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 12, color: '#8c8c8c' }}>¥{h.market_value?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                       <Tag color={h.pnl_percent >= 0 ? 'red' : 'green'} style={{ margin: 0, fontSize: 11 }}>
@@ -334,7 +336,7 @@ export default function Home() {
           >
             <Table
               columns={[
-                { title: '排名', key: 'rank', width: 60, render: (_: any, __: any, index: number) => index < 3 ? <TrophyIcon index={index} /> : <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: '#f0f0f0', color: '#8c8c8c', fontSize: 11 }}>{index + 1}</span> },
+                { title: '排名', key: 'rank', width: 60, render: (_: any, __: any, index: number) => index < 3 ? <TrophyIcon index={index} /> : <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'var(--bg-secondary)', color: 'var(--text-tertiary)', fontSize: 11 }}>{index + 1}</span> },
                 { title: '板块', dataIndex: 'name', key: 'name', render: (text: string, _: any, index: number) => <strong style={index < 3 ? { color: trophyColors[index] } : {}}>{text}</strong> },
                 { title: '涨跌幅', dataIndex: 'change', key: 'change', align: 'right' as const, sorter: (a: SectorData, b: SectorData) => a.change - b.change, render: (val: number) => <span style={{ color: getReturnColor(val), fontWeight: 600 }}>{formatReturn(val)}</span> },
                 { title: '成交额', dataIndex: 'volume', key: 'volume', align: 'right' as const },
@@ -391,6 +393,7 @@ export default function Home() {
                   </Row>
                   {capitalFlow.northbound?.trend?.length > 0 && (
                     <ReactECharts
+                      theme={getEchartsTheme(isDark)}
                       option={{
                         tooltip: { trigger: 'axis', formatter: (params: any) => `${params[0]?.axisValue}<br/>${params.map((p: any) => `${p.seriesName}: ${p.value}亿`).join('<br/>')}` },
                         legend: { data: ['沪股通', '深股通', '合计'], bottom: 0 },
@@ -422,6 +425,7 @@ export default function Home() {
                   {capitalFlow.mainFlow?.length > 0 ? (
                     <>
                       <ReactECharts
+                        theme={getEchartsTheme(isDark)}
                         option={{
                           tooltip: {
                             trigger: 'axis',
@@ -554,6 +558,7 @@ export default function Home() {
                   </Tag>
                 </div>
                 <ReactECharts
+                  theme={getEchartsTheme(isDark)}
                   option={getGaugeOption(index.name, index.pePercentile ?? 50, index.valuation)}
                   style={{ height: 180 }}
                   opts={{ renderer: 'svg' }}

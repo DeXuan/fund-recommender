@@ -55,7 +55,13 @@ async function getFundsByIndustry(industry) {
 
 async function getIndustries() {
   const pool = getPool();
-  const result = await pool.query('SELECT DISTINCT industry FROM funds ORDER BY industry');
+  const result = await pool.query(`
+    SELECT DISTINCT industry FROM (
+      SELECT industry FROM funds
+      UNION
+      SELECT '易方达' as industry FROM yifangda_funds LIMIT 1
+    ) combined ORDER BY industry
+  `);
   return result.rows.map(r => r.industry);
 }
 
@@ -217,60 +223,87 @@ async function batchFetchReturns(codes) {
 
 async function getAllFundsWithNav(filters = {}) {
   const pool = getPool();
+
+  // 合并 funds + yifangda_funds，以基金代码去重
+  // funds 表数据为主，yifangda_funds 补充不在 funds 中的基金
   let query = `
-    SELECT f.*, n.nav, n.total_nav, n.nav_date,
-           n.return_1w, n.return_1m, n.return_3m, n.return_6m, n.return_1y
-    FROM funds f
-    LEFT JOIN LATERAL (
-      SELECT nav, total_nav, nav_date, return_1w, return_1m, return_3m, return_6m, return_1y
-      FROM fund_nav
-      WHERE fund_code = f.code
-      ORDER BY return_1y IS NOT NULL DESC, nav_date DESC
-      LIMIT 1
-    ) n ON true
-    WHERE 1=1
+    SELECT * FROM (
+      SELECT f.code, f.name, f.type, f.industry, f.index_name,
+             f.management_fee, f.custody_fee, f.service_fee, f.total_fee,
+             f.scale, f.rating, f.buy_suggestion, f.valuation, f.trend,
+             f.logic, f.is_gold_selected, f.daily_limit,
+             COALESCE(f.manager, '') as manager,
+             n.nav, n.total_nav, n.nav_date,
+             n.return_1w, n.return_1m, n.return_3m, n.return_6m, n.return_1y
+      FROM funds f
+      LEFT JOIN LATERAL (
+        SELECT nav, total_nav, nav_date, return_1w, return_1m, return_3m, return_6m, return_1y
+        FROM fund_nav
+        WHERE fund_code = f.code
+        ORDER BY return_1y IS NOT NULL DESC, nav_date DESC
+        LIMIT 1
+      ) n ON true
+
+      UNION ALL
+
+      SELECT y.fund_code as code, y.fund_name as name,
+             '易方达' as type, '易方达' as industry, '' as index_name,
+             0 as management_fee, 0 as custody_fee, 0 as service_fee, 0 as total_fee,
+             COALESCE(y.scale, 0) as scale, 3 as rating,
+             '' as buy_suggestion, '' as valuation, '' as trend,
+             '' as logic, false as is_gold_selected, 0 as daily_limit,
+             COALESCE(y.fund_manager, '') as manager,
+             y.unit_nav as nav, NULL as total_nav, y.nav_date,
+             y.return_1w, y.return_1m, y.return_3m, y.return_6m, y.return_1y
+      FROM yifangda_funds y
+      WHERE y.fund_code NOT IN (SELECT code FROM funds)
+    ) combined WHERE 1=1
   `;
   const params = [];
   let paramIndex = 1;
 
   if (filters.industry) {
-    query += ` AND f.industry = $${paramIndex++}`;
+    query += ` AND industry = $${paramIndex++}`;
     params.push(filters.industry);
   }
   if (filters.type) {
-    query += ` AND f.type = $${paramIndex++}`;
+    query += ` AND type = $${paramIndex++}`;
     params.push(filters.type);
   }
   if (filters.search) {
-    query += ` AND (f.code ILIKE $${paramIndex} OR f.name ILIKE $${paramIndex})`;
+    query += ` AND (code ILIKE $${paramIndex} OR name ILIKE $${paramIndex})`;
     params.push(`%${filters.search}%`);
     paramIndex++;
   }
   if (filters.manager) {
-    query += ` AND f.manager = $${paramIndex++}`;
+    query += ` AND manager = $${paramIndex++}`;
     params.push(filters.manager);
   }
 
-  // 排序（camelCase → 数据库列名映射）
-  const sortColumnMap = { return1y: 'n.return_1y', return6m: 'n.return_6m', return3m: 'n.return_3m', return1m: 'n.return_1m', return1w: 'n.return_1w', totalFee: 'f.total_fee', scale: 'f.scale', rating: 'f.rating' };
-  const sortField = filters.sort && sortColumnMap[filters.sort] ? filters.sort : null;
+  // 排序
+  const sortColumnMap = {
+    return1y: 'return_1y', return6m: 'return_6m', return3m: 'return_3m',
+    return1m: 'return_1m', return1w: 'return_1w',
+    totalFee: 'total_fee', scale: 'scale', rating: 'rating',
+    code: 'code', name: 'name', nav: 'nav',
+  };
+  const sortField = filters.sort && sortColumnMap[filters.sort] ? sortColumnMap[filters.sort] : null;
   if (sortField) {
-    const sortColumn = sortColumnMap[sortField];
     const order = filters.order === 'asc' ? 'ASC' : 'DESC';
-    query += ` ORDER BY ${sortColumn} ${order} NULLS LAST`;
+    query += ` ORDER BY ${sortField} ${order} NULLS LAST`;
   } else {
-    query += ' ORDER BY f.code';
+    query += ' ORDER BY code';
   }
 
-  // 分页支持
+  // 分页
   const page = parseInt(filters.page) || 1;
-  const pageSize = Math.min(parseInt(filters.pageSize) || 100, 500); // 最大500条
+  const pageSize = Math.min(parseInt(filters.pageSize) || 100, 500);
   const offset = (page - 1) * pageSize;
 
-  // 先查总数
-  const fromIndex = query.indexOf('FROM');
+  // 总数（去掉外层SELECT * 和 ORDER BY/LIMIT）
   const lastOrderBy = query.lastIndexOf('ORDER BY');
-  const countQuery = 'SELECT COUNT(*) ' + query.substring(fromIndex, lastOrderBy > fromIndex ? lastOrderBy : undefined);
+  const innerQuery = query.substring(query.indexOf('FROM ('), lastOrderBy > 0 ? lastOrderBy : undefined);
+  const countQuery = `SELECT COUNT(*) ${innerQuery}`;
   const countResult = await pool.query(countQuery, params);
   const total = parseInt(countResult.rows[0].count);
 
@@ -279,46 +312,34 @@ async function getAllFundsWithNav(filters = {}) {
 
   const result = await pool.query(query, params);
 
-  // 找出收益率为空的基金，从外部API补充
-  const nullReturnCodes = result.rows
-    .filter(r => r.return_1y == null || r.return_1m == null)
-    .map(r => r.code);
-  let apiReturns = new Map();
-  if (nullReturnCodes.length > 0) {
-    try { apiReturns = await batchFetchReturns(nullReturnCodes); } catch {}
-  }
-
   return {
-    data: result.rows.map(row => {
-    const apiRet = apiReturns.get(row.code);
-    return {
-    code: row.code,
-    name: row.name,
-    type: row.type,
-    industry: row.industry,
-    index: row.index_name,
-    managementFee: parseFloat(row.management_fee) || 0,
-    custodyFee: parseFloat(row.custody_fee) || 0,
-    serviceFee: parseFloat(row.service_fee) || 0,
-    totalFee: parseFloat(row.total_fee) || 0,
-    scale: parseFloat(row.scale) || 0,
-    rating: row.rating,
-    buySuggestion: row.buy_suggestion,
-    valuation: row.valuation,
-    trend: row.trend,
-    logic: row.logic,
-    isGoldSelected: row.is_gold_selected,
-    dailyLimit: row.daily_limit,
-    manager: row.manager || null,
-    nav: row.nav ? parseFloat(row.nav) : null,
-    navDate: row.nav_date || null,
-    return1w: row.return_1w ? parseFloat(row.return_1w) : null,
-    return1m: row.return_1m ? parseFloat(row.return_1m) : (apiRet?.return1m ?? null),
-    return3m: row.return_3m ? parseFloat(row.return_3m) : (apiRet?.return3m ?? null),
-    return6m: row.return_6m ? parseFloat(row.return_6m) : (apiRet?.return6m ?? null),
-    return1y: row.return_1y ? parseFloat(row.return_1y) : (apiRet?.return1y ?? null),
-    };
-    }),
+    data: result.rows.map(row => ({
+      code: row.code,
+      name: row.name,
+      type: row.type,
+      industry: row.industry,
+      index: row.index_name,
+      managementFee: parseFloat(row.management_fee) || 0,
+      custodyFee: parseFloat(row.custody_fee) || 0,
+      serviceFee: parseFloat(row.service_fee) || 0,
+      totalFee: parseFloat(row.total_fee) || 0,
+      scale: parseFloat(row.scale) || 0,
+      rating: row.rating,
+      buySuggestion: row.buy_suggestion,
+      valuation: row.valuation,
+      trend: row.trend,
+      logic: row.logic,
+      isGoldSelected: row.is_gold_selected,
+      dailyLimit: row.daily_limit,
+      manager: row.manager || null,
+      nav: row.nav ? parseFloat(row.nav) : null,
+      navDate: row.nav_date || null,
+      return1w: row.return_1w ? parseFloat(row.return_1w) : null,
+      return1m: row.return_1m ? parseFloat(row.return_1m) : null,
+      return3m: row.return_3m ? parseFloat(row.return_3m) : null,
+      return6m: row.return_6m ? parseFloat(row.return_6m) : null,
+      return1y: row.return_1y ? parseFloat(row.return_1y) : null,
+    })),
     total,
     page,
     pageSize,
@@ -425,57 +446,86 @@ async function updateSectorData(sectors) {
 async function seedFunds(funds) {
   const pool = getPool();
   let insertedCount = 0;
+  let failedCount = 0;
+  let consecutiveFailures = 0;
+  const MAX_CONSECUTIVE_FAILURES = 5;
+  const MAX_RETRIES = 1;
+  const TIMEOUT_MS = 30000; // 30秒超时
+
+  const startTime = Date.now();
 
   for (const fund of funds) {
-    try {
-      await pool.query(
-        `INSERT INTO funds (code, name, type, industry, index_name, management_fee, custody_fee, service_fee, total_fee, scale, rating, buy_suggestion, valuation, trend, logic, is_gold_selected, daily_limit)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-         ON CONFLICT (code) DO UPDATE SET
-           name = EXCLUDED.name,
-           type = EXCLUDED.type,
-           industry = EXCLUDED.industry,
-           index_name = EXCLUDED.index_name,
-           management_fee = EXCLUDED.management_fee,
-           custody_fee = EXCLUDED.custody_fee,
-           service_fee = EXCLUDED.service_fee,
-           total_fee = EXCLUDED.total_fee,
-           scale = EXCLUDED.scale,
-           rating = EXCLUDED.rating,
-           buy_suggestion = EXCLUDED.buy_suggestion,
-           valuation = EXCLUDED.valuation,
-           trend = EXCLUDED.trend,
-           logic = EXCLUDED.logic,
-           is_gold_selected = EXCLUDED.is_gold_selected,
-           daily_limit = EXCLUDED.daily_limit,
-           updated_at = NOW()`,
-        [
-          fund.code,
-          fund.name,
-          fund.type,
-          fund.industry,
-          fund.index || null,
-          fund.managementFee || 0,
-          fund.custodyFee || 0,
-          fund.serviceFee || 0,
-          fund.totalFee || 0,
-          fund.scale || 0,
-          fund.rating || 3,
-          fund.buySuggestion || null,
-          fund.valuation || null,
-          fund.trend || null,
-          fund.logic || null,
-          fund.isGoldSelected || false,
-          fund.dailyLimit || 0,
-        ]
-      );
-      insertedCount++;
-    } catch (e) {
-      console.warn(`种子数据插入失败 ${fund.code}:`, e.message);
+    // 检查超时
+    if (Date.now() - startTime > TIMEOUT_MS) {
+      console.warn(`[种子数据] 超时（${TIMEOUT_MS}ms），停止插入`);
+      break;
+    }
+
+    // 如果连续失败太多次，停止插入
+    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+      console.warn(`[种子数据] 连续失败 ${MAX_CONSECUTIVE_FAILURES} 次，停止插入`);
+      break;
+    }
+
+    let success = false;
+    for (let retry = 0; retry <= MAX_RETRIES && !success; retry++) {
+      try {
+        await pool.query(
+          `INSERT INTO funds (code, name, type, industry, index_name, management_fee, custody_fee, service_fee, total_fee, scale, rating, buy_suggestion, valuation, trend, logic, is_gold_selected, daily_limit)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+           ON CONFLICT (code) DO UPDATE SET
+             name = EXCLUDED.name,
+             type = EXCLUDED.type,
+             industry = EXCLUDED.industry,
+             index_name = EXCLUDED.index_name,
+             management_fee = EXCLUDED.management_fee,
+             custody_fee = EXCLUDED.custody_fee,
+             service_fee = EXCLUDED.service_fee,
+             total_fee = EXCLUDED.total_fee,
+             scale = EXCLUDED.scale,
+             rating = EXCLUDED.rating,
+             buy_suggestion = EXCLUDED.buy_suggestion,
+             valuation = EXCLUDED.valuation,
+             trend = EXCLUDED.trend,
+             logic = EXCLUDED.logic,
+             is_gold_selected = EXCLUDED.is_gold_selected OR funds.is_gold_selected,
+             daily_limit = EXCLUDED.daily_limit,
+             updated_at = NOW()`,
+          [
+            fund.code,
+            fund.name,
+            fund.type,
+            fund.industry,
+            fund.index || null,
+            fund.managementFee || 0,
+            fund.custodyFee || 0,
+            fund.serviceFee || 0,
+            fund.totalFee || 0,
+            fund.scale || 0,
+            fund.rating || 3,
+            fund.buySuggestion || null,
+            fund.valuation || null,
+            fund.trend || null,
+            fund.logic || null,
+            fund.isGoldSelected || false,
+            fund.dailyLimit || 0,
+          ]
+        );
+        insertedCount++;
+        success = true;
+        consecutiveFailures = 0;
+      } catch (e) {
+        consecutiveFailures++;
+        if (retry < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, 500));
+        } else {
+          failedCount++;
+        }
+      }
     }
   }
 
-  console.log(`[种子数据] 尝试插入 ${funds.length} 只基金，成功 ${insertedCount} 只`);
+  console.log(`[种子数据] 尝试插入 ${funds.length} 只基金，成功 ${insertedCount} 只${failedCount > 0 ? `，失败 ${failedCount} 只` : ''}`);
 }
 
 // 批量更新基金经理
@@ -496,13 +546,43 @@ async function updateFundManagers(managerMap) {
   console.log(`[基金经理] 更新 ${updatedCount} 只基金的经理信息`);
 }
 
-// 获取所有基金经理列表（去重，按管理基金数量降序）
+// 更新单只基金的详情（经理、费率、规模等）
+async function updateFundDetail(code, detail) {
+  const pool = getPool();
+  const sets = [];
+  const params = [];
+  let idx = 1;
+
+  if (detail.manager != null) { sets.push(`manager = $${idx++}`); params.push(detail.manager); }
+  if (detail.managementFee != null) { sets.push(`management_fee = $${idx++}`); params.push(detail.managementFee); }
+  if (detail.custodyFee != null) { sets.push(`custody_fee = $${idx++}`); params.push(detail.custodyFee); }
+  if (detail.totalFee != null) { sets.push(`total_fee = $${idx++}`); params.push(detail.totalFee); }
+  if (detail.scale != null) { sets.push(`scale = $${idx++}`); params.push(detail.scale); }
+  if (detail.buySuggestion != null) { sets.push(`buy_suggestion = $${idx++}`); params.push(detail.buySuggestion); }
+  if (detail.dailyLimit != null) { sets.push(`daily_limit = $${idx++}`); params.push(detail.dailyLimit); }
+
+  if (sets.length === 0) return;
+  sets.push('updated_at = NOW()');
+  params.push(code);
+
+  await pool.query(`UPDATE funds SET ${sets.join(', ')} WHERE code = $${idx}`, params);
+}
+
+// 获取所有基金经理列表（去重，按管理基金数量降序，含易方达）
 async function getManagers() {
   const pool = getPool();
   const result = await pool.query(`
-    SELECT manager, COUNT(*) as fund_count
-    FROM funds
-    WHERE manager IS NOT NULL AND manager != ''
+    SELECT manager, SUM(fund_count) as fund_count FROM (
+      SELECT manager, COUNT(*) as fund_count
+      FROM funds
+      WHERE manager IS NOT NULL AND manager != ''
+      GROUP BY manager
+      UNION ALL
+      SELECT fund_manager as manager, COUNT(*) as fund_count
+      FROM yifangda_funds
+      WHERE fund_manager IS NOT NULL AND fund_manager != ''
+      GROUP BY fund_manager
+    ) combined
     GROUP BY manager
     ORDER BY fund_count DESC
   `);
@@ -595,6 +675,7 @@ module.exports = {
   updateSectorData,
   seedFunds,
   updateFundManagers,
+  updateFundDetail,
   getManagers,
   getFundCount,
   getHS300FundDetails,

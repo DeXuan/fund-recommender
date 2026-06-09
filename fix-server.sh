@@ -59,8 +59,14 @@ fi
 # ---- 3. 检查数据库连接 ----
 echo ""
 info "检查数据库连接..."
-if command -v psql &> /dev/null; then
-    PGPASSWORD="your_db_password" psql -h localhost -U your_db_user -d your_database -c "SELECT 1;" 2>/dev/null && \
+if command -v psql &> /dev/null && [ -f .env ]; then
+    # 从 .env 读取数据库配置
+    DB_HOST=$(grep "^PG_HOST=" .env | cut -d= -f2 | tr -d ' ')
+    DB_PORT=$(grep "^PG_PORT=" .env | cut -d= -f2 | tr -d ' ')
+    DB_NAME=$(grep "^PG_DATABASE=" .env | cut -d= -f2 | tr -d ' ')
+    DB_USER=$(grep "^PG_USER=" .env | cut -d= -f2 | tr -d ' ')
+    DB_PASS=$(grep "^PG_PASSWORD=" .env | cut -d= -f2 | tr -d ' ')
+    PGPASSWORD="$DB_PASS" psql -h "${DB_HOST:-localhost}" -p "${DB_PORT:-5432}" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" 2>/dev/null && \
         info "数据库连接成功" || \
         warn "数据库连接失败，请检查PostgreSQL是否运行"
 else

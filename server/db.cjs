@@ -15,18 +15,28 @@ const pool = new Pool({
   database: process.env.PG_DATABASE,
   user: process.env.PG_USER,
   password: process.env.PG_PASSWORD,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  max: 10,
+  idleTimeoutMillis: 5000,
+  connectionTimeoutMillis: 15000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 });
 
 pool.on('error', (err) => {
   console.error('PostgreSQL 连接池错误:', err.message);
 });
 
-async function initDatabase() {
-  const client = await pool.connect();
-  try {
+// 防止未处理的Promise rejection导致进程崩溃
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('未处理的Promise rejection:', reason);
+});
+
+async function initDatabase(retries = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const client = await pool.connect();
+      try {
     const createStatements = [
       // 用户表
       `CREATE TABLE IF NOT EXISTS users (
@@ -190,6 +200,10 @@ async function initDatabase() {
       `CREATE INDEX IF NOT EXISTS idx_dca_plans_user ON dca_plans(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_oauth_accounts_provider ON oauth_accounts(provider, provider_user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_fund_nav_code_date ON fund_nav(fund_code, nav_date DESC)`,
+      // 性能优化索引
+      `CREATE INDEX IF NOT EXISTS idx_funds_industry ON funds(industry)`,
+      `CREATE INDEX IF NOT EXISTS idx_sector_data_trade_date ON sector_data(trade_date DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_fund_nav_code_return_date ON fund_nav(fund_code, return_1y DESC NULLS LAST, nav_date DESC)`,
       // 持仓盈亏字段（如果不存在则添加）
       `DO $$ BEGIN
         ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS current_nav NUMERIC(12,6) DEFAULT 0;
@@ -199,9 +213,90 @@ async function initDatabase() {
         ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS nav_updated_at TIMESTAMP;
       EXCEPTION WHEN duplicate_column THEN NULL;
       END $$`,
+      // 定投字段（如果不存在则添加）
+      `DO $$ BEGIN
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS dca_enabled BOOLEAN DEFAULT false;
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS dca_amount NUMERIC(12,2);
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS dca_frequency VARCHAR(20) DEFAULT 'monthly';
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS dca_day_of_month INTEGER DEFAULT 1;
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS dca_day_of_week INTEGER DEFAULT 1;
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS dca_start_date DATE;
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS dca_end_date DATE;
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS dca_status VARCHAR(20) DEFAULT 'active';
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS dca_last_executed DATE;
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$`,
       // 基金经理字段
       `DO $$ BEGIN
         ALTER TABLE funds ADD COLUMN IF NOT EXISTS manager VARCHAR(50);
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$`,
+      // 用户角色字段（admin / user）
+      `DO $$ BEGIN
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user';
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$`,
+      // 修复已有用户的 status 字段（排除正常值 active 和 disabled）
+      `UPDATE users SET status = 'active' WHERE status IS NULL OR status NOT IN ('active', 'disabled')`,
+      `CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`,
+      `CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)`,
+      // 管理员操作审计日志
+      `CREATE TABLE IF NOT EXISTS admin_audit_logs (
+        id SERIAL PRIMARY KEY,
+        admin_id INTEGER NOT NULL REFERENCES users(id),
+        admin_username VARCHAR(50) NOT NULL,
+        action VARCHAR(50) NOT NULL,
+        target_user_id INTEGER,
+        target_username VARCHAR(50),
+        detail TEXT DEFAULT '',
+        ip_address VARCHAR(50) DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_audit_admin ON admin_audit_logs(admin_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_audit_action ON admin_audit_logs(action)`,
+      `CREATE INDEX IF NOT EXISTS idx_audit_time ON admin_audit_logs(created_at DESC)`,
+      // 招商银行持仓理财产品表
+      `CREATE TABLE IF NOT EXISTS cmb_products (
+        product_code VARCHAR(20) PRIMARY KEY,
+        product_name VARCHAR(200) NOT NULL,
+        risk_level VARCHAR(20) DEFAULT '',
+        product_status VARCHAR(20) DEFAULT '',
+        investment_period VARCHAR(20) DEFAULT '',
+        nav NUMERIC(10,4),
+        nav_date DATE,
+        return_1m NUMERIC(8,2),
+        return_3m NUMERIC(8,2),
+        return_6m NUMERIC(8,2),
+        return_1y NUMERIC(8,2),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      // 确保 cmb_products 表有 investment_period 列
+      `DO $$ BEGIN
+        ALTER TABLE cmb_products ADD COLUMN IF NOT EXISTS investment_period VARCHAR(20) DEFAULT '';
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$`,
+      // 招银理财净值表（确保存在）
+      `CREATE TABLE IF NOT EXISTS cmb_zhaoyin_nav (
+        id SERIAL PRIMARY KEY,
+        product_code VARCHAR(20) NOT NULL,
+        product_name VARCHAR(200),
+        unit_nav NUMERIC(12,6),
+        cumulative_nav NUMERIC(12,6),
+        nav_date DATE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(product_code, nav_date)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_zhaoyin_nav_code ON cmb_zhaoyin_nav(product_code)`,
+      `CREATE INDEX IF NOT EXISTS idx_zhaoyin_nav_date ON cmb_zhaoyin_nav(nav_date DESC)`,
+      // 招银理财净值表年化收益率列
+      `DO $$ BEGIN
+        ALTER TABLE cmb_zhaoyin_nav ADD COLUMN IF NOT EXISTS return_1m_annualized NUMERIC(8,4);
+        ALTER TABLE cmb_zhaoyin_nav ADD COLUMN IF NOT EXISTS return_3m_annualized NUMERIC(8,4);
+        ALTER TABLE cmb_zhaoyin_nav ADD COLUMN IF NOT EXISTS return_6m_annualized NUMERIC(8,4);
+        ALTER TABLE cmb_zhaoyin_nav ADD COLUMN IF NOT EXISTS return_ytd_annualized NUMERIC(8,4);
+        ALTER TABLE cmb_zhaoyin_nav ADD COLUMN IF NOT EXISTS return_since_annualized NUMERIC(8,4);
       EXCEPTION WHEN duplicate_column THEN NULL;
       END $$`,
       // 沪深300基金详情表（申购费、超额收益等）
@@ -231,9 +326,20 @@ async function initDatabase() {
     }
 
     console.log('PostgreSQL 数据库初始化完成');
-  } finally {
-    client.release();
+      } finally {
+        client.release();
+      }
+      return; // 成功则退出
+    } catch (err) {
+      lastError = err;
+      console.error(`数据库初始化失败 (第${attempt}次):`, err.message);
+      if (attempt < retries) {
+        console.log(`等待3秒后重试...`);
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    }
   }
+  throw lastError;
 }
 
 function getPool() {

@@ -60,7 +60,7 @@ const allFunds = [
   { code: '011102', name: '天弘中证光伏产业指数A', type: 'ETF联接', industry: '新能源', index: '光伏产业', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 22.10, rating: 4, buySuggestion: '逢低布局', dailyLimit: 0, isGoldSelected: true },
   { code: '011103', name: '天弘中证光伏产业指数C', type: 'ETF联接', industry: '新能源', index: '光伏产业', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 15.60, rating: 4, buySuggestion: '逢低布局', dailyLimit: 0 },
   { code: '012323', name: '华宝医疗ETF联接C', type: 'ETF联接', industry: '医药', index: '中证医疗', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 3.80, rating: 4, buySuggestion: '左侧布局', dailyLimit: 0 },
-  { code: '012348', name: '天弘恒生科技ETF联接A', type: 'ETF联接', industry: '港股', index: '中证新能源', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 18.50, rating: 4, buySuggestion: '逢低布局', dailyLimit: 0 },
+  { code: '012348', name: '天弘恒生科技ETF联接A', type: 'ETF联接', industry: '港股', index: '恒生科技', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 18.50, rating: 4, buySuggestion: '逢低布局', dailyLimit: 0 },
   { code: '012349', name: '天弘恒生科技ETF联接C', type: 'ETF联接', industry: '港股', index: '恒生科技', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 15.60, rating: 4, buySuggestion: '定投配置', dailyLimit: 0 },
   { code: '012634', name: '国泰中证医疗ETF联接A', type: 'ETF联接', industry: '医药', index: '中证医疗', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 12.50, rating: 5, buySuggestion: '首选配置', dailyLimit: 0, isGoldSelected: true },
   { code: '012635', name: '国泰中证医疗ETF联接C', type: 'ETF联接', industry: '医药', index: '中证医疗', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.30, totalFee: 0.90, scale: 8.20, rating: 5, buySuggestion: '首选配置', dailyLimit: 0 },
@@ -71,7 +71,7 @@ const allFunds = [
   { code: '012831', name: '南方中证新能源ETF联接A', type: 'ETF联接', industry: '新能源', index: '中证新能源', managementFee: 0.15, custodyFee: 0.05, serviceFee: 0.00, totalFee: 0.20, scale: 15.60, rating: 5, buySuggestion: '逢低布局', dailyLimit: 0, isGoldSelected: true },
   { code: '012870', name: '易方达纳斯达克100ETF联接(QDII-LOF)C', type: 'QDII', industry: '纳斯达克100', index: '纳斯达克100', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.30, totalFee: 0.90, scale: 1.86, rating: 5, buySuggestion: '暂停申购', dailyLimit: 0 },
   { code: '013018', name: '富国中证军工ETF联接A', type: 'ETF联接', industry: '军工', index: '中证军工', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 28.90, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
-  { code: '014852', name: '嘉实添惠一年持有混合A', type: 'ETF联接', industry: '机器人', index: '中证机器人', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 12.50, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
+  { code: '014852', name: '嘉实添惠一年持有混合A', type: '混合', industry: '混合', index: '混合基金', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 12.50, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
   { code: '014978', name: '华安纳斯达克100ETF联接C', type: 'QDII', industry: '纳斯达克100', index: '纳斯达克100', managementFee: 0.60, custodyFee: 0.20, serviceFee: 0.20, totalFee: 0.80, scale: 11.64, rating: 5, buySuggestion: '限大额', dailyLimit: 10 },
   { code: '016055', name: '博时纳斯达克100ETF发起式联接(QDII)A', type: 'QDII', industry: '纳斯达克100', index: '纳斯达克100', managementFee: 0.50, custodyFee: 0.15, serviceFee: 0.00, totalFee: 0.65, scale: 13.01, rating: 5, buySuggestion: '暂停申购', dailyLimit: 0 },
   { code: '016057', name: '博时纳斯达克100ETF发起式联接(QDII)C', type: 'QDII', industry: '纳斯达克100', index: '纳斯达克100', managementFee: 0.50, custodyFee: 0.15, serviceFee: 0.30, totalFee: 0.85, scale: 6.52, rating: 5, buySuggestion: '暂停申购', dailyLimit: 0 },
@@ -79,8 +79,8 @@ const allFunds = [
   { code: '016453', name: '南方纳斯达克100指数(QDII)C', type: 'QDII', industry: '纳斯达克100', index: '纳斯达克100', managementFee: 0.50, custodyFee: 0.15, serviceFee: 0.10, totalFee: 0.65, scale: 32.50, rating: 5, buySuggestion: '限大额', dailyLimit: 200 },
   { code: '016532', name: '嘉实纳斯达克100ETF发起联接(QDII)A人民币', type: 'QDII', industry: '纳斯达克100', index: '纳斯达克100', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 18.86, rating: 5, buySuggestion: '暂停申购', dailyLimit: 0 },
   { code: '016533', name: '嘉实纳斯达克100ETF发起联接(QDII)C人民币', type: 'QDII', industry: '纳斯达克100', index: '纳斯达克100', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.25, totalFee: 0.75, scale: 15.78, rating: 5, buySuggestion: '暂停申购', dailyLimit: 0 },
-  { code: '016664', name: '天弘全球高端制造混合(QDII)A', type: 'ETF联接', industry: '苹果概念', index: '苹果概念', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 8.50, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
-  { code: '017730', name: '嘉实全球产业升级股票发起式(QDII)A', type: 'ETF联接', industry: '苹果概念', index: '苹果概念', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 3.20, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
+  { code: '016664', name: '天弘全球高端制造混合(QDII)A', type: 'QDII', industry: '科技', index: '全球高端制造', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 8.50, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
+  { code: '017730', name: '嘉实全球产业升级股票发起式(QDII)A', type: 'QDII', industry: '科技', index: '全球产业升级', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 3.20, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
   { code: '017732', name: '鹏华中证人工智能主题ETF联接A', type: 'ETF联接', industry: '人工智能', index: '中证人工智能', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 8.50, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
   { code: '018043', name: '天弘纳斯达克100指数发起(QDII)A', type: 'QDII', industry: '纳斯达克100', index: '纳斯达克100', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 21.86, rating: 5, buySuggestion: '暂停申购', dailyLimit: 0 },
   { code: '018044', name: '天弘纳斯达克100指数发起(QDII)C', type: 'QDII', industry: '纳斯达克100', index: '纳斯达克100', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.70, scale: 24.11, rating: 5, buySuggestion: '暂停申购', dailyLimit: 0 },
@@ -107,7 +107,7 @@ const allFunds = [
   { code: '159928', name: '汇添富中证主要消费ETF', type: 'ETF', industry: '消费', index: '中证主要消费', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 45.60, rating: 3, buySuggestion: '定投配置', dailyLimit: 0 },
   { code: '159936', name: '广发中证全指可选消费ETF', type: 'ETF', industry: '消费', index: '中证可选消费', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 28.90, rating: 3, buySuggestion: '定投配置', dailyLimit: 0 },
   { code: '159939', name: '广发中证全指信息技术ETF', type: 'ETF', industry: '信息技术', index: '中证信息技术', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 35.60, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
-  { code: '159992', name: '银华中证创新药产业ETF', type: 'ETF', industry: '医药', index: '中证5G通信', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 45.60, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
+  { code: '159992', name: '银华中证创新药产业ETF', type: 'ETF', industry: '医药', index: '中证创新药', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 45.60, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
   { code: '159995', name: '华夏国证半导体芯片ETF', type: 'ETF', industry: '半导体/芯片', index: '国证芯片', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 120.50, rating: 5, buySuggestion: '优先配置', dailyLimit: 0 },
   { code: '160213', name: '国泰纳斯达克100指数(QDII)', type: 'QDII', industry: '纳斯达克100', index: '纳斯达克100', managementFee: 0.80, custodyFee: 0.20, serviceFee: 0.00, totalFee: 1.00, scale: 16.36, rating: 5, buySuggestion: '暂停申购', dailyLimit: 0, isGoldSelected: true },
   { code: '160706', name: '嘉实沪深300ETF联接(LOF)A', type: 'ETF联接', industry: '沪深300', index: '沪深300', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 85.30, rating: 4, buySuggestion: '适合定投', dailyLimit: 0, isGoldSelected: true },
@@ -214,6 +214,19 @@ const allFunds = [
   { code: '560880', name: '广发中证全指家用电器ETF', type: 'ETF', industry: '家电', index: '中证全指家用电器', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 18.60, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
   { code: '005063', name: '广发中证全指家用电器ETF联接A', type: 'ETF联接', industry: '家电', index: '中证全指家用电器', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 8.30, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
   { code: '005064', name: '广发中证全指家用电器ETF联接C', type: 'ETF联接', industry: '家电', index: '中证全指家用电器', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 5.60, rating: 3, buySuggestion: '短期灵活', dailyLimit: 0 },
+
+  // ===== 易方达基金（代码已通过东方财富API逐一校验） =====
+  // 注意：005827/110011/110020/110003 已在上方 seed 数据中存在，此处不重复
+  { code: '012920', name: '易方达全球成长精选混合(QDII)人民币A', type: 'QDII', industry: '纳斯达克100', index: '混合基金', managementFee: 1.50, custodyFee: 0.25, serviceFee: 0.00, totalFee: 1.75, scale: 85.30, rating: 4, buySuggestion: '限大额', dailyLimit: 0 },
+  { code: '020602', name: '易方达中证红利低波动ETF联接发起式A', type: 'ETF联接', industry: '红利', index: '中证红利低波动', managementFee: 0.20, custodyFee: 0.05, serviceFee: 0.00, totalFee: 0.25, scale: 28.50, rating: 5, buySuggestion: '适合定投', dailyLimit: 0, isGoldSelected: true },
+  { code: '110022', name: '易方达消费行业股票', type: '股票型', industry: '消费', index: '中证主要消费', managementFee: 1.50, custodyFee: 0.25, serviceFee: 0.00, totalFee: 1.75, scale: 220.50, rating: 4, buySuggestion: '适合定投', dailyLimit: 0 },
+  { code: '007379', name: '易方达上证50ETF联接基金A', type: 'ETF联接', industry: '上证50', index: '上证50', managementFee: 0.15, custodyFee: 0.05, serviceFee: 0.00, totalFee: 0.20, scale: 35.20, rating: 5, buySuggestion: '适合定投', dailyLimit: 0, isGoldSelected: true },
+  { code: '007380', name: '易方达上证50ETF联接基金C', type: 'ETF联接', industry: '上证50', index: '上证50', managementFee: 0.15, custodyFee: 0.05, serviceFee: 0.20, totalFee: 0.40, scale: 25.80, rating: 4, buySuggestion: '短期灵活', dailyLimit: 0 },
+  { code: '002910', name: '易方达供给改革混合', type: '混合', industry: '混合', index: '混合基金', managementFee: 1.50, custodyFee: 0.25, serviceFee: 0.00, totalFee: 1.75, scale: 85.40, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
+  { code: '007346', name: '易方达科技创新混合A', type: '混合', industry: '科技', index: '混合基金', managementFee: 1.50, custodyFee: 0.25, serviceFee: 0.00, totalFee: 1.75, scale: 65.30, rating: 3, buySuggestion: '适合定投', dailyLimit: 0 },
+  { code: '009342', name: '易方达优质企业三年持有期混合', type: '混合', industry: '消费', index: '混合基金', managementFee: 1.50, custodyFee: 0.25, serviceFee: 0.00, totalFee: 1.75, scale: 120.60, rating: 4, buySuggestion: '长期持有', dailyLimit: 0 },
+  { code: '161131', name: '易方达科润混合(LOF)', type: '混合', industry: '科技', index: '混合基金', managementFee: 1.50, custodyFee: 0.25, serviceFee: 0.00, totalFee: 1.75, scale: 45.20, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
+  { code: '110005', name: '易方达积极成长混合', type: '混合', industry: '混合', index: '混合基金', managementFee: 1.50, custodyFee: 0.25, serviceFee: 0.00, totalFee: 1.75, scale: 55.80, rating: 3, buySuggestion: '适合定投', dailyLimit: 0 },
 ];
 
 // 基金经理映射（基金代码 → 基金经理）
@@ -456,6 +469,17 @@ const fundManagerMap = {
   '562500': '华龙',
   '588000': '荣膺',
   '588080': '林伟斌,成曦',
+  // 易方达基金经理（仅新增的，005827/110011/110020/110003 已在上方）
+  '012920': '郑希',
+  '020602': '成曦',
+  '110022': '萧楠',
+  '007379': '成曦',
+  '007380': '成曦',
+  '002910': '杨嘉文',
+  '007346': '刘武',
+  '009342': '张坤',
+  '161131': '陈皓',
+  '110005': '陈皓',
 };
 
 // 明星基金经理详细信息

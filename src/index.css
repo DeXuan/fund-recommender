@@ -381,6 +381,20 @@ a:hover {
   transform: scale(0.98);
 }
 
+/* 卡片 & 统计值初始隐藏 — GSAP 按视口顺序渐入，避免先闪现再动画 */
+.ant-card,
+.ant-statistic-content-value {
+  opacity: 0;
+  transform: translateY(24px);
+}
+
+/* GSAP 动画完成后标记为已显示 */
+.ant-card.gsap-revealed,
+.ant-statistic-content-value.gsap-revealed {
+  opacity: 1;
+  transform: none;
+}
+
 /* 卡片 hover 效果 */
 .ant-card-hoverable:hover {
   border-color: var(--primary-border);
@@ -487,6 +501,7 @@ a:hover {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+
 /* 加载动画 */
 @keyframes fadeIn {
   from {
@@ -572,9 +587,154 @@ a:hover {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-/* 暗色模式支持（预留） */
-@media (prefers-color-scheme: dark) {
-  /* 暗色模式变量 - 暂未启用 */
+/* 暗色模式 */
+[data-theme="dark"] {
+  --primary: #4096ff;
+  --primary-hover: #69b1ff;
+  --primary-active: #1677ff;
+  --primary-bg: #111a2c;
+  --primary-border: #15395b;
+
+  --success: #73d13d;
+  --success-bg: #162312;
+  --success-border: #274916;
+  --warning: #ffc53d;
+  --warning-bg: #2b2111;
+  --warning-border: #594214;
+  --danger: #ff7875;
+  --danger-bg: #2c1618;
+  --danger-border: #58181c;
+  --info: #4096ff;
+  --info-bg: #111a2c;
+  --info-border: #15395b;
+
+  --text-primary: #e8e8e8;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #6b6b6b;
+  --text-quaternary: #484848;
+  --bg-primary: #141414;
+  --bg-secondary: #1f1f1f;
+  --bg-container: #1a1a1a;
+  --border-color: #333;
+  --border-color-light: #262626;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2), 0 1px 6px -1px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 3px 6px -4px rgba(0, 0, 0, 0.3), 0 6px 16px 0 rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 6px 16px -8px rgba(0, 0, 0, 0.4), 0 9px 28px 0 rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #484848;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #595959;
+}
+
+/* 暗色模式下 Ant Design 覆盖 */
+[data-theme="dark"] .compare-table-scroll .ant-table-thead th {
+  background: #262626 !important;
+}
+
+[data-theme="dark"] .skeleton {
+  background: linear-gradient(90deg, #262626 25%, #333 37%, #262626 63%);
+}
+
+/* 暗色模式下常见内联样式覆盖 */
+[data-theme="dark"] .ant-layout {
+  background: var(--bg-primary) !important;
+}
+
+[data-theme="dark"] .ant-layout-header {
+  background: rgba(26, 26, 26, 0.95) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+[data-theme="dark"] .ant-card {
+  background: var(--bg-container);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .ant-table {
+  background: var(--bg-container);
+}
+
+[data-theme="dark"] .ant-table-thead > tr > th,
+[data-theme="dark"] .ant-table-thead > tr > td {
+  background: #262626 !important;
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .ant-table-tbody > tr > td {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .ant-modal-content {
+  background: var(--bg-container);
+}
+
+[data-theme="dark"] .ant-drawer-content {
+  background: var(--bg-container);
+}
+
+[data-theme="dark"] .ant-dropdown-menu {
+  background: var(--bg-container);
+}
+
+[data-theme="dark"] .ant-select-dropdown {
+  background: var(--bg-container);
+}
+
+[data-theme="dark"] .ant-input,
+[data-theme="dark"] .ant-input-affix-wrapper,
+[data-theme="dark"] .ant-select-selector,
+[data-theme="dark"] .ant-picker {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .ant-input::placeholder {
+  color: var(--text-tertiary) !important;
+}
+
+[data-theme="dark"] .ant-tabs-tab {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--primary) !important;
+}
+
+[data-theme="dark"] .ant-tag {
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .ant-statistic-title {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .ant-statistic-content {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .ant-divider {
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .ant-empty-description {
+  color: var(--text-tertiary);
+}
+
+/* 暗色模式下 ECharts 容器 */
+[data-theme="dark"] .echarts-for-react {
+  filter: none;
 }
 
 /* GSAP tilt cards get transform-style set via JS */
