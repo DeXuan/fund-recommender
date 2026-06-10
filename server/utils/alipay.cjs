@@ -97,9 +97,51 @@ function isAlipayConfigured() {
   return !!(process.env.ALIPAY_APP_ID && process.env.ALIPAY_PRIVATE_KEY && process.env.ALIPAY_PUBLIC_KEY);
 }
 
+/**
+ * 创建当面付订单（预创建，返回二维码URL）
+ */
+async function createPayment(outTradeNo, totalAmount, subject) {
+  const sdk = getAlipaySdk();
+  if (!sdk) throw new Error('支付宝SDK未配置');
+  const notifyUrl = process.env.ALIPAY_NOTIFY_URL || 'http://47.116.77.67:8688/api/subscription/notify';
+  const result = await sdk.exec('alipay.trade.precreate', {
+    bizContent: {
+      outTradeNo,
+      totalAmount: totalAmount.toString(),
+      subject,
+    },
+    notifyUrl,
+  });
+  return result;
+}
+
+/**
+ * 查询订单支付状态
+ */
+async function queryPayment(outTradeNo) {
+  const sdk = getAlipaySdk();
+  if (!sdk) throw new Error('支付宝SDK未配置');
+  const result = await sdk.exec('alipay.trade.query', {
+    bizContent: { outTradeNo },
+  });
+  return result;
+}
+
+/**
+ * 验证支付宝异步通知签名
+ */
+function verifyNotification(postData) {
+  const sdk = getAlipaySdk();
+  if (!sdk) return false;
+  return sdk.checkNotifySign(postData);
+}
+
 module.exports = {
   getAlipaySdk,
   getOAuthToken,
   getUserInfo,
   isAlipayConfigured,
+  createPayment,
+  queryPayment,
+  verifyNotification,
 };

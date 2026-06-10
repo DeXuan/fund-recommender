@@ -231,7 +231,7 @@ export default function DCACalculator() {
         </Row>
 
         <div style={{ marginTop: 16 }}>
-          <span style={{ color: '#666', marginRight: 12 }}>快捷设置：</span>
+          <span style={{ color: isDark ? '#a0a0a0' : '#666', marginRight: 12 }}>快捷设置：</span>
           <Space>
             <Tag style={{ cursor: 'pointer' }} onClick={() => { setFrequency('monthly'); setAmount(500); setPeriod(12); setExpectedReturn(8); }}>保守型</Tag>
             <Tag style={{ cursor: 'pointer' }} onClick={() => { setFrequency('monthly'); setAmount(1000); setPeriod(36); setExpectedReturn(10); }}>稳健型</Tag>
@@ -289,7 +289,7 @@ export default function DCACalculator() {
               pagination={{ pageSize: 12 }}
               size="small"
               summary={() => (
-                <Table.Summary.Row style={{ fontWeight: 600, background: '#f5f5f5' }}>
+                <Table.Summary.Row style={{ fontWeight: 600, background: isDark ? '#1f1f1f' : '#f5f5f5' }}>
                   <Table.Summary.Cell index={0}>最终</Table.Summary.Cell>
                   <Table.Summary.Cell index={1}>{formatCurrency(result.totalInvestment)}</Table.Summary.Cell>
                   <Table.Summary.Cell index={2}>{formatCurrency(result.totalInvestment)}</Table.Summary.Cell>
@@ -332,7 +332,7 @@ export default function DCACalculator() {
                 onClick={() => { setFrequency(plan.freq); setAmount(plan.amount); setPeriod(plan.p); setExpectedReturn(plan.r); setResult(null); }}
               >
                 <strong>{plan.label}</strong>
-                <div style={{ fontSize: 13, color: '#666', marginTop: 8 }}>{plan.desc}</div>
+                <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', marginTop: 8 }}>{plan.desc}</div>
               </Card>
             </Col>
           ))}

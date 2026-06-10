@@ -254,6 +254,36 @@ export interface User {
   nickname: string;
   avatar_url?: string;
   role?: 'admin' | 'user';
+  subscription_status?: 'free' | 'premium';
+  subscription_end?: string;
+  created_at?: string;
+}
+
+// 订阅
+export interface SubscriptionPlan {
+  id: number;
+  name: string;
+  price: number;
+  duration_days: number;
+  features: string[];
+}
+
+export interface SubscriptionOrder {
+  id: number;
+  out_trade_no: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'expired';
+  plan_name?: string;
+  paid_at?: string;
+  created_at: string;
+}
+
+// AI选股
+export interface StockPickResult {
+  fund: { code: string; name: string; type: string; industry: string; nav: number; return1y: number; return6m: number; return3m: number; return1m: number; totalFee: number; scale: number; rating: number };
+  score: number;
+  breakdown: { return1y: number; fee: number; scale: number; valuation: number; momentum: number };
+  reasoning: string;
 }
 
 // 理财记账

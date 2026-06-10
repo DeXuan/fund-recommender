@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { portfolioApi } from '../services/api';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface CategoryData {
   name: string;
@@ -51,6 +52,7 @@ const CATEGORY_META: Record<string, { label: string; group: string; color: strin
 };
 
 export default function ReturnsMap() {
+  const { isDark } = useTheme();
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState<InsightsData | null>(null);
   const [mapData, setMapData] = useState<ReturnsMapData | null>(null);
@@ -110,8 +112,8 @@ export default function ReturnsMap() {
           return `<div style="font-size:13px"><div style="font-weight:600;margin-bottom:4px">${date}</div><div>当日收益: <span style="color:${color};font-weight:600">${value >= 0 ? '+' : ''}¥${value.toLocaleString()}</span></div></div>`;
         },
       },
-      visualMap: { show: true, min: -maxAbs, max: maxAbs, orient: 'horizontal', left: 'center', bottom: 6, itemWidth: 14, itemHeight: 120, text: ['盈利', '亏损'], textStyle: { fontSize: 11, color: '#666' }, inRange: { color: ['#237804', '#3f8600', '#52c41a', '#d9d9d9', '#ff7875', '#ff4d4f', '#cf1322'] } },
-      calendar: { top: 30, left: 50, right: 30, bottom: 60, cellSize: ['auto', 15], range: String(year), itemStyle: { borderWidth: 2, borderColor: '#fff' }, splitLine: { show: true }, yearLabel: { show: false }, monthLabel: { nameMap: monthNames, fontSize: 11, color: '#666' }, dayLabel: { nameMap: ['日', '一', '二', '三', '四', '五', '六'], fontSize: 10, color: '#999' } },
+      visualMap: { show: true, min: -maxAbs, max: maxAbs, orient: 'horizontal', left: 'center', bottom: 6, itemWidth: 14, itemHeight: 120, text: ['盈利', '亏损'], textStyle: { fontSize: 11, color: isDark ? '#a0a0a0' : '#666' }, inRange: { color: ['#237804', '#3f8600', '#52c41a', '#d9d9d9', '#ff7875', '#ff4d4f', '#cf1322'] } },
+      calendar: { top: 30, left: 50, right: 30, bottom: 60, cellSize: ['auto', 15], range: String(year), itemStyle: { borderWidth: 2, borderColor: '#fff' }, splitLine: { show: true }, yearLabel: { show: false }, monthLabel: { nameMap: monthNames, fontSize: 11, color: isDark ? '#a0a0a0' : '#666' }, dayLabel: { nameMap: ['日', '一', '二', '三', '四', '五', '六'], fontSize: 10, color: isDark ? '#6b6b6b' : '#999' } },
       series: [{ type: 'heatmap', coordinateSystem: 'calendar', data: heatData }],
     };
   };
@@ -125,7 +127,7 @@ export default function ReturnsMap() {
       series: [{
         type: 'pie', radius: ['35%', '60%'], center: ['50%', '42%'],
         label: { formatter: '{b}\n{d}%', fontSize: 10 },
-        data: categories.map(c => ({ name: CATEGORY_META[c.name]?.label || c.name, value: c.value, itemStyle: { color: CATEGORY_META[c.name]?.color || '#999' } })),
+        data: categories.map(c => ({ name: CATEGORY_META[c.name]?.label || c.name, value: c.value, itemStyle: { color: CATEGORY_META[c.name]?.color || (isDark ? '#6b6b6b' : '#999') } })),
       }],
     };
   };
@@ -178,7 +180,7 @@ export default function ReturnsMap() {
         extra={
           <Space>
             {mapData && (
-              <span style={{ fontSize: 13, color: '#666' }}>
+              <span style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>
                 胜率 <b style={{ color: '#1890ff' }}>{mapData.summary.totalDays > 0 ? ((mapData.summary.profitDays / mapData.summary.totalDays) * 100).toFixed(0) : 0}%</b>
                 &nbsp;·&nbsp;
                 盈利 <b style={{ color: '#cf1322' }}>{mapData.summary.profitDays}</b>天
@@ -215,16 +217,16 @@ export default function ReturnsMap() {
             {categories.length > 0 ? (
               <>
                 <ReactECharts option={getCategoryPieOption()} style={{ height: 260 }} />
-                <Row gutter={8} style={{ textAlign: 'center', borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
+                <Row gutter={8} style={{ textAlign: 'center', borderTop: `1px solid ${isDark ? '#262626' : '#f0f0f0'}`, paddingTop: 8 }}>
                   <Col span={12}>
                     <div style={{ fontSize: 12, color: '#888' }}>进阶理财</div>
                     <div style={{ fontSize: 18, fontWeight: 600, color: advancedPnl >= 0 ? '#cf1322' : '#3f8600' }}>{advancedWeight.toFixed(0)}%</div>
-                    <div style={{ fontSize: 11, color: '#999' }}>{pnlSign(advancedPnl)}¥{Math.abs(advancedPnl).toFixed(0)}</div>
+                    <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999' }}>{pnlSign(advancedPnl)}¥{Math.abs(advancedPnl).toFixed(0)}</div>
                   </Col>
                   <Col span={12}>
                     <div style={{ fontSize: 12, color: '#888' }}>稳健理财</div>
                     <div style={{ fontSize: 18, fontWeight: 600, color: stablePnl >= 0 ? '#cf1322' : '#3f8600' }}>{stableWeight.toFixed(0)}%</div>
-                    <div style={{ fontSize: 11, color: '#999' }}>{pnlSign(stablePnl)}¥{Math.abs(stablePnl).toFixed(0)}</div>
+                    <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999' }}>{pnlSign(stablePnl)}¥{Math.abs(stablePnl).toFixed(0)}</div>
                   </Col>
                 </Row>
               </>
@@ -239,7 +241,7 @@ export default function ReturnsMap() {
             {advanced.length > 0 && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#722ed1' }}>
-                  <RiseOutlined style={{ marginRight: 4 }} />进阶理财 <span style={{ fontWeight: 400, color: '#999', fontSize: 11 }}>（高波动·高收益）</span>
+                  <RiseOutlined style={{ marginRight: 4 }} />进阶理财 <span style={{ fontWeight: 400, color: isDark ? '#6b6b6b' : '#999', fontSize: 11 }}>（高波动·高收益）</span>
                 </div>
                 {advanced.map(cat => (
                   <CategoryRow key={cat.name} cat={cat} totalValue={totalValue} />
@@ -250,7 +252,7 @@ export default function ReturnsMap() {
             {stable.length > 0 && (
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#1890ff' }}>
-                  <SafetyOutlined style={{ marginRight: 4 }} />稳健理财 <span style={{ fontWeight: 400, color: '#999', fontSize: 11 }}>（低波动·稳健收益）</span>
+                  <SafetyOutlined style={{ marginRight: 4 }} />稳健理财 <span style={{ fontWeight: 400, color: isDark ? '#6b6b6b' : '#999', fontSize: 11 }}>（低波动·稳健收益）</span>
                 </div>
                 {stable.map(cat => (
                   <CategoryRow key={cat.name} cat={cat} totalValue={totalValue} />
@@ -259,7 +261,7 @@ export default function ReturnsMap() {
             )}
             {/* 收益率柱状图 */}
             {categories.length > 1 && (
-              <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 8, marginTop: 4 }}>
+              <div style={{ borderTop: `1px solid ${isDark ? '#262626' : '#f0f0f0'}`, paddingTop: 8, marginTop: 4 }}>
                 <ReactECharts option={getCategoryBarOption()} style={{ height: Math.max(categories.length * 36, 100) }} />
               </div>
             )}
@@ -273,8 +275,8 @@ export default function ReturnsMap() {
           <Row gutter={[12, 8]}>
             {market.map(m => (
               <Col xs={12} sm={8} md={4} key={m.code}>
-                <div style={{ textAlign: 'center', padding: '6px 0', background: '#fafafa', borderRadius: 6 }}>
-                  <div style={{ fontSize: 12, color: '#666' }}>{m.name}</div>
+                <div style={{ textAlign: 'center', padding: '6px 0', background: isDark ? '#262626' : '#fafafa', borderRadius: 6 }}>
+                  <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>{m.name}</div>
                   <div style={{ fontSize: 16, fontWeight: 600, color: m.changePercent >= 0 ? '#cf1322' : '#3f8600' }}>
                     {m.price > 0 ? m.price.toFixed(2) : '--'}
                     {m.changePercent !== 0 && (
@@ -320,15 +322,15 @@ export default function ReturnsMap() {
                     fontSize: 16, padding: '0 12px', height: 28, lineHeight: '28px',
                   }}
                 />
-                <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
+                <div style={{ marginTop: 8, fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>
                   预期年化收益 <b>{riskProfile.expectedReturn}</b>
                 </div>
               </div>
               {riskProfile.allocation && (
                 <div style={{ fontSize: 12 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4, color: '#333' }}>建议配置：</div>
+                  <div style={{ fontWeight: 600, marginBottom: 4, color: isDark ? '#e8e8e8' : '#333' }}>建议配置：</div>
                   {riskProfile.allocation.map((a: any, i: number) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px dashed #f0f0f0' }}>
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: `1px dashed ${isDark ? '#262626' : '#f0f0f0'}` }}>
                       <span>{a.industry}</span>
                       <span style={{ fontWeight: 600 }}>{a.percentage}%</span>
                     </div>
@@ -364,7 +366,7 @@ export default function ReturnsMap() {
               <Empty description="暂无建议" />
             )}
             {!riskProfile && (
-              <div style={{ textAlign: 'center', marginTop: 12, padding: '8px', background: '#f6ffed', borderRadius: 6, fontSize: 12, color: '#389e0d' }}>
+              <div style={{ textAlign: 'center', marginTop: 12, padding: '8px', background: isDark ? '#162312' : '#f6ffed', borderRadius: 6, fontSize: 12, color: '#389e0d' }}>
                 完成 <a href="/web/risk-assessment" style={{ fontWeight: 600 }}>风险评估</a> 可获得个性化配置建议
               </div>
             )}
@@ -377,7 +379,8 @@ export default function ReturnsMap() {
 
 // 资产类别行组件
 function CategoryRow({ cat, totalValue }: { cat: CategoryData; totalValue: number }) {
-  const meta = CATEGORY_META[cat.name] || { label: cat.name, color: '#999', icon: null };
+  const { isDark } = useTheme();
+  const meta = CATEGORY_META[cat.name] || { label: cat.name, color: isDark ? '#6b6b6b' : '#999', icon: null };
   return (
     <div style={{ marginBottom: 6 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -387,7 +390,7 @@ function CategoryRow({ cat, totalValue }: { cat: CategoryData; totalValue: numbe
           <Tag color={meta.color} style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>{cat.weight.toFixed(1)}%</Tag>
         </Space>
         <Space size={12}>
-          <span style={{ fontSize: 12, color: '#666' }}>¥{cat.value.toLocaleString()}</span>
+          <span style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>¥{cat.value.toLocaleString()}</span>
           <span style={{ fontSize: 12, fontWeight: 600, color: cat.pnl >= 0 ? '#cf1322' : '#3f8600' }}>
             {cat.pnl >= 0 ? '+' : ''}{cat.pnlPercent.toFixed(2)}%
           </span>

@@ -408,6 +408,34 @@ router.get('/api/industry-analysis/:industry', async (req, res) => {
       '水电': { match: ['水电'], trend: '丰水期上涨', valuation: '合理', buySuggestion: '丰水期配置', logic: '6-10月主汛期来水量增加，水电发电量提升；长江电力等龙头股息率约3-5%，丰水期业绩弹性最大' },
       '啤酒/饮料': { match: ['啤酒/饮料'], trend: '季节性上涨', valuation: '合理偏低', buySuggestion: '夏季旺季', logic: '夏季为啤酒消费绝对旺季，Q2-Q3营收占全年40%+；2026年有世界杯赛事催化，叠加油价下行降低运输成本' },
       '家电': { match: ['家电'], trend: '高温驱动', valuation: '合理偏低', buySuggestion: '高温驱动', logic: '7-8月空调销售/安装高峰，终端需求旺季；高温天气+地产后周期双重共振，白电龙头估值合理' },
+      '酒店旅游': {
+        match: ['酒店旅游'], trend: '季节性上涨', valuation: '低估', buySuggestion: '逢低布局',
+        logic: '毕业季+暑假双轮驱动，6-9月为旅游出行绝对旺季；2026年暑期旅游预订量同比+20%以上，酒店RevPAR持续修复；中证旅游主题指数PE处于近3年20%分位，估值性价比突出',
+        tradingVolumeAnalysis: {
+          summary: '酒店旅游板块近期交易量温和放大，毕业季+暑假旺季预期带动资金提前布局',
+          reasons: [
+            { title: '暑期旅游旺季来临', detail: '6-9月为旅游出行绝对旺季，大学生毕业旅行+中小学生暑假双重驱动，携程/飞猪数据显示暑期旅游预订量同比+20%以上', impact: 'high' },
+            { title: '酒店RevPAR持续修复', detail: '国内酒店入住率和平均房价持续回升，华住/锦江/首旅等龙头Q1业绩超预期，RevPAR同比+5-8%', impact: 'high' },
+            { title: '估值处于历史低位', detail: '中证旅游主题指数PE约25倍，处于近3年20%分位以下，安全边际较高', impact: 'medium' },
+            { title: '政策利好', detail: '各地促消费政策持续出台，签证便利化、景区门票减免等措施提振旅游需求', impact: 'medium' },
+          ],
+        },
+        customBatchPlan: [
+          { batch: 1, time: '立即', percentage: 30, targets: '旅游ETF富国 (159766) 或 旅游ETF华夏 (562510)', method: '支付宝/券商买入ETF', reason: '当前估值低位，先建底仓，毕业季+暑假旺季即将启动' },
+          { batch: 2, time: '2周后', percentage: 25, targets: '旅游ETF富国 (159766)', method: '支付宝定投或手动买入', reason: '观察暑期旅游数据和酒店入住率，确认旺季趋势' },
+          { batch: 3, time: '1个月后', percentage: 25, targets: '旅游ETF华夏 (562510)', method: '手动买入', reason: '分散持仓，两个ETF跟踪同一指数但成分权重略有差异' },
+          { batch: 4, time: '旺季中期(8月)', percentage: 20, targets: '表现最优基金', method: '加仓或止盈调仓', reason: '根据实际表现调整，旺季末期可逐步止盈' },
+        ],
+        customRiskWarning: '1. 基金有风险，投资需谨慎。以上推荐基于数据分析，不构成投资建议。\n2. 酒店旅游板块季节性强，旺季(6-9月)过后可能面临回调压力。\n3. 最大风险：暑期旅游数据不及预期、极端天气影响出行、宏观经济下行压制消费。\n4. 旅游板块波动较大，建议占总仓位的5-10%，不超过15%。\n5. 止盈线建议设在15-20%，止损线-12%。\n6. 旺季末期(9月后)建议逐步减仓，避免季节性回调。',
+        investmentAdvice: {
+          shortTerm: '未来1-3个月：毕业季+暑假旺季，可积极配置。关注暑期旅游预订数据和酒店入住率。',
+          mediumTerm: '未来3-12个月：旺季(6-9月)持有，旺季末期(9-10月)逐步止盈。淡季可小仓位观望。',
+          longTerm: '未来1年以上：旅游行业长期受益于消费升级和人均可支配收入增长，但季节性波动大，适合波段操作而非长期持有。',
+          targetAllocation: '建议占总仓位的5-10%，不超过15%',
+          stopProfit: '15-20%',
+          stopLoss: '-12%',
+        },
+      },
     };
 
     const config = industryMap[decodedIndustry];
@@ -927,6 +955,7 @@ router.post('/api/watchlist/check', authMiddleware, async (req, res) => {
   try {
     const { codes } = req.body;
     if (!Array.isArray(codes)) return res.json({});
+    if (codes.length > 100) return res.status(400).json({ error: '单次查询不能超过100个基金代码' });
     const pool = getPool();
     const result = await pool.query(
       'SELECT fund_code FROM watchlist WHERE user_id = $1 AND fund_code = ANY($2)',
@@ -1112,6 +1141,15 @@ router.get('/api/alerts', authMiddleware, async (req, res) => {
       }
     }
 
+    // 6. 新闻事件驱动的持仓提醒
+    try {
+      const { generateNewsAlerts } = require('../news-fetcher.cjs');
+      const newsAlerts = await generateNewsAlerts(req.user.id, pool);
+      alerts.push(...newsAlerts);
+    } catch (e) {
+      // 新闻模块可能未初始化，忽略错误
+    }
+
     res.json(alerts);
   } catch (error) {
     console.error('获取提醒数据失败:', error.message);
@@ -1180,6 +1218,39 @@ router.get('/api/cmb-products', async (req, res) => {
   } catch (error) {
     console.error('获取招行理财产品数据失败:', error.message);
     res.status(500).json({ error: '获取招行理财产品数据失败' });
+  }
+});
+
+// 按产品代码查询招行理财产品名称（轻量接口，用于添加持仓时自动关联）
+router.get('/api/cmb-products/lookup/:code', async (req, res) => {
+  try {
+    const pool = getPool();
+    const { code } = req.params;
+    const result = await pool.query(
+      `SELECT product_code, product_name, nav AS unit_nav, nav_date
+       FROM cmb_products WHERE product_code = $1`,
+      [code]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: '产品不存在' });
+    }
+    // 也查最新净值
+    const navResult = await pool.query(
+      `SELECT unit_nav, nav_date FROM cmb_zhaoyin_nav
+       WHERE product_code = $1 ORDER BY nav_date DESC LIMIT 1`,
+      [code]
+    );
+    const row = result.rows[0];
+    const nav = navResult.rows[0];
+    res.json({
+      product_code: row.product_code,
+      product_name: row.product_name,
+      unit_nav: nav ? parseFloat(nav.unit_nav) : (row.unit_nav ? parseFloat(row.unit_nav) : null),
+      nav_date: nav ? nav.nav_date : row.nav_date,
+    });
+  } catch (error) {
+    console.error('查询招行理财产品失败:', error.message);
+    res.status(500).json({ error: '查询招行理财产品失败' });
   }
 });
 
@@ -1275,6 +1346,8 @@ router.get('/api/cmb-zhaoyin-nav', async (req, res) => {
   try {
     const pool = getPool();
     const { search, sort, order, page = 1, pageSize = 50 } = req.query;
+    const safePageSize = Math.min(100, Math.max(1, parseInt(pageSize) || 50));
+    const safePage = Math.max(1, parseInt(page) || 1);
 
     let where = '';
     const params = [];
@@ -1300,7 +1373,7 @@ router.get('/api/cmb-zhaoyin-nav', async (req, res) => {
     const sortCol = sortMap[sort] || 'n.nav_date';
     const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
 
-    const offset = (parseInt(page) - 1) * parseInt(pageSize);
+    const offset = (safePage - 1) * safePageSize;
 
     const dataSql = `
       SELECT DISTINCT ON (n.product_code)
@@ -1316,7 +1389,7 @@ router.get('/api/cmb-zhaoyin-nav', async (req, res) => {
       ORDER BY n.product_code, n.nav_date DESC
       LIMIT $${idx++} OFFSET $${idx++}
     `;
-    const dataResult = await pool.query(dataSql, [...params, parseInt(pageSize), offset]);
+    const dataResult = await pool.query(dataSql, [...params, safePageSize, offset]);
 
     res.json({
       data: dataResult.rows.map(r => ({
@@ -1332,9 +1405,9 @@ router.get('/api/cmb-zhaoyin-nav', async (req, res) => {
         return_since_inception_annualized: r.return_since_annualized ? parseFloat(r.return_since_annualized) : null,
       })),
       total,
-      page: parseInt(page),
-      pageSize: parseInt(pageSize),
-      totalPages: Math.ceil(total / parseInt(pageSize)),
+      page: safePage,
+      pageSize: safePageSize,
+      totalPages: Math.ceil(total / safePageSize),
     });
   } catch (error) {
     console.error('获取招银理财净值数据失败:', error.message);
@@ -1398,11 +1471,55 @@ router.get('/api/market/valuation-trend', async (req, res) => {
   }
 });
 
+// ========== 市场重大事件日历 API ==========
+router.get('/api/market-events', (req, res) => {
+  try {
+    const { marketEvents, categoryConfig, impactConfig } = require('../market-events.cjs');
+    const { month, category, impact } = req.query;
+
+    let events = [...marketEvents];
+
+    if (month) {
+      const m = parseInt(month);
+      if (m >= 1 && m <= 12) events = events.filter(e => e.month === m);
+    }
+    if (category) {
+      events = events.filter(e => e.category === category);
+    }
+    if (impact) {
+      events = events.filter(e => e.impact === impact);
+    }
+
+    // 按月份和日期排序
+    events.sort((a, b) => a.month - b.month || a.id.localeCompare(b.id));
+
+    // 按月分组
+    const byMonth = {};
+    events.forEach(e => {
+      if (!byMonth[e.month]) byMonth[e.month] = [];
+      byMonth[e.month].push(e);
+    });
+
+    res.json({
+      events,
+      byMonth,
+      categoryConfig,
+      impactConfig,
+      total: events.length,
+    });
+  } catch (error) {
+    console.error('获取市场事件失败:', error.message);
+    res.status(500).json({ error: '获取市场事件失败' });
+  }
+});
+
 // GET /api/yifangda-funds — 获取易方达基金数据
 router.get('/api/yifangda-funds', async (req, res) => {
   try {
     const pool = getPool();
     const { search, sort = 'return_1y', order = 'desc', manager, page = 1, pageSize = 50 } = req.query;
+    const safePageSize = Math.min(100, Math.max(1, parseInt(pageSize) || 50));
+    const safePage = Math.max(1, parseInt(page) || 1);
 
     const conditions = [];
     const params = [];
@@ -1440,7 +1557,7 @@ router.get('/api/yifangda-funds', async (req, res) => {
     const sortCol = sortMap[sort] || 'return_1y';
     const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
 
-    const offset = (parseInt(page) - 1) * parseInt(pageSize);
+    const offset = (safePage - 1) * safePageSize;
 
     // 数据
     const dataResult = await pool.query(
@@ -1449,7 +1566,7 @@ router.get('/api/yifangda-funds', async (req, res) => {
        FROM yifangda_funds ${where}
        ORDER BY ${sortCol} ${sortOrder} NULLS LAST
        LIMIT $${idx++} OFFSET $${idx++}`,
-      [...params, parseInt(pageSize), offset]
+      [...params, safePageSize, offset]
     );
 
     // 经理列表（用于筛选）
@@ -1475,9 +1592,9 @@ router.get('/api/yifangda-funds', async (req, res) => {
         updated_at: r.updated_at,
       })),
       total,
-      page: parseInt(page),
-      pageSize: parseInt(pageSize),
-      totalPages: Math.ceil(total / parseInt(pageSize)),
+      page: safePage,
+      pageSize: safePageSize,
+      totalPages: Math.ceil(total / safePageSize),
       managers: managersResult.rows.map(r => ({
         name: r.fund_manager,
         count: parseInt(r.cnt),
@@ -1514,6 +1631,8 @@ router.get('/api/gold-funds', async (req, res) => {
       page = 1, pageSize = 100,
       minReturn, maxFee, minScale,
     } = req.query;
+    const safePageSize = Math.min(100, Math.max(1, parseInt(pageSize) || 100));
+    const safePage = Math.max(1, parseInt(page) || 1);
 
     const conditions = ['f.is_gold_selected = true'];
     const params = [];
@@ -1571,7 +1690,7 @@ router.get('/api/gold-funds', async (req, res) => {
     const total = parseInt(countResult.rows[0].count);
 
     // 分页
-    const offset = (parseInt(page) - 1) * parseInt(pageSize);
+    const offset = (safePage - 1) * safePageSize;
 
     // 数据查询
     const dataResult = await pool.query(
@@ -1590,7 +1709,7 @@ router.get('/api/gold-funds', async (req, res) => {
        ${where}
        ORDER BY ${sortCol} ${sortOrder} NULLS LAST
        LIMIT $${idx++} OFFSET $${idx++}`,
-      [...params, parseInt(pageSize), offset]
+      [...params, safePageSize, offset]
     );
 
     // 统计分类分布
@@ -1634,9 +1753,9 @@ router.get('/api/gold-funds', async (req, res) => {
         return1y: r.return_1y ? parseFloat(r.return_1y) : null,
       })),
       total,
-      page: parseInt(page),
-      pageSize: parseInt(pageSize),
-      totalPages: Math.ceil(total / parseInt(pageSize)),
+      page: safePage,
+      pageSize: safePageSize,
+      totalPages: Math.ceil(total / safePageSize),
       categories: categoryResult.rows.map(r => ({ name: r.industry, count: parseInt(r.cnt) })),
       managers: managerResult.rows.map(r => ({ name: r.manager, count: parseInt(r.cnt) })),
     });
@@ -1735,6 +1854,223 @@ router.get('/api/gold-funds/stats', async (req, res) => {
   }
 });
 
+// ========== 实时财经新闻 API ==========
+// GET /api/news — 获取新闻列表（默认隐藏低影响）
+router.get('/api/news', (req, res) => {
+  try {
+    const { getCachedNews } = require('../news-fetcher.cjs');
+    // 默认过滤低影响公告，除非显式指定 impact=all
+    const query = { ...req.query };
+    if (!query.impact) query.impact = 'high,medium';
+    const result = getCachedNews(query);
+    res.json(result);
+  } catch (error) {
+    console.error('获取新闻失败:', error.message);
+    res.status(500).json({ error: '获取新闻失败' });
+  }
+});
+
+// GET /api/news/stats — 新闻统计
+router.get('/api/news/stats', (req, res) => {
+  try {
+    const { getNewsStats } = require('../news-fetcher.cjs');
+    res.json(getNewsStats());
+  } catch (error) {
+    res.status(500).json({ error: '获取新闻统计失败' });
+  }
+});
+
+// GET /api/news/personal — 获取与用户持仓/自选相关的新闻
+router.get('/api/news/personal', authMiddleware, async (req, res) => {
+  try {
+    const { getCachedNews, NEWS_INDUSTRY_MAP } = require('../news-fetcher.cjs');
+    const pool = getPool();
+
+    // 1. 获取用户持仓基金信息
+    const holdings = await pool.query(
+      `SELECT DISTINCT fr.fund_code, fr.fund_name, f.industry, f.type
+       FROM fund_records fr
+       LEFT JOIN funds f ON fr.fund_code = f.code
+       WHERE fr.user_id = $1`,
+      [req.user.id]
+    );
+
+    // 2. 获取用户自选基金信息
+    const watchlist = await pool.query(
+      `SELECT w.fund_code, w.fund_name, f.industry, f.type
+       FROM watchlist w
+       LEFT JOIN funds f ON w.fund_code = f.code
+       WHERE w.user_id = $1`,
+      [req.user.id]
+    );
+
+    // 3. 提取关键词集合
+    const fundNames = new Set();
+    const industries = new Set();
+
+    [...holdings.rows, ...watchlist.rows].forEach(r => {
+      if (r.fund_name) fundNames.add(r.fund_name);
+      if (r.industry) industries.add(r.industry);
+    });
+
+    // 4. 构建行业关键词（从 NEWS_INDUSTRY_MAP 反向查找匹配行业的关键词）
+    const industryKeywords = new Set();
+    for (const [keyword, industry] of Object.entries(NEWS_INDUSTRY_MAP)) {
+      if (industries.has(industry)) {
+        industryKeywords.add(keyword);
+      }
+    }
+
+    // 5. 构建持仓行业重仓股名称集合（用于个股匹配）
+    // 行业→重仓股映射（与 api.cjs 中 generateFundDetail 的 holdingsMap 一致）
+    const INDUSTRY_HOLDINGS = {
+      '人工智能': ['科大讯飞', '海康威视', '中际旭创', '工业富联', '寒武纪', '紫光股份', '中科曙光', '浪潮信息', '用友网络', '金山办公'],
+      '半导体/芯片': ['北方华创', '中芯国际', '韦尔股份', '兆易创新', '卓胜微', '圣邦股份', '中微公司', '长电科技', '华虹半导体', '紫光国微'],
+      '医药': ['恒瑞医药', '药明康德', '迈瑞医疗', '片仔癀', '爱尔眼科', '智飞生物', '长春高新', '沃森生物', '通策医疗', '华大基因'],
+      '新能源': ['宁德时代', '比亚迪', '隆基绿能', '阳光电源', '通威股份', '亿纬锂能', '赣锋锂业', '天齐锂业', '璞泰来', '恩捷股份'],
+      '消费': ['贵州茅台', '五粮液', '山西汾酒', '泸州老窖', '海天味业', '伊利股份', '洋河股份', '古井贡酒', '今世缘', '舍得酒业'],
+      '证券': ['中信证券', '东方财富', '华泰证券', '国泰君安', '海通证券', '招商证券', '中金公司', '申万宏源', '广发证券', '兴业证券'],
+      '金融': ['招商银行', '中国平安', '工商银行', '建设银行', '农业银行', '兴业银行', '浦发银行', '民生银行'],
+      '陶瓷/建材': ['海螺水泥', '东方雨虹', '北新建材', '旗滨集团', '蒙娜丽莎', '东鹏控股', '帝欧家居', '伟星新材', '华新水泥', '冀东水泥'],
+      '军工': ['中航沈飞', '航发动力', '中航光电', '紫光国微', '中航西飞', '航天电器', '中直股份', '洪都航空'],
+      '煤炭': ['中国神华', '陕西煤业', '兖矿能源', '中煤能源', '山西焦煤', '平煤股份', '淮北矿业', '潞安环能'],
+      '电力': ['长江电力', '华能国际', '国电电力', '大唐发电', '华电国际', '中国核电', '三峡能源', '龙源电力'],
+      '纳斯达克100': ['英伟达', '苹果', '微软', '亚马逊', 'Meta', '谷歌', '特斯拉', '博通', '奈飞', 'AMD', 'NVDA', 'AAPL', 'MSFT', 'AMZN'],
+      '标普500': ['英伟达', '苹果', '微软', '亚马逊', '谷歌', '伯克希尔', '摩根大通', 'Visa', '礼来', 'NVDA', 'AAPL', 'MSFT'],
+    };
+    const heldStockNames = new Set();
+    for (const industry of industries) {
+      const stocks = INDUSTRY_HOLDINGS[industry] || [];
+      stocks.forEach(s => heldStockNames.add(s));
+    }
+
+    // 6. 从缓存新闻中筛选相关新闻
+    const allNews = getCachedNews({ pageSize: 200, page: 1 });
+    const personalNews = [];
+    const seen = new Set();
+
+    for (const item of allNews.items) {
+      const text = (item.title + ' ' + item.content).toLowerCase();
+      let matched = false;
+      let matchReason = '';
+      let relevance = 'low';
+
+      // 匹配1：基金名称（如"易方达沪深300"出现在新闻中）
+      for (const name of fundNames) {
+        const nameKey = name.replace(/ETF联接|指数增强|混合|股票|债券|A$|C$|基金/g, '').trim();
+        if (nameKey.length >= 2 && text.includes(nameKey.toLowerCase())) {
+          matched = true;
+          matchReason = `持仓基金「${name}」相关`;
+          relevance = 'high';
+          break;
+        }
+      }
+
+      // 匹配2：行业关键词（收集所有匹配，优先选持仓行业的长关键词）
+      if (!matched) {
+        let bestMatch = null;
+        for (const keyword of industryKeywords) {
+          if (text.includes(keyword.toLowerCase())) {
+            const industry = NEWS_INDUSTRY_MAP[keyword];
+            const isHeld = [...holdings.rows].some(h => h.industry === industry);
+            const candidate = { keyword, industry, isHeld, relevance: isHeld ? 'high' : 'medium' };
+            if (!bestMatch) {
+              bestMatch = candidate;
+            } else {
+              // 优先持仓行业 > 自选行业；同级优先长关键词（更精确）
+              if (candidate.isHeld && !bestMatch.isHeld) {
+                bestMatch = candidate;
+              } else if (candidate.isHeld === bestMatch.isHeld && keyword.length > bestMatch.keyword.length) {
+                bestMatch = candidate;
+              }
+            }
+          }
+        }
+        if (bestMatch) {
+          matched = true;
+          matchReason = bestMatch.isHeld
+            ? `持仓行业「${bestMatch.industry}」相关`
+            : `自选行业「${bestMatch.industry}」相关`;
+          relevance = bestMatch.relevance;
+        }
+      }
+
+      // 匹配3：个股名称（新闻中提到的股票名称是否在持仓行业重仓股中）
+      if (!matched && item.stocks) {
+        for (const stock of item.stocks) {
+          if (stock.name && heldStockNames.has(stock.name)) {
+            matched = true;
+            matchReason = `持仓重仓股「${stock.name}」相关`;
+            relevance = 'high';
+            break;
+          }
+        }
+      }
+      // 补充：从新闻文本中匹配重仓股名称
+      if (!matched) {
+        for (const stockName of heldStockNames) {
+          if (text.includes(stockName)) {
+            matched = true;
+            matchReason = `持仓重仓股「${stockName}」相关`;
+            relevance = 'high';
+            break;
+          }
+        }
+      }
+
+      if (matched && !seen.has(item.id)) {
+        seen.add(item.id);
+        personalNews.push({
+          ...item,
+          matchReason,
+          relevance,
+        });
+      }
+    }
+
+    // 按相关性和时间排序
+    personalNews.sort((a, b) => {
+      const relOrder = { high: 0, medium: 1, low: 2 };
+      if (relOrder[a.relevance] !== relOrder[b.relevance]) {
+        return relOrder[a.relevance] - relOrder[b.relevance];
+      }
+      return b.timestamp - a.timestamp;
+    });
+
+    res.json({
+      items: personalNews,
+      total: personalNews.length,
+      holdings: holdings.rows.map(r => ({
+        code: r.fund_code,
+        name: r.fund_name,
+        industry: r.industry,
+      })),
+      watchlist: watchlist.rows.map(r => ({
+        code: r.fund_code,
+        name: r.fund_name,
+        industry: r.industry,
+      })),
+      matchedIndustries: [...industries],
+    });
+  } catch (error) {
+    console.error('获取个人相关新闻失败:', error.message);
+    res.status(500).json({ error: '获取个人相关新闻失败' });
+  }
+});
+
+// POST /api/news/refresh — 手动刷新新闻（管理员）
+function createNewsRefreshRoute(fetchAllNews) {
+  router.post('/api/news/refresh', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+      const result = await fetchAllNews();
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error('刷新新闻失败:', error.message);
+      res.status(500).json({ error: '刷新新闻失败' });
+    }
+  });
+}
+
 // POST /api/funds/fetch-gold — 抓取金选基金数据（管理员）
 function createGoldFundRoute(fetchGoldFundData) {
   router.post('/api/funds/fetch-gold', authMiddleware, adminMiddleware, async (req, res) => {
@@ -1748,4 +2084,4 @@ function createGoldFundRoute(fetchGoldFundData) {
   });
 }
 
-module.exports = { router, createStatusRoute, createUpdateRoute, createYiFangDaRoute, createGoldFundRoute };
+module.exports = { router, createStatusRoute, createUpdateRoute, createYiFangDaRoute, createGoldFundRoute, createNewsRefreshRoute };

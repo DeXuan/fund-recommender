@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Card, Row, Col, Statistic, Table, Tag, Tabs, Input, Select, Space, Button, Spin, Progress, Tooltip, Badge, Switch, message } from 'antd';
+import { Card, Row, Col, Statistic, Table, Tag, Tabs, Input, Select, Space, Button, Spin, Progress, Tooltip, Badge, Switch, message, Modal, Form, Popconfirm, Empty } from 'antd';
 import {
   DashboardOutlined, DatabaseOutlined, FileTextOutlined, ReloadOutlined,
   ThunderboltOutlined, HddOutlined, CloudServerOutlined, BugOutlined,
   ClockCircleOutlined, SearchOutlined, ApiOutlined, LineChartOutlined,
   PauseCircleOutlined, PlayCircleOutlined, LaptopOutlined, CloudOutlined,
+  AlertOutlined, CheckCircleOutlined, WarningOutlined, CloseCircleOutlined,
+  PlusOutlined, DeleteOutlined, EditOutlined, HeartOutlined, BellOutlined,
+  SettingOutlined, ExclamationCircleOutlined, SafetyOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { adminApi } from '../../services/api';
 
 const { Search } = Input;
+const { TextArea } = Input;
 
 // Gauge chart component
 function GaugeChart({ value, title, color, max }: { value: number; title: string; color: string; max?: number }) {
@@ -55,6 +59,319 @@ function MetricsChart({ data }: { data: { timestamp: number; qps: number; cacheH
   return <ReactECharts option={option} style={{ height: 280 }} />;
 }
 
+// Health check component
+function HealthCheck() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try { setData(await adminApi.getHealthCheck()); }
+    catch { message.error('健康检查失败'); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return <Spin style={{ display: 'block', margin: '40px auto' }} />;
+  if (!data) return null;
+
+  const statusIcon = (s: string) => {
+    if (s === 'healthy') return <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 18 }} />;
+    if (s === 'warning') return <WarningOutlined style={{ color: '#faad14', fontSize: 18 }} />;
+    if (s === 'critical' || s === 'unhealthy') return <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 18 }} />;
+    return <ExclamationCircleOutlined style={{ color: '#999', fontSize: 18 }} />;
+  };
+
+  const overallColor = data.status === 'healthy' ? '#52c41a' : data.status === 'warning' ? '#faad14' : '#ff4d4f';
+  const overallLabel = data.status === 'healthy' ? '健康' : data.status === 'warning' ? '警告' : '异常';
+
+  return (
+    <div>
+      <Card size="small" style={{ marginBottom: 16 }}>
+        <Row gutter={16} align="middle">
+          <Col>
+            <Space>
+              <HeartOutlined style={{ fontSize: 28, color: overallColor }} />
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: overallColor }}>系统{overallLabel}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>检查耗时 {data.totalLatency}ms</div>
+              </div>
+            </Space>
+          </Col>
+          <Col flex="auto" />
+          <Col><Button icon={<ReloadOutlined />} onClick={fetchData}>重新检查</Button></Col>
+        </Row>
+      </Card>
+
+      <Row gutter={[12, 12]}>
+        {data.checks?.map((check: any, idx: number) => (
+          <Col xs={24} sm={12} md={8} key={idx}>
+            <Card size="small" hoverable style={{ borderLeft: `3px solid ${check.status === 'healthy' ? '#52c41a' : check.status === 'warning' ? '#faad14' : '#ff4d4f'}` }}>
+              <Space>
+                {statusIcon(check.status)}
+                <div>
+                  <div style={{ fontWeight: 500 }}>{check.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{check.detail}</div>
+                </div>
+              </Space>
+              {check.value !== undefined && (
+                <Progress percent={check.value} size="small" showInfo={false}
+                  strokeColor={check.value > 90 ? '#ff4d4f' : check.value > 70 ? '#faad14' : '#52c41a'}
+                  style={{ marginTop: 8 }} />
+              )}
+            </Card>
+          </Col>
+        ))}
+      </Row>
+    </div>
+  );
+}
+
+// API statistics component
+function ApiStats() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [hours, setHours] = useState(24);
+
+  const fetchData = useCallback(async () => {
+    try { setLoading(true); setData(await adminApi.getApiStats(hours)); }
+    catch { message.error('获取API统计失败'); }
+    finally { setLoading(false); }
+  }, [hours]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return <Spin style={{ display: 'block', margin: '40px auto' }} />;
+  if (!data) return null;
+
+  const trendOption = data.trend?.length > 0 ? {
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['请求数', '错误数', '平均响应(ms)'], bottom: 0 },
+    grid: { left: 50, right: 50, top: 10, bottom: 40 },
+    xAxis: { type: 'category', data: data.trend.map((t: any) => new Date(t.hour_start).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })) },
+    yAxis: [
+      { type: 'value', name: '请求数', position: 'left' },
+      { type: 'value', name: 'ms', position: 'right' },
+    ],
+    series: [
+      { name: '请求数', type: 'bar', data: data.trend.map((t: any) => parseInt(t.requests)), itemStyle: { color: '#1677ff' } },
+      { name: '错误数', type: 'bar', data: data.trend.map((t: any) => parseInt(t.errors)), itemStyle: { color: '#ff4d4f' } },
+      { name: '平均响应(ms)', type: 'line', yAxisIndex: 1, data: data.trend.map((t: any) => parseFloat(t.avg_ms)), smooth: true, color: '#faad14' },
+    ],
+  } : null;
+
+  return (
+    <div>
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+        <Col xs={12} sm={6}>
+          <Card size="small"><Statistic title="24h总请求" value={parseInt(data.errorRate?.total) || 0} prefix={<ApiOutlined />} /></Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small"><Statistic title="24h错误" value={parseInt(data.errorRate?.errors) || 0} valueStyle={{ color: parseInt(data.errorRate?.errors) > 0 ? '#ff4d4f' : '#52c41a' }} /></Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small"><Statistic title="错误率" value={parseFloat(data.errorRate?.error_rate) || 0} suffix="%" valueStyle={{ color: parseFloat(data.errorRate?.error_rate) > 5 ? '#ff4d4f' : '#52c41a' }} /></Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Select value={hours} onChange={setHours} style={{ width: '100%' }}
+            options={[{ label: '最近6小时', value: 6 }, { label: '最近24小时', value: 24 }, { label: '最近7天', value: 168 }]} />
+        </Col>
+      </Row>
+
+      {trendOption && (
+        <Card size="small" title="请求趋势" style={{ marginBottom: 16 }}>
+          <ReactECharts option={trendOption} style={{ height: 240 }} />
+        </Card>
+      )}
+
+      <Card size="small" title="接口详情 (按请求量排序)">
+        <Table dataSource={data.endpoints} rowKey={(r: any) => `${r.method}_${r.endpoint}`} size="small" pagination={{ pageSize: 15 }}
+          columns={[
+            { title: '接口', dataIndex: 'endpoint', ellipsis: true, render: (v: string, r: any) => (
+              <Space>
+                <Tag color={r.method === 'GET' ? 'blue' : r.method === 'POST' ? 'green' : 'orange'} style={{ margin: 0, fontSize: 10 }}>{r.method}</Tag>
+                <span style={{ fontSize: 12 }}>{v}</span>
+                {r.live && <Tag color="processing" style={{ fontSize: 9 }}>实时</Tag>}
+              </Space>
+            )},
+            { title: '请求数', dataIndex: 'total_requests', width: 90, sorter: (a: any, b: any) => a.total_requests - b.total_requests, render: (v: number) => (parseInt(String(v)) || 0).toLocaleString() },
+            { title: '错误数', dataIndex: 'total_errors', width: 80, render: (v: number) => <span style={{ color: parseInt(String(v)) > 0 ? '#ff4d4f' : undefined }}>{parseInt(String(v)) || 0}</span> },
+            { title: '平均响应', dataIndex: 'avg_ms', width: 100, render: (v: number) => <span style={{ color: parseFloat(String(v)) > 1000 ? '#ff4d4f' : parseFloat(String(v)) > 500 ? '#faad14' : undefined }}>{parseFloat(String(v)) || 0}ms</span> },
+            { title: 'P95', dataIndex: 'p95_ms', width: 100, render: (v: number) => `${parseFloat(String(v)) || 0}ms` },
+            { title: '最大响应', dataIndex: 'max_ms', width: 100, render: (v: number) => `${parseFloat(String(v)) || 0}ms` },
+          ]}
+        />
+      </Card>
+    </div>
+  );
+}
+
+// Alert rules component
+function AlertManagement() {
+  const [rules, setRules] = useState<any[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyStats, setHistoryStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<any>(null);
+  const [form] = Form.useForm();
+
+  const fetchRules = useCallback(async () => {
+    try { setLoading(true); const res = await adminApi.getAlertRules(); setRules(res.rules); }
+    catch { message.error('获取告警规则失败'); }
+    finally { setLoading(false); }
+  }, []);
+
+  const fetchHistory = useCallback(async () => {
+    try { setHistoryLoading(true); const res = await adminApi.getAlertHistory({ pageSize: 100 }); setHistory(res.history); setHistoryStats(res.stats); }
+    catch { message.error('获取告警历史失败'); }
+    finally { setHistoryLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchRules(); fetchHistory(); }, []);
+
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
+      if (editingRule) {
+        await adminApi.updateAlertRule(editingRule.id, values);
+        message.success('规则已更新');
+      } else {
+        await adminApi.createAlertRule(values);
+        message.success('规则已创建');
+      }
+      setModalOpen(false);
+      setEditingRule(null);
+      form.resetFields();
+      fetchRules();
+    } catch (err: any) { if (err.message) message.error(err.message); }
+  };
+
+  const handleDelete = async (id: number) => {
+    try { await adminApi.deleteAlertRule(id); message.success('规则已删除'); fetchRules(); }
+    catch { message.error('删除失败'); }
+  };
+
+  const handleResolve = async (id: number) => {
+    try { await adminApi.resolveAlert(id); message.success('告警已解决'); fetchHistory(); }
+    catch { message.error('操作失败'); }
+  };
+
+  const metricLabels: Record<string, string> = {
+    cpu_usage: 'CPU使用率', memory_usage: '内存使用率', disk_usage: '磁盘使用率',
+    db_connections: '数据库连接数', cache_hit_ratio: '缓存命中率', error_rate: '错误率',
+    response_time: '响应时间', qps: 'QPS',
+  };
+  const severityColors: Record<string, string> = { info: 'blue', warning: 'orange', critical: 'red' };
+
+  return (
+    <div>
+      {historyStats && (
+        <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+          <Col xs={12} sm={6}><Card size="small"><Statistic title="触发中" value={parseInt(historyStats.firing_count) || 0} valueStyle={{ color: '#ff4d4f' }} prefix={<AlertOutlined />} /></Card></Col>
+          <Col xs={12} sm={6}><Card size="small"><Statistic title="已解决" value={parseInt(historyStats.resolved_count) || 0} valueStyle={{ color: '#52c41a' }} /></Card></Col>
+          <Col xs={12} sm={6}><Card size="small"><Statistic title="严重" value={parseInt(historyStats.critical_count) || 0} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+          <Col xs={12} sm={6}><Card size="small"><Statistic title="24h告警" value={parseInt(historyStats.last_24h) || 0} /></Card></Col>
+        </Row>
+      )}
+
+      <Tabs defaultActiveKey="rules" items={[
+        {
+          key: 'rules',
+          label: <><SettingOutlined /> 告警规则</>,
+          children: (
+            <div>
+              <div style={{ marginBottom: 12 }}>
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingRule(null); form.resetFields(); setModalOpen(true); }}>新建规则</Button>
+              </div>
+              <Table dataSource={rules} rowKey="id" loading={loading} size="small" pagination={false}
+                columns={[
+                  { title: '规则名称', dataIndex: 'name', ellipsis: true },
+                  { title: '指标', dataIndex: 'metric', width: 120, render: (v: string) => metricLabels[v] || v },
+                  { title: '条件', key: 'condition', width: 150, render: (_: any, r: any) => `${metricLabels[r.metric] || r.metric} ${r.operator} ${r.threshold}` },
+                  { title: '严重级别', dataIndex: 'severity', width: 90, render: (v: string) => <Tag color={severityColors[v] || 'default'}>{v}</Tag> },
+                  { title: '状态', dataIndex: 'enabled', width: 80, render: (v: boolean) => <Badge status={v ? 'success' : 'default'} text={v ? '启用' : '禁用'} /> },
+                  { title: '操作', width: 120, render: (_: any, r: any) => (
+                    <Space>
+                      <Button size="small" icon={<EditOutlined />} onClick={() => { setEditingRule(r); form.setFieldsValue(r); setModalOpen(true); }} />
+                      <Popconfirm title="确定删除？" onConfirm={() => handleDelete(r.id)}>
+                        <Button size="small" danger icon={<DeleteOutlined />} />
+                      </Popconfirm>
+                    </Space>
+                  )},
+                ]}
+              />
+            </div>
+          ),
+        },
+        {
+          key: 'history',
+          label: <><BellOutlined /> 告警历史</>,
+          children: (
+            <div>
+              <div style={{ marginBottom: 12 }}>
+                <Button icon={<ReloadOutlined />} onClick={fetchHistory}>刷新</Button>
+              </div>
+              <Table dataSource={history} rowKey="id" loading={historyLoading} size="small"
+                pagination={{ pageSize: 20 }}
+                columns={[
+                  { title: '时间', dataIndex: 'created_at', width: 170, render: (t: string) => new Date(t).toLocaleString('zh-CN') },
+                  { title: '规则', dataIndex: 'rule_name', ellipsis: true },
+                  { title: '指标', dataIndex: 'metric', width: 120, render: (v: string) => metricLabels[v] || v },
+                  { title: '当前值', dataIndex: 'current_value', width: 100, render: (v: number) => parseFloat(String(v)) || 0 },
+                  { title: '阈值', dataIndex: 'threshold', width: 80, render: (v: number) => parseFloat(String(v)) || 0 },
+                  { title: '级别', dataIndex: 'severity', width: 80, render: (v: string) => <Tag color={severityColors[v] || 'default'}>{v}</Tag> },
+                  { title: '状态', dataIndex: 'status', width: 80, render: (v: string) => <Badge status={v === 'firing' ? 'error' : 'success'} text={v === 'firing' ? '触发中' : '已解决'} /> },
+                  { title: '操作', width: 100, render: (_: any, r: any) => r.status === 'firing' ?
+                    <Button size="small" type="primary" onClick={() => handleResolve(r.id)}>解决</Button> : '-' },
+                ]}
+              />
+            </div>
+          ),
+        },
+      ]} />
+
+      <Modal title={editingRule ? '编辑告警规则' : '新建告警规则'} open={modalOpen} onCancel={() => { setModalOpen(false); setEditingRule(null); }} onOk={handleSave} destroyOnClose>
+        <Form form={form} layout="vertical" initialValues={{ severity: 'warning', enabled: true, operator: '>', threshold: 0 }}>
+          <Form.Item label="规则名称" name="name" rules={[{ required: true }]}>
+            <Input placeholder="如：CPU使用率过高" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item label="监控指标" name="metric" rules={[{ required: true }]}>
+                <Select options={Object.entries(metricLabels).map(([k, v]) => ({ label: v, value: k }))} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="运算符" name="operator" rules={[{ required: true }]}>
+                <Select options={[{ label: '>', value: '>' }, { label: '>=', value: '>=' }, { label: '<', value: '<' }, { label: '<=', value: '<=' }, { label: '=', value: '=' }]} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="阈值" name="threshold" rules={[{ required: true }]}>
+                <Input type="number" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item label="严重级别" name="severity">
+                <Select options={[{ label: 'Info', value: 'info' }, { label: 'Warning', value: 'warning' }, { label: 'Critical', value: 'critical' }]} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="启用" name="enabled" valuePropName="checked">
+                <Switch />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+    </div>
+  );
+}
+
 // Database details component
 function DBDetails() {
   const [data, setData] = useState<any>(null);
@@ -73,7 +390,6 @@ function DBDetails() {
 
   return (
     <Row gutter={[16, 16]}>
-      {/* Summary cards */}
       <Col xs={24}>
         <Row gutter={[12, 12]}>
           <Col xs={12} sm={8} md={4}><Card size="small"><Statistic title="死锁次数" value={data.deadlocks} valueStyle={{ color: data.deadlocks > 0 ? '#ff4d4f' : '#52c41a' }} /></Card></Col>
@@ -176,7 +492,6 @@ function TableSpace() {
   if (loading) return <Spin style={{ display: 'block', margin: '40px auto' }} />;
   if (!data) return null;
 
-  // Pie chart for table sizes
   const pieOption = {
     tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
     legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 11 } },
@@ -249,7 +564,6 @@ function LogViewer() {
   const levelColors: Record<string, string> = { error: 'red', warn: 'orange', warning: 'orange', info: 'blue' };
   const levelBg: Record<string, string> = { error: 'rgba(255,77,79,0.06)', warn: 'rgba(250,173,20,0.06)', warning: 'rgba(250,173,20,0.06)', info: 'transparent' };
 
-  // Stats
   const errorCount = logs.filter(l => l.level === 'error').length;
   const warnCount = logs.filter(l => l.level === 'warn' || l.level === 'warning').length;
 
@@ -312,6 +626,54 @@ function LogViewer() {
   );
 }
 
+// System settings component
+function SystemSettings() {
+  const [config, setConfig] = useState<Record<string, { value: string; description: string }>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    adminApi.getSettings().then(res => setConfig(res.config)).catch(() => message.error('获取配置失败')).finally(() => setLoading(false));
+  }, []);
+
+  const handleUpdate = async (key: string, value: string) => {
+    try {
+      setSaving(true);
+      await adminApi.updateSettings({ [key]: value });
+      setConfig(prev => ({ ...prev, [key]: { ...prev[key], value } }));
+      message.success('配置已更新');
+    } catch { message.error('更新失败'); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <Spin style={{ display: 'block', margin: '40px auto' }} />;
+
+  const configLabels: Record<string, string> = {
+    registration_enabled: '开放注册',
+    max_login_attempts: '最大登录失败次数',
+    lockout_duration_minutes: '锁定时长(分钟)',
+    password_min_length: '密码最小长度',
+    session_timeout_hours: '会话超时(小时)',
+  };
+
+  return (
+    <Card size="small" title="系统配置">
+      <Table dataSource={Object.entries(config).map(([key, val]) => ({ key, ...val }))} rowKey="key" size="small" pagination={false}
+        columns={[
+          { title: '配置项', dataIndex: 'key', width: 200, render: (v: string) => configLabels[v] || v },
+          { title: '说明', dataIndex: 'description', ellipsis: true },
+          { title: '当前值', dataIndex: 'value', width: 200, render: (v: string, r: any) => {
+            if (r.key === 'registration_enabled') {
+              return <Switch checked={v === 'true'} onChange={(checked) => handleUpdate(r.key, String(checked))} loading={saving} />;
+            }
+            return <Input size="small" defaultValue={v} onPressEnter={(e) => handleUpdate(r.key, (e.target as HTMLInputElement).value)} onBlur={(e) => { if (e.target.value !== v) handleUpdate(r.key, e.target.value); }} />;
+          }},
+        ]}
+      />
+    </Card>
+  );
+}
+
 function formatDuration(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
@@ -337,15 +699,8 @@ function ServerResources() {
   if (loading) return <Spin style={{ display: 'block', margin: '40px auto' }} />;
   if (!data) return null;
 
-  const diskChartData = data.disks?.map((d: any) => ({ name: d.mount, value: parseInt(d.used) || 0 })) || [];
-  const diskOption = {
-    tooltip: { trigger: 'item' },
-    series: [{ type: 'pie', radius: ['40%', '70%'], data: diskChartData, label: { formatter: '{b}\n{c}' } }],
-  };
-
   return (
     <Row gutter={[16, 16]}>
-      {/* System info */}
       <Col xs={24}>
         <Card size="small">
           <Row gutter={[16, 8]}>
@@ -357,7 +712,6 @@ function ServerResources() {
         </Card>
       </Col>
 
-      {/* CPU */}
       <Col xs={24} md={12}>
         <Card title="CPU" size="small">
           <Row gutter={[16, 12]}>
@@ -387,7 +741,6 @@ function ServerResources() {
         </Card>
       </Col>
 
-      {/* Memory */}
       <Col xs={24} md={12}>
         <Card title="内存" size="small">
           <Row gutter={[16, 12]}>
@@ -412,7 +765,6 @@ function ServerResources() {
         </Card>
       </Col>
 
-      {/* Disk usage */}
       <Col xs={24} md={12}>
         <Card title="磁盘使用" size="small">
           {data.disks?.map((disk: any, idx: number) => {
@@ -430,7 +782,6 @@ function ServerResources() {
         </Card>
       </Col>
 
-      {/* Network & TCP */}
       <Col xs={24} md={12}>
         <Card title="网络" size="small">
           <Row gutter={[16, 12]}>
@@ -452,7 +803,6 @@ function ServerResources() {
         </Card>
       </Col>
 
-      {/* Disk I/O */}
       <Col xs={24} md={12}>
         <Card title="磁盘 I/O" size="small">
           <Row gutter={[16, 12]}>
@@ -462,7 +812,6 @@ function ServerResources() {
         </Card>
       </Col>
 
-      {/* Top processes */}
       <Col xs={24}>
         <Card title="Top 进程 (按 CPU 排序)" size="small">
           <Table dataSource={data.topProcesses} rowKey="pid" size="small" pagination={false}
@@ -553,8 +902,9 @@ export default function SystemMonitor() {
       </Card>
 
       {/* Detail tabs */}
-      <Tabs defaultActiveKey="overview"
+      <Tabs defaultActiveKey="health"
         items={[
+          { key: 'health', label: <><HeartOutlined /> 健康检查</>, children: <HealthCheck /> },
           {
             key: 'overview',
             label: <><CloudServerOutlined /> 系统概览</>,
@@ -595,9 +945,12 @@ export default function SystemMonitor() {
               </Row>
             ),
           },
+          { key: 'api', label: <><ApiOutlined /> API统计</>, children: <ApiStats /> },
+          { key: 'alerts', label: <><AlertOutlined /> 告警管理</>, children: <AlertManagement /> },
           { key: 'server', label: <><LaptopOutlined /> 服务器资源</>, children: <ServerResources /> },
           { key: 'db', label: <><DatabaseOutlined /> 数据库详情</>, children: <DBDetails /> },
           { key: 'space', label: <><HddOutlined /> 数据表空间</>, children: <TableSpace /> },
+          { key: 'settings', label: <><SettingOutlined /> 系统配置</>, children: <SystemSettings /> },
           { key: 'logs', label: <><FileTextOutlined /> 运行日志</>, children: <LogViewer /> },
         ]}
       />

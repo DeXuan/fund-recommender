@@ -8,7 +8,7 @@ import {
   PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined,
   DownloadOutlined, ArrowUpOutlined, ArrowDownOutlined, FundOutlined,
   ScheduleOutlined, SyncOutlined, CheckCircleOutlined, PauseCircleOutlined,
-  LinkOutlined, SafetyOutlined, CalculatorOutlined,
+  LinkOutlined, SafetyOutlined, CalculatorOutlined, CrownOutlined,
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import ReactECharts from 'echarts-for-react';
@@ -16,18 +16,23 @@ import dayjs from 'dayjs';
 import { portfolioApi, fundApi } from '../services/api';
 import type { PortfolioHolding, PortfolioSummary, FundRecord } from '../types';
 import ReturnsMap from '../components/ReturnsMap';
+import VIPInsights from '../components/VIPInsights';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { getEchartsTheme } from '../utils/echarts-theme';
 import { formatCurrency } from '../utils/format';
 
 export default function Portfolio() {
   const { isDark } = useTheme();
+  const { user } = useAuth();
+  const isVIP = user?.subscription_status === 'premium';
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<FundRecord | null>(null);
   const [form] = Form.useForm();
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [productType, setProductType] = useState<'fund' | 'cmb'>('fund');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const alipayFileInputRef = useRef<HTMLInputElement>(null);
   const lookupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -68,20 +73,38 @@ export default function Portfolio() {
   const handleFundCodeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const code = e.target.value.trim();
     if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
-    if (code.length === 6 && /^\d{6}$/.test(code)) {
-      lookupTimerRef.current = setTimeout(async () => {
-        setLookupLoading(true);
-        try {
-          const fund = await fundApi.getFundDetail(code);
-          form.setFieldsValue({ fund_name: fund.name });
-        } catch {
-          // fund not found, leave name empty for manual input
-        } finally {
-          setLookupLoading(false);
-        }
-      }, 300);
+    if (productType === 'cmb') {
+      // 招行理财产品代码：输入后自动查询产品名称
+      if (code.length >= 4) {
+        lookupTimerRef.current = setTimeout(async () => {
+          setLookupLoading(true);
+          try {
+            const product = await fundApi.lookupCMBProduct(code);
+            form.setFieldsValue({ fund_name: product.product_name });
+          } catch {
+            // product not found, leave name empty for manual input
+          } finally {
+            setLookupLoading(false);
+          }
+        }, 300);
+      }
+    } else {
+      // 基金代码：6位数字自动查询
+      if (code.length === 6 && /^\d{6}$/.test(code)) {
+        lookupTimerRef.current = setTimeout(async () => {
+          setLookupLoading(true);
+          try {
+            const fund = await fundApi.getFundDetail(code);
+            form.setFieldsValue({ fund_name: fund.name });
+          } catch {
+            // fund not found, leave name empty for manual input
+          } finally {
+            setLookupLoading(false);
+          }
+        }, 300);
+      }
     }
-  }, [form]);
+  }, [form, productType]);
 
   const loadData = async () => {
     try {
@@ -136,6 +159,7 @@ export default function Portfolio() {
 
   const handleAdd = () => {
     setEditingRecord(null);
+    setProductType('fund');
     form.resetFields();
     setModalOpen(true);
   };
@@ -228,6 +252,30 @@ export default function Portfolio() {
     a.download = '基金持仓导入模板.csv';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportHoldings = () => {
+    if (!summary?.holdings?.length) {
+      message.warning('暂无持仓数据可导出');
+      return;
+    }
+    const escCsv = (v: string | number | null | undefined) => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = '基金代码,基金名称,持有份额,成本价,总成本,当前净值,市值,盈亏,盈亏比例,净值更新时间';
+    const rows = summary.holdings.map((h: PortfolioHolding) =>
+      [h.fund_code, h.fund_name, h.total_shares, h.avg_cost_price, h.total_cost, h.current_nav, h.market_value, h.pnl, h.pnl_percent + '%', h.nav_updated_at || ''].map(escCsv).join(',')
+    );
+    const csv = header + '\n' + rows.join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `持仓明细_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    message.success('导出成功');
   };
 
   // 定投计划操作
@@ -405,7 +453,7 @@ export default function Portfolio() {
     {
       title: '基金代码', dataIndex: 'fund_code', key: 'fund_code', width: 100,
       render: (code: string) => (
-        <Link to={`/funds/${code}`} style={{ color: '#8c8c8c', fontFamily: 'monospace' }}>{code}</Link>
+        <Link to={`/funds/${code}`} style={{ color: isDark ? '#6b6b6b' : '#8c8c8c', fontFamily: 'monospace' }}>{code}</Link>
       ),
     },
     {
@@ -492,7 +540,7 @@ export default function Portfolio() {
       title: '基金代码', dataIndex: 'fund_code', key: 'fund_code', width: 100,
       sorter: (a: PortfolioHolding, b: PortfolioHolding) => a.fund_code.localeCompare(b.fund_code),
       render: (code: string) => (
-        <Link to={`/funds/${code}`} style={{ color: '#8c8c8c', fontFamily: 'monospace' }}>{code}</Link>
+        <Link to={`/funds/${code}`} style={{ color: isDark ? '#6b6b6b' : '#8c8c8c', fontFamily: 'monospace' }}>{code}</Link>
       ),
     },
     {
@@ -613,7 +661,7 @@ export default function Portfolio() {
           <span>
             持仓明细
             {lastRefreshTime && (
-              <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 'normal', marginLeft: 12 }}>
+              <span style={{ fontSize: 12, color: isDark ? '#6b6b6b' : '#8c8c8c', fontWeight: 'normal', marginLeft: 12 }}>
                 净值更新于 {lastRefreshTime}
               </span>
             )}
@@ -630,6 +678,7 @@ export default function Portfolio() {
             </Button>
             <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>下载模板</Button>
             <Button icon={<UploadOutlined />} onClick={() => fileInputRef.current?.click()}>导入CSV</Button>
+            <Button icon={<DownloadOutlined />} onClick={handleExportHoldings}>导出持仓</Button>
             <Button icon={<UploadOutlined />} onClick={() => alipayFileInputRef.current?.click()}>支付宝导入</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>添加持仓</Button>
             <input
@@ -743,19 +792,19 @@ export default function Portfolio() {
           />
           <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginTop: 12 }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ color: '#8c8c8c', fontSize: 12 }}>我的持仓收益</div>
+              <div style={{ color: isDark ? '#6b6b6b' : '#8c8c8c', fontSize: 12 }}>我的持仓收益</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: (summary?.totalReturn || 0) >= 0 ? '#cf1322' : '#3f8600' }}>
                 {(summary?.totalReturn || 0) >= 0 ? '+' : ''}{(summary?.totalReturn || 0).toFixed(2)}%
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ color: '#8c8c8c', fontSize: 12 }}>沪深300同期</div>
+              <div style={{ color: isDark ? '#6b6b6b' : '#8c8c8c', fontSize: 12 }}>沪深300同期</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: parseFloat(benchmarkData[benchmarkData.length - 1]?.return_pct || 0) >= 0 ? '#cf1322' : '#3f8600' }}>
                 {benchmarkData.length > 0 ? `${parseFloat(benchmarkData[benchmarkData.length - 1].return_pct) >= 0 ? '+' : ''}${benchmarkData[benchmarkData.length - 1].return_pct}%` : '-'}
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ color: '#8c8c8c', fontSize: 12 }}>超额收益</div>
+              <div style={{ color: isDark ? '#6b6b6b' : '#8c8c8c', fontSize: 12 }}>超额收益</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#722ed1' }}>
                 {benchmarkData.length > 0
                   ? `${((summary?.totalReturn || 0) - parseFloat(benchmarkData[benchmarkData.length - 1].return_pct)) >= 0 ? '+' : ''}${((summary?.totalReturn || 0) - parseFloat(benchmarkData[benchmarkData.length - 1].return_pct)).toFixed(2)}%`
@@ -805,20 +854,37 @@ export default function Portfolio() {
         destroyOnClose
       >
         <Form form={form} layout="vertical" preserve={false}>
+          <Form.Item label="产品类型">
+            <Segmented
+              options={[
+                { label: '基金', value: 'fund' },
+                { label: '招行理财', value: 'cmb' },
+              ]}
+              value={productType}
+              onChange={(val) => {
+                setProductType(val as 'fund' | 'cmb');
+                form.setFieldsValue({ fund_code: '', fund_name: '' });
+              }}
+            />
+          </Form.Item>
           <Form.Item
             name="fund_code"
-            label="基金代码"
-            rules={[{ required: true, message: '请输入基金代码' }]}
+            label={productType === 'cmb' ? '产品代码' : '基金代码'}
+            rules={[{ required: true, message: productType === 'cmb' ? '请输入产品代码' : '请输入基金代码' }]}
           >
-            <Input placeholder="例如: 013349" maxLength={6} onChange={handleFundCodeChange} />
+            <Input
+              placeholder={productType === 'cmb' ? '例如: PY040217' : '例如: 013349'}
+              maxLength={productType === 'cmb' ? 20 : 6}
+              onChange={handleFundCodeChange}
+            />
           </Form.Item>
           <Form.Item
             name="fund_name"
-            label="基金名称"
-            rules={[{ required: true, message: '请输入基金名称' }]}
+            label={productType === 'cmb' ? '产品名称' : '基金名称'}
+            rules={[{ required: true, message: productType === 'cmb' ? '请输入产品名称' : '请输入基金名称' }]}
           >
             <Input
-              placeholder="例如: 人工智能ETF联接A"
+              placeholder={productType === 'cmb' ? '输入代码后自动填充' : '例如: 人工智能ETF联接A'}
               suffix={lookupLoading ? <Spin size="small" /> : undefined}
             />
           </Form.Item>
@@ -1025,11 +1091,11 @@ export default function Portfolio() {
                       <Col xs={24} sm={8} key={option.value}>
                         <Card
                           hoverable
-                          style={{ border: riskProfile.riskTolerance === option.value ? '2px solid #1677ff' : '1px solid #e8e8e8', cursor: 'pointer' }}
+                          style={{ border: riskProfile.riskTolerance === option.value ? '2px solid #1677ff' : `1px solid ${isDark ? '#333' : '#e8e8e8'}`, cursor: 'pointer' }}
                           onClick={() => setRiskProfile({ ...riskProfile, riskTolerance: option.value as any })}
                         >
                           <strong>{option.label}</strong>
-                          <p style={{ fontSize: 12, color: '#666', margin: '8px 0 0' }}>{option.desc}</p>
+                          <p style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', margin: '8px 0 0' }}>{option.desc}</p>
                         </Card>
                       </Col>
                     ))}
@@ -1078,7 +1144,7 @@ export default function Portfolio() {
                         <span style={{ color: '#1677ff', fontWeight: 600 }}>{item.percentage}%</span>
                       </div>
                       <Progress percent={item.percentage} showInfo={false} />
-                      <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>推荐基金：{item.funds.join('、')}</div>
+                      <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>推荐基金：{item.funds.join('、')}</div>
                     </div>
                   ))}
                 </Card>
@@ -1172,7 +1238,7 @@ export default function Portfolio() {
             </Row>
 
             <div style={{ marginTop: 16 }}>
-              <span style={{ color: '#666', marginRight: 12 }}>快捷设置：</span>
+              <span style={{ color: isDark ? '#a0a0a0' : '#666', marginRight: 12 }}>快捷设置：</span>
               <Space>
                 <Tag style={{ cursor: 'pointer' }} onClick={() => { setDcaFrequency('monthly'); setDcaAmount(500); setDcaPeriod(12); setDcaExpectedReturn(8); setDcaResult(null); }}>保守型</Tag>
                 <Tag style={{ cursor: 'pointer' }} onClick={() => { setDcaFrequency('monthly'); setDcaAmount(1000); setDcaPeriod(36); setDcaExpectedReturn(10); setDcaResult(null); }}>稳健型</Tag>
@@ -1248,7 +1314,7 @@ export default function Portfolio() {
                   pagination={{ pageSize: 12 }}
                   size="small"
                   summary={() => (
-                    <Table.Summary.Row style={{ fontWeight: 600, background: '#f5f5f5' }}>
+                    <Table.Summary.Row style={{ fontWeight: 600, background: isDark ? '#1f1f1f' : '#f5f5f5' }}>
                       <Table.Summary.Cell index={0}>最终</Table.Summary.Cell>
                       <Table.Summary.Cell index={1}>{formatCurrency(dcaResult.totalInvestment)}</Table.Summary.Cell>
                       <Table.Summary.Cell index={2}>{formatCurrency(dcaResult.totalInvestment)}</Table.Summary.Cell>
@@ -1295,7 +1361,7 @@ export default function Portfolio() {
                     onClick={() => { setDcaFrequency(plan.freq as any); setDcaAmount(plan.amount); setDcaPeriod(plan.p); setDcaExpectedReturn(plan.r); setDcaResult(null); }}
                   >
                     <strong>{plan.label}</strong>
-                    <div style={{ fontSize: 13, color: '#666', marginTop: 8 }}>{plan.desc}</div>
+                    <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', marginTop: 8 }}>{plan.desc}</div>
                   </Card>
                 </Col>
               ))}
@@ -1304,6 +1370,23 @@ export default function Portfolio() {
         </>
       ),
     },
+    // VIP 智能分析 Tab
+    ...(isVIP ? [{
+      key: 'vip',
+      label: (
+        <span style={{ position: 'relative' }}>
+          <CrownOutlined style={{ marginRight: 6, color: '#ffd700' }} />
+          VIP分析
+          <span style={{
+            position: 'absolute', top: -8, right: -16,
+            background: 'linear-gradient(135deg, #ffd700, #ff8c00)',
+            color: '#fff', fontSize: 9, padding: '1px 4px', borderRadius: 4,
+            fontWeight: 700, lineHeight: '14px',
+          }}>PRO</span>
+        </span>
+      ),
+      children: <VIPInsights />,
+    }] : []),
   ];
 
   return (
@@ -1311,6 +1394,19 @@ export default function Portfolio() {
       <h2 style={{ marginBottom: 24 }}>
         <FundOutlined style={{ marginRight: 8 }} />
         理财记账
+        {!isVIP && (
+          <a
+            href="/subscription"
+            style={{
+              marginLeft: 12, fontSize: 12, color: '#ffd700',
+              background: 'linear-gradient(135deg, #1a1a2e, #0f3460)',
+              padding: '4px 12px', borderRadius: 16, textDecoration: 'none',
+              fontWeight: 500,
+            }}
+          >
+            <CrownOutlined style={{ marginRight: 4 }} />开通VIP解锁智能分析
+          </a>
+        )}
       </h2>
 
       <Tabs

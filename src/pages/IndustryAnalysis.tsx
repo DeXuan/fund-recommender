@@ -115,6 +115,7 @@ const INDUSTRIES = [
   { key: '煤炭', icon: '⛏️', label: '煤炭', tag: '夏季' },
   { key: '啤酒/饮料', icon: '🍺', label: '啤酒/饮料', tag: '夏季' },
   { key: '家电', icon: '❄️', label: '家电', tag: '夏季' },
+  { key: '酒店旅游', icon: '🏨', label: '酒店旅游', tag: '毕业季' },
   // 其他行业
   { key: '医药', icon: '💊', label: '医药' },
   { key: '人工智能', icon: '🤖', label: '人工智能' },
@@ -227,7 +228,7 @@ export default function IndustryAnalysis() {
     if (valuation.includes('偏低')) return '#73d13d';
     if (valuation.includes('合理')) return '#1677ff';
     if (valuation.includes('偏高') || valuation.includes('高')) return '#ff4d4f';
-    return '#666';
+    return isDark ? '#a0a0a0' : '#666';
   };
 
   const formatReturn = (value: number | undefined) => {
@@ -269,7 +270,7 @@ export default function IndustryAnalysis() {
             return (
               <span key={ind.key} style={{ display: 'contents' }}>
                 {isFirstNonSummer && (
-                  <div style={{ width: '100%', height: 0, borderTop: '1px dashed #e8e8e8', margin: '4px 0' }} />
+                  <div style={{ width: '100%', height: 0, borderTop: `1px dashed ${isDark ? '#333' : '#e8e8e8'}`, margin: '4px 0' }} />
                 )}
                 <button
                   onClick={() => { setSelectedIndustry(ind.key); setActiveTab('compare'); }}
@@ -343,7 +344,7 @@ export default function IndustryAnalysis() {
 
           {/* 标签页 */}
           <div className="card" style={{ padding: 0 }}>
-            <div style={{ display: 'flex', borderBottom: '1px solid #e8e8e8', alignItems: 'center' }}>
+            <div style={{ display: 'flex', borderBottom: `1px solid ${isDark ? '#333' : '#e8e8e8'}`, alignItems: 'center' }}>
               {[
                 { key: 'compare', label: '基金对比总表' },
                 { key: 'fee', label: '费率对比' },
@@ -365,7 +366,7 @@ export default function IndustryAnalysis() {
                     background: 'none',
                     cursor: 'pointer',
                     borderBottom: activeTab === tab.key ? '2px solid #1677ff' : '2px solid transparent',
-                    color: activeTab === tab.key ? '#1677ff' : '#666',
+                    color: activeTab === tab.key ? '#1677ff' : isDark ? '#a0a0a0' : '#666',
                     fontWeight: activeTab === tab.key ? 600 : 400,
                     fontSize: 14,
                   }}
@@ -378,9 +379,9 @@ export default function IndustryAnalysis() {
                   onClick={() => setGoldOnly(!goldOnly)}
                   style={{
                     padding: '6px 16px',
-                    border: goldOnly ? '1px solid #faad14' : '1px solid #d9d9d9',
-                    background: goldOnly ? '#faad14' : 'white',
-                    color: goldOnly ? 'white' : '#666',
+                    border: goldOnly ? '1px solid #faad14' : `1px solid ${isDark ? '#444' : '#d9d9d9'}`,
+                    background: goldOnly ? '#faad14' : isDark ? '#1a1a1a' : 'white',
+                    color: goldOnly ? 'white' : isDark ? '#a0a0a0' : '#666',
                     borderRadius: 4,
                     cursor: 'pointer',
                     fontSize: 13,
@@ -474,7 +475,7 @@ export default function IndustryAnalysis() {
                         <td>{formatReturn(fund.return1w)}</td>
                         <td>{fund.managementFee}%</td>
                         <td>
-                          <span style={{ color: fund.totalFee > 0.8 ? '#ff4d4f' : '#333', fontWeight: fund.totalFee > 0.8 ? 600 : 400 }}>
+                          <span style={{ color: fund.totalFee > 0.8 ? '#ff4d4f' : isDark ? '#e8e8e8' : '#333', fontWeight: fund.totalFee > 0.8 ? 600 : 400 }}>
                             {fund.totalFee}%
                           </span>
                         </td>
@@ -525,7 +526,7 @@ export default function IndustryAnalysis() {
                         <td>{fund.serviceFee}%</td>
                         <td>
                           <span style={{
-                            color: fund.totalFee > 0.8 ? '#ff4d4f' : fund.totalFee <= 0.6 ? '#52c41a' : '#333',
+                            color: fund.totalFee > 0.8 ? '#ff4d4f' : fund.totalFee <= 0.6 ? '#52c41a' : isDark ? '#e8e8e8' : '#333',
                             fontWeight: 600,
                           }}>
                             {fund.totalFee}%
@@ -539,7 +540,7 @@ export default function IndustryAnalysis() {
                 </table>
               </div>
 
-              <div style={{ marginTop: 24, padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
+              <div style={{ marginTop: 24, padding: 16, background: isDark ? '#1f1f1f' : '#f5f5f5', borderRadius: 8 }}>
                 <h4 style={{ marginBottom: 8 }}>费率说明</h4>
                 <div style={{ fontSize: 13, lineHeight: 1.8 }}>
                   <p><strong>A类 vs C类</strong>：A类收取申购费（支付宝1折），适合持有≥1年；C类免申购费但收销售服务费，适合短期持有</p>
@@ -588,8 +589,8 @@ export default function IndustryAnalysis() {
                             lineHeight: '24px',
                             fontSize: 12,
                             fontWeight: 600,
-                            background: index < 3 ? '#faad14' : '#f0f0f0',
-                            color: index < 3 ? 'white' : '#666',
+                            background: index < 3 ? '#faad14' : isDark ? '#262626' : '#f0f0f0',
+                            color: index < 3 ? 'white' : isDark ? '#a0a0a0' : '#666',
                           }}>
                             {index + 1}
                           </span>
@@ -611,7 +612,7 @@ export default function IndustryAnalysis() {
                             padding: '2px 8px',
                             borderRadius: 4,
                             fontSize: 12,
-                            background: fund.trend.includes('上涨') ? '#f6ffed' : fund.trend.includes('反弹') ? '#e6f4ff' : '#fff2f0',
+                            background: fund.trend.includes('上涨') ? isDark ? '#162312' : '#f6ffed' : fund.trend.includes('反弹') ? isDark ? '#111a2c' : '#e6f4ff' : isDark ? '#2c1618' : '#fff2f0',
                             color: fund.trend.includes('上涨') ? '#52c41a' : fund.trend.includes('反弹') ? '#1677ff' : '#ff4d4f',
                           }}>
                             {fund.trend}
@@ -709,7 +710,7 @@ export default function IndustryAnalysis() {
                     top: 0,
                     bottom: 0,
                     width: 2,
-                    background: '#e8e8e8',
+                    background: isDark ? '#333' : '#e8e8e8',
                   }}></div>
 
                   {data.batchPlan.map((plan) => (
@@ -726,12 +727,12 @@ export default function IndustryAnalysis() {
                         boxShadow: '0 0 0 2px #1677ff',
                       }}></div>
 
-                      <div style={{ background: 'white', padding: 16, borderRadius: 8, border: '1px solid #e8e8e8' }}>
+                      <div style={{ background: isDark ? '#1a1a1a' : 'white', padding: 16, borderRadius: 8, border: `1px solid ${isDark ? '#333' : '#e8e8e8'}` }}>
                         <div className="flex-between" style={{ marginBottom: 8 }}>
                           <h4>第 {plan.batch} 批</h4>
                           <span className="badge badge-success">{plan.percentage}%</span>
                         </div>
-                        <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>
+                        <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', marginBottom: 8 }}>
                           <strong>时间：</strong>{plan.time}
                         </div>
                         <div style={{ fontSize: 13, marginBottom: 8 }}>
@@ -740,7 +741,7 @@ export default function IndustryAnalysis() {
                         <div style={{ fontSize: 13, marginBottom: 4 }}>
                           <strong>操作方式：</strong>{plan.method}
                         </div>
-                        <div style={{ fontSize: 13, color: '#666' }}>
+                        <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>
                           <strong>理由：</strong>{plan.reason}
                         </div>
                       </div>
@@ -765,9 +766,9 @@ export default function IndustryAnalysis() {
               </div>
 
               {/* 风险提示 */}
-              <div className="card" style={{ border: '1px solid #ffccc7', background: '#fff2f0' }}>
+              <div className="card" style={{ border: '1px solid #ffccc7', background: isDark ? '#2c1618' : '#fff2f0' }}>
                 <h3 style={{ color: '#ff4d4f', marginBottom: 12 }}>风险提示</h3>
-                <div style={{ fontSize: 13, lineHeight: 1.8, color: '#666', whiteSpace: 'pre-line' }}>
+                <div style={{ fontSize: 13, lineHeight: 1.8, color: isDark ? '#a0a0a0' : '#666', whiteSpace: 'pre-line' }}>
                   {data.riskWarning}
                 </div>
               </div>
@@ -796,8 +797,8 @@ export default function IndustryAnalysis() {
                     <div key={idx} style={{
                       padding: 16,
                       borderRadius: 8,
-                      border: '1px solid #e8e8e8',
-                      background: reason.impact === 'high' ? '#f6ffed' : reason.impact === 'medium' ? '#e6f4ff' : '#f5f5f5',
+                      border: `1px solid ${isDark ? '#333' : '#e8e8e8'}`,
+                      background: reason.impact === 'high' ? isDark ? '#162312' : '#f6ffed' : reason.impact === 'medium' ? isDark ? '#111a2c' : '#e6f4ff' : isDark ? '#1f1f1f' : '#f5f5f5',
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                         <h4 style={{ margin: 0, fontSize: 15 }}>
@@ -822,9 +823,9 @@ export default function IndustryAnalysis() {
                 </div>
               </div>
 
-              <div className="card" style={{ border: '1px solid #b7eb8f', background: '#f6ffed' }}>
+              <div className="card" style={{ border: '1px solid #b7eb8f', background: isDark ? '#162312' : '#f6ffed' }}>
                 <h3 style={{ color: '#52c41a', marginBottom: 12 }}>交易量分析结论</h3>
-                <div style={{ fontSize: 14, lineHeight: 1.8, color: '#333' }}>
+                <div style={{ fontSize: 14, lineHeight: 1.8, color: isDark ? '#e8e8e8' : '#333' }}>
                   <p>当前{data.industry}板块交易量放大是<strong>多重因素共振</strong>的结果：</p>
                   <ul style={{ paddingLeft: 20, marginTop: 8 }}>
                     <li><strong>政策驱动</strong>：房地产和基建政策频繁出台，市场预期差大</li>
@@ -857,7 +858,7 @@ export default function IndustryAnalysis() {
               <div className="card">
                 <h3 className="card-title">分周期投资策略</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ padding: 16, borderRadius: 8, border: '1px solid #ffd666', background: '#fffbe6' }}>
+                  <div style={{ padding: 16, borderRadius: 8, border: '1px solid #ffd666', background: isDark ? '#2b2111' : '#fffbe6' }}>
                     <h4 style={{ margin: '0 0 8px', color: '#faad14' }}>短期策略（1-3个月）</h4>
                     <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8 }}>{data.investmentAdvice.shortTerm}</p>
                   </div>
@@ -865,7 +866,7 @@ export default function IndustryAnalysis() {
                     <h4 style={{ margin: '0 0 8px', color: '#1677ff' }}>中期策略（3-12个月）</h4>
                     <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8 }}>{data.investmentAdvice.mediumTerm}</p>
                   </div>
-                  <div style={{ padding: 16, borderRadius: 8, border: '1px solid #b7eb8f', background: '#f6ffed' }}>
+                  <div style={{ padding: 16, borderRadius: 8, border: '1px solid #b7eb8f', background: isDark ? '#162312' : '#f6ffed' }}>
                     <h4 style={{ margin: '0 0 8px', color: '#52c41a' }}>长期策略（1年以上）</h4>
                     <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8 }}>{data.investmentAdvice.longTerm}</p>
                   </div>
@@ -875,17 +876,17 @@ export default function IndustryAnalysis() {
               <div className="card">
                 <h3 className="card-title">关键指标</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                  <div style={{ padding: 16, borderRadius: 8, background: '#f0f5ff', textAlign: 'center' }}>
+                  <div style={{ padding: 16, borderRadius: 8, background: isDark ? '#111a2c' : '#f0f5ff', textAlign: 'center' }}>
                     <div style={{ fontSize: 24, fontWeight: 700, color: '#1677ff' }}>{data.investmentAdvice.targetAllocation}</div>
-                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>建议仓位占比</div>
+                    <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>建议仓位占比</div>
                   </div>
-                  <div style={{ padding: 16, borderRadius: 8, background: '#f6ffed', textAlign: 'center' }}>
+                  <div style={{ padding: 16, borderRadius: 8, background: isDark ? '#162312' : '#f6ffed', textAlign: 'center' }}>
                     <div style={{ fontSize: 24, fontWeight: 700, color: '#52c41a' }}>{data.investmentAdvice.stopProfit}</div>
-                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>止盈线</div>
+                    <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>止盈线</div>
                   </div>
-                  <div style={{ padding: 16, borderRadius: 8, background: '#fff2f0', textAlign: 'center' }}>
+                  <div style={{ padding: 16, borderRadius: 8, background: isDark ? '#2c1618' : '#fff2f0', textAlign: 'center' }}>
                     <div style={{ fontSize: 24, fontWeight: 700, color: '#ff4d4f' }}>{data.investmentAdvice.stopLoss}</div>
-                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>止损线</div>
+                    <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>止损线</div>
                   </div>
                 </div>
               </div>
@@ -1016,7 +1017,7 @@ export default function IndustryAnalysis() {
                       </tbody>
                     </table>
                   </div>
-                  <div style={{ marginTop: 16, padding: 12, background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 6, fontSize: 13, lineHeight: 2 }}>
+                  <div style={{ marginTop: 16, padding: 12, background: isDark ? '#111a2c' : '#e6f4ff', border: '1px solid #91caff', borderRadius: 6, fontSize: 13, lineHeight: 2 }}>
                     <strong style={{ color: '#1677ff' }}>估值分位说明：</strong>
                     20%以下=极度低估（重仓买入）| 20-40%=偏低估（定投加仓）| 40-60%=合理（正常定投）| 60-80%=偏高估（小额定投）| 80%以上=极度高估（观望减仓）
                   </div>
@@ -1052,8 +1053,8 @@ export default function IndustryAnalysis() {
                               <span style={{
                                 display: 'inline-block', width: 24, height: 24, borderRadius: '50%',
                                 textAlign: 'center', lineHeight: '24px', fontSize: 12, fontWeight: 600,
-                                background: rec.rank <= 3 ? '#faad14' : '#f0f0f0',
-                                color: rec.rank <= 3 ? 'white' : '#666',
+                                background: rec.rank <= 3 ? '#faad14' : isDark ? '#262626' : '#f0f0f0',
+                                color: rec.rank <= 3 ? 'white' : isDark ? '#a0a0a0' : '#666',
                               }}>
                                 {rec.rank}
                               </span>
@@ -1066,7 +1067,7 @@ export default function IndustryAnalysis() {
                                 {rec.buySuggestion || '--'}
                               </Tag>
                             </td>
-                            <td style={{ fontSize: 13, color: '#666', maxWidth: 300 }}>{rec.logic || '--'}</td>
+                            <td style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', maxWidth: 300 }}>{rec.logic || '--'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1075,9 +1076,9 @@ export default function IndustryAnalysis() {
                   <Card title="推荐逻辑" style={{ marginTop: 16 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
                       {recommendations.slice(0, 4).map((rec, i) => (
-                        <div key={rec.industry || i} style={{ padding: 12, background: '#f5f5f5', borderRadius: 6 }}>
+                        <div key={rec.industry || i} style={{ padding: 12, background: isDark ? '#1f1f1f' : '#f5f5f5', borderRadius: 6 }}>
                           <strong>{rec.industry || '--'}</strong>
-                          <p style={{ fontSize: 13, color: '#666', margin: '8px 0 0' }}>{rec.logic || '--'}</p>
+                          <p style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', margin: '8px 0 0' }}>{rec.logic || '--'}</p>
                         </div>
                       ))}
                     </div>
@@ -1145,13 +1146,13 @@ export default function IndustryAnalysis() {
                         style={{ height: 250 }}
                         opts={{ renderer: 'svg' }}
                       />
-                      <div style={{ textAlign: 'center', fontSize: 13, color: '#595959', marginTop: 8 }}>
+                      <div style={{ textAlign: 'center', fontSize: 13, color: isDark ? '#a0a0a0' : '#595959', marginTop: 8 }}>
                         当前估值：<span style={{ fontWeight: 600, color: getValuationColor(idx.current_valuation) }}>{idx.current_valuation}</span>
                         <span style={{ marginLeft: 16 }}>建议：{idx.current_suggestion}</span>
                       </div>
                     </Card>
                   ))}
-                  <div style={{ marginTop: 16, padding: 12, background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 6, fontSize: 13, lineHeight: 2 }}>
+                  <div style={{ marginTop: 16, padding: 12, background: isDark ? '#111a2c' : '#e6f4ff', border: '1px solid #91caff', borderRadius: 6, fontSize: 13, lineHeight: 2 }}>
                     <strong style={{ color: '#1677ff' }}>估值趋势说明：</strong>
                     PE分位越低，估值越便宜，投资价值越高。绿色区域(20%以下)=极度低估，红色区域(80%以上)=极度高估。
                   </div>

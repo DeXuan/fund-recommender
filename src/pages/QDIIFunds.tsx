@@ -4,6 +4,7 @@ import { Card, Tabs, Table, Tag, Button, Spin, Row, Col, Alert } from 'antd';
 import { GlobalOutlined } from '@ant-design/icons';
 import { fundApi } from '../services/api';
 import { formatReturn, getReturnColor } from '../utils/format';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface Fund {
   code: string;
@@ -93,6 +94,7 @@ interface SP500Analysis {
 }
 
 export default function QDIIFunds() {
+  const { isDark } = useTheme();
   const [funds, setFunds] = useState<Fund[]>([]);
   const [loading, setLoading] = useState(true);
   const [sp500Data, setSp500Data] = useState<SP500Analysis | null>(null);
@@ -323,17 +325,17 @@ export default function QDIIFunds() {
               <Row gutter={16}>
                 <Col xs={24} sm={8}>
                   <strong>华安纳斯达克100ETF联接A (040046)</strong>
-                  <p style={{ fontSize: 13, color: '#666', margin: '4px 0' }}>费率适中0.80%，规模大47亿，金选基金</p>
+                  <p style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', margin: '4px 0' }}>费率适中0.80%，规模大47亿，金选基金</p>
                   <p style={{ fontSize: 13 }}>近1年收益：<span className="rise">+30.99%</span></p>
                 </Col>
                 <Col xs={24} sm={8}>
                   <strong>天弘纳斯达克100指数A (018043)</strong>
-                  <p style={{ fontSize: 13, color: '#666', margin: '4px 0' }}>费率最低0.60%，规模22亿</p>
+                  <p style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', margin: '4px 0' }}>费率最低0.60%，规模22亿</p>
                   <p style={{ fontSize: 13 }}>近1年收益：<span className="rise">+30.48%</span></p>
                 </Col>
                 <Col xs={24} sm={8}>
                   <strong>南方纳斯达克100指数A (016452)</strong>
-                  <p style={{ fontSize: 13, color: '#666', margin: '4px 0' }}>费率0.65%，限额最高200元/日</p>
+                  <p style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', margin: '4px 0' }}>费率0.65%，限额最高200元/日</p>
                   <p style={{ fontSize: 13 }}>近1年收益：<span className="rise">+30.20%</span></p>
                 </Col>
               </Row>
@@ -382,7 +384,7 @@ export default function QDIIFunds() {
 
           {/* 子标签页导航 */}
           <Card style={{ padding: 0, marginBottom: 16 }}>
-            <div style={{ display: 'flex', borderBottom: '1px solid #e8e8e8', overflowX: 'auto' }}>
+            <div style={{ display: 'flex', borderBottom: isDark ? '1px solid #333' : '1px solid #e8e8e8', overflowX: 'auto' }}>
               {[
                 { key: 'funds', label: `基金对比 (${sp500Data?.funds.length ?? 0})` },
                 { key: 'holdings', label: `权重股分析 (${sp500Data?.topHoldings.length ?? 0})` },
@@ -397,7 +399,7 @@ export default function QDIIFunds() {
                     background: 'none',
                     cursor: 'pointer',
                     borderBottom: sp500Tab === tab.key ? '2px solid #1677ff' : '2px solid transparent',
-                    color: sp500Tab === tab.key ? '#1677ff' : '#666',
+                    color: sp500Tab === tab.key ? '#1677ff' : (isDark ? '#a0a0a0' : '#666'),
                     fontWeight: sp500Tab === tab.key ? 600 : 400,
                     whiteSpace: 'nowrap',
                   }}
@@ -428,7 +430,7 @@ export default function QDIIFunds() {
                               <Link to={`/funds/${pick.code}`} style={{ fontWeight: 600, color: '#1677ff' }}>
                                 {pick.name} ({pick.code})
                               </Link>
-                              <p style={{ fontSize: 12, color: '#666', margin: '2px 0 0' }}>{pick.reason}</p>
+                              <p style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', margin: '2px 0 0' }}>{pick.reason}</p>
                             </div>
                           </Col>
                         ))}
@@ -456,7 +458,7 @@ export default function QDIIFunds() {
               {sp500Tab === 'holdings' && (
                 <div>
                   <Card title="标普500前10大权重股分析" style={{ marginBottom: 16 }}>
-                    <p style={{ marginBottom: 16, fontSize: 13, color: '#666' }}>
+                    <p style={{ marginBottom: 16, fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>
                       标普500由美国500家大型上市公司组成，前10大权重股占比约35%，科技巨头主导走势
                     </p>
                     <div style={{ overflowX: 'auto' }}>
@@ -521,19 +523,19 @@ export default function QDIIFunds() {
                   <Card title="投资策略建议" style={{ marginBottom: 16 }}>
                     <Row gutter={16}>
                       <Col xs={24} sm={8}>
-                        <div style={{ padding: 16, background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f', height: '100%' }}>
+                        <div style={{ padding: 16, background: isDark ? '#162312' : '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f', height: '100%' }}>
                           <h4 style={{ color: '#52c41a', marginBottom: 8 }}>短期（3个月）</h4>
                           <p style={{ fontSize: 13 }}>{sp500Data.recommendation.strategy.shortTerm}</p>
                         </div>
                       </Col>
                       <Col xs={24} sm={8}>
-                        <div style={{ padding: 16, background: '#e6f4ff', borderRadius: 8, border: '1px solid #91caff', height: '100%' }}>
+                        <div style={{ padding: 16, background: isDark ? '#111a2c' : '#e6f4ff', borderRadius: 8, border: '1px solid #91caff', height: '100%' }}>
                           <h4 style={{ color: '#1677ff', marginBottom: 8 }}>中期（6个月）</h4>
                           <p style={{ fontSize: 13 }}>{sp500Data.recommendation.strategy.mediumTerm}</p>
                         </div>
                       </Col>
                       <Col xs={24} sm={8}>
-                        <div style={{ padding: 16, background: '#fff7e6', borderRadius: 8, border: '1px solid #ffd591', height: '100%' }}>
+                        <div style={{ padding: 16, background: isDark ? '#2b2111' : '#fff7e6', borderRadius: 8, border: '1px solid #ffd591', height: '100%' }}>
                           <h4 style={{ color: '#fa8c16', marginBottom: 8 }}>长期（1年）</h4>
                           <p style={{ fontSize: 13 }}>{sp500Data.recommendation.strategy.longTerm}</p>
                         </div>
@@ -559,7 +561,7 @@ export default function QDIIFunds() {
 
                   <Card title="分批建仓方案" style={{ marginBottom: 16 }}>
                     <div style={{ position: 'relative', paddingLeft: 30 }}>
-                      <div style={{ position: 'absolute', left: 15, top: 0, bottom: 0, width: 2, background: '#e8e8e8' }}></div>
+                      <div style={{ position: 'absolute', left: 15, top: 0, bottom: 0, width: 2, background: isDark ? '#333' : '#e8e8e8' }}></div>
                       {sp500Data.recommendation.batchPlan.map((plan, idx) => (
                         <div key={idx} style={{ marginBottom: 24, position: 'relative' }}>
                           <div style={{
@@ -567,14 +569,14 @@ export default function QDIIFunds() {
                             borderRadius: '50%', background: '#1677ff', border: '2px solid white',
                             boxShadow: '0 0 0 2px #1677ff',
                           }}></div>
-                          <div style={{ background: 'white', padding: 16, borderRadius: 8, border: '1px solid #e8e8e8' }}>
+                          <div style={{ background: isDark ? '#1a1a1a' : 'white', padding: 16, borderRadius: 8, border: isDark ? '1px solid #333' : '1px solid #e8e8e8' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                               <h4>第 {plan.batch} 批</h4>
                               <span className="badge badge-success">{plan.pct}%</span>
                             </div>
-                            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}><strong>时间：</strong>{plan.time}</div>
+                            <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', marginBottom: 4 }}><strong>时间：</strong>{plan.time}</div>
                             <div style={{ fontSize: 13, marginBottom: 4 }}><strong>操作：</strong>{plan.action}</div>
-                            <div style={{ fontSize: 13, color: '#666' }}><strong>理由：</strong>{plan.reason}</div>
+                            <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}><strong>理由：</strong>{plan.reason}</div>
                           </div>
                         </div>
                       ))}
@@ -628,21 +630,21 @@ export default function QDIIFunds() {
       <Card title="QDII额度说明" style={{ marginTop: 16 }}>
         <Row gutter={16}>
           <Col xs={24} sm={8}>
-            <Card size="small" style={{ background: '#fff2f0', border: '1px solid #ffccc7' }}>
+            <Card size="small" style={{ background: isDark ? '#2c1618' : '#fff2f0', border: '1px solid #ffccc7' }}>
               <h4 style={{ color: '#ff4d4f', marginBottom: 8 }}>暂停申购</h4>
-              <p style={{ fontSize: 13, color: '#666', margin: 0 }}>QDII额度紧张，基金公司暂停申购，无法买入</p>
+              <p style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', margin: 0 }}>QDII额度紧张，基金公司暂停申购，无法买入</p>
             </Card>
           </Col>
           <Col xs={24} sm={8}>
-            <Card size="small" style={{ background: '#fffbe6', border: '1px solid #ffe58f' }}>
+            <Card size="small" style={{ background: isDark ? '#2b2111' : '#fffbe6', border: '1px solid #ffe58f' }}>
               <h4 style={{ color: '#faad14', marginBottom: 8 }}>限大额</h4>
-              <p style={{ fontSize: 13, color: '#666', margin: 0 }}>每日限购10-10000元不等，国泰标普500限额最宽松(1万元/日)</p>
+              <p style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', margin: 0 }}>每日限购10-10000元不等，国泰标普500限额最宽松(1万元/日)</p>
             </Card>
           </Col>
           <Col xs={24} sm={8}>
-            <Card size="small" style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
+            <Card size="small" style={{ background: isDark ? '#162312' : '#f6ffed', border: '1px solid #b7eb8f' }}>
               <h4 style={{ color: '#52c41a', marginBottom: 8 }}>开放申购</h4>
-              <p style={{ fontSize: 13, color: '#666', margin: 0 }}>正常申购，无限额限制</p>
+              <p style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', margin: 0 }}>正常申购，无限额限制</p>
             </Card>
           </Col>
         </Row>

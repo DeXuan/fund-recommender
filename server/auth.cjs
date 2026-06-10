@@ -90,8 +90,9 @@ async function authMiddleware(req, res, next) {
         userStatus = result.rows[0].status || 'active';
         userStatusCache.set(decoded.id, { status: userStatus, expiresAt: now + STATUS_CACHE_TTL });
       } catch (dbErr) {
-        // If DB check fails, allow the request but log the error
+        // Fail closed: deny access when status cannot be verified
         console.warn('[authMiddleware] 用户状态检查失败:', dbErr.message);
+        return res.status(503).json({ error: '服务暂时不可用，请稍后重试' });
       }
     }
 
@@ -136,6 +137,15 @@ router.post('/register', strictLimit, async (req, res) => {
   try {
     const { username, password, nickname } = req.body;
 
+    // Check if registration is enabled
+    const pool = getPool();
+    try {
+      const regConfig = await pool.query("SELECT value FROM system_config WHERE key = 'registration_enabled'");
+      if (regConfig.rows[0]?.value === 'false') {
+        return res.status(403).json({ error: '注册功能已关闭，请联系管理员' });
+      }
+    } catch {}
+
     if (!username || !password) {
       return res.status(400).json({ error: '用户名和密码不能为空' });
     }
@@ -145,11 +155,16 @@ router.post('/register', strictLimit, async (req, res) => {
     if (!/^[a-zA-Z0-9_一-龥]+$/.test(username)) {
       return res.status(400).json({ error: '用户名只能包含字母、数字、下划线和中文' });
     }
-    if (password.length < 8) {
-      return res.status(400).json({ error: '密码长度不能少于8个字符' });
-    }
 
-    const pool = getPool();
+    // Check password policy
+    let minLen = 8;
+    try {
+      const pwdConfig = await pool.query("SELECT value FROM system_config WHERE key = 'password_min_length'");
+      minLen = parseInt(pwdConfig.rows[0]?.value) || 8;
+    } catch {}
+    if (password.length < minLen) {
+      return res.status(400).json({ error: `密码长度不能少于${minLen}个字符` });
+    }
     const existing = await pool.query('SELECT id FROM users WHERE username = $1', [username]);
     if (existing.rows.length > 0) {
       return res.status(400).json({ error: '用户名已存在' });
@@ -170,43 +185,114 @@ router.post('/register', strictLimit, async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.json({ token, user: { id: userId, username, nickname: displayName, role: 'user' } });
+    res.json({ token, user: { id: userId, username, nickname: displayName, role: 'user', subscription_status: 'free' } });
   } catch (error) {
     console.error('注册失败:', error.message);
     res.status(500).json({ error: '注册失败' });
   }
 });
 
+// Parse user agent for browser/OS info
+function parseUserAgent(ua) {
+  if (!ua) return { browser: '', os: '', device: '' };
+  let browser = 'Unknown', os = 'Unknown', device = 'Desktop';
+  if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome';
+  else if (ua.includes('Firefox')) browser = 'Firefox';
+  else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
+  else if (ua.includes('Edg')) browser = 'Edge';
+  else if (ua.includes('MSIE') || ua.includes('Trident')) browser = 'IE';
+  if (ua.includes('Windows')) os = 'Windows';
+  else if (ua.includes('Mac OS')) os = 'macOS';
+  else if (ua.includes('Linux')) os = 'Linux';
+  else if (ua.includes('Android')) { os = 'Android'; device = 'Mobile'; }
+  else if (ua.includes('iPhone') || ua.includes('iPad')) { os = 'iOS'; device = 'Mobile'; }
+  if (ua.includes('Mobile') && device !== 'Mobile') device = 'Mobile';
+  return { browser, os, device };
+}
+
+// Log login attempt
+async function logLogin(pool, userId, username, ip, userAgent, status, failReason) {
+  try {
+    const ua = parseUserAgent(userAgent);
+    await pool.query(
+      `INSERT INTO login_logs (user_id, username, login_ip, user_agent, browser, os, device, status, fail_reason)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [userId || null, username, ip || '', userAgent || '', ua.browser, ua.os, ua.device, status, failReason || '']
+    );
+  } catch (e) { /* don't let logging break login flow */ }
+}
+
 // POST /api/auth/login
 router.post('/login', strictLimit, async (req, res) => {
   try {
     const { username, password } = req.body;
+    const loginIp = req.ip || req.connection?.remoteAddress || '';
+    const userAgent = req.headers['user-agent'] || '';
 
     if (!username || !password) {
       return res.status(400).json({ error: '用户名和密码不能为空' });
     }
 
     const pool = getPool();
+
+    // Check registration enabled
+    try {
+      const regConfig = await pool.query("SELECT value FROM system_config WHERE key = 'registration_enabled'");
+      // This is login, not registration, so we don't block here
+    } catch {}
+
     const result = await pool.query(
-      'SELECT id, username, password_hash, nickname, avatar_url, role, status FROM users WHERE username = $1',
+      'SELECT id, username, password_hash, nickname, avatar_url, role, status, login_fail_count, locked_until, subscription_status, subscription_end FROM users WHERE username = $1',
       [username]
     );
 
     if (result.rows.length === 0) {
+      await logLogin(pool, null, username, loginIp, userAgent, 'failed', '用户不存在');
       return res.status(400).json({ error: '用户名或密码错误' });
     }
 
-    const { id, username: uname, password_hash: hash, nickname, avatar_url: avatarUrl, role, status } = result.rows[0];
+    const { id, username: uname, password_hash: hash, nickname, avatar_url: avatarUrl, role, status, login_fail_count, locked_until, subscription_status, subscription_end } = result.rows[0];
+
+    // Check account lockout
+    if (locked_until && new Date(locked_until) > new Date()) {
+      const remainMin = Math.ceil((new Date(locked_until).getTime() - Date.now()) / 60000);
+      await logLogin(pool, id, username, loginIp, userAgent, 'locked', `账户已锁定，剩余${remainMin}分钟`);
+      return res.status(423).json({ error: `账户已锁定，请${remainMin}分钟后重试` });
+    }
+
     if (status === 'disabled') {
+      await logLogin(pool, id, username, loginIp, userAgent, 'failed', '账户已禁用');
       return res.status(403).json({ error: '该账户已被禁用，请联系管理员' });
     }
+
     const valid = await bcrypt.compare(password, hash);
     if (!valid) {
+      // Increment fail count
+      const failCount = (parseInt(login_fail_count) || 0) + 1;
+      let lockUntil = null;
+      try {
+        const maxAttempts = await pool.query("SELECT value FROM system_config WHERE key = 'max_login_attempts'");
+        const lockDuration = await pool.query("SELECT value FROM system_config WHERE key = 'lockout_duration_minutes'");
+        const maxAtt = parseInt(maxAttempts.rows[0]?.value) || 5;
+        const lockMin = parseInt(lockDuration.rows[0]?.value) || 30;
+        if (failCount >= maxAtt) {
+          lockUntil = new Date(Date.now() + lockMin * 60 * 1000);
+        }
+      } catch {}
+      await pool.query('UPDATE users SET login_fail_count = $1, locked_until = $2 WHERE id = $3',
+        [failCount, lockUntil, id]);
+      await logLogin(pool, id, username, loginIp, userAgent, 'failed', `密码错误(${failCount}次)`);
+      if (lockUntil) {
+        return res.status(423).json({ error: '登录失败次数过多，账户已锁定30分钟' });
+      }
       return res.status(400).json({ error: '用户名或密码错误' });
     }
 
-    // Update last login time
-    pool.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [id]).catch(() => {});
+    // Reset fail count on successful login
+    await pool.query('UPDATE users SET last_login_at = NOW(), login_fail_count = 0, locked_until = NULL, last_login_ip = $1 WHERE id = $2',
+      [loginIp, id]);
+
+    await logLogin(pool, id, uname, loginIp, userAgent, 'success', '');
 
     const token = jwt.sign(
       { id, username: uname, nickname, role: role || 'user' },
@@ -216,7 +302,7 @@ router.post('/login', strictLimit, async (req, res) => {
 
     res.json({
       token,
-      user: { id, username: uname, nickname, avatar_url: avatarUrl || '', role: role || 'user' },
+      user: { id, username: uname, nickname, avatar_url: avatarUrl || '', role: role || 'user', subscription_status: role === 'admin' ? 'premium' : (subscription_status || 'free'), subscription_end: role === 'admin' ? '2099-12-31' : subscription_end },
     });
   } catch (error) {
     console.error('登录失败:', error.message);
@@ -229,7 +315,7 @@ router.get('/me', authMiddleware, async (req, res) => {
   try {
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, username, nickname, avatar_url, role, created_at FROM users WHERE id = $1',
+      'SELECT id, username, nickname, avatar_url, role, created_at, subscription_status, subscription_end FROM users WHERE id = $1',
       [req.user.id]
     );
 
@@ -244,13 +330,94 @@ router.get('/me', authMiddleware, async (req, res) => {
       [req.user.id]
     );
 
+    const subStatus = user.role === 'admin' ? 'premium' : (user.subscription_status || 'free');
+    const subEnd = user.role === 'admin' ? '2099-12-31' : user.subscription_end;
     res.json({
-      user: { id: user.id, username: user.username, nickname: user.nickname, avatar_url: user.avatar_url || '', role: user.role || 'user', created_at: user.created_at },
+      user: { id: user.id, username: user.username, nickname: user.nickname, avatar_url: user.avatar_url || '', role: user.role || 'user', created_at: user.created_at, subscription_status: subStatus, subscription_end: subEnd },
       oauthAccounts: oauthResult.rows,
     });
   } catch (error) {
     console.error('获取用户信息失败:', error.message);
     res.status(500).json({ error: '获取用户信息失败' });
+  }
+});
+
+// PUT /api/auth/profile — update current user's profile
+router.put('/profile', authMiddleware, async (req, res) => {
+  try {
+    const { nickname, avatar_url } = req.body;
+    const pool = getPool();
+
+    const updates = [];
+    const params = [];
+    let idx = 1;
+
+    if (nickname !== undefined) {
+      if (!nickname.trim()) return res.status(400).json({ error: '昵称不能为空' });
+      if (nickname.length > 30) return res.status(400).json({ error: '昵称不能超过30个字符' });
+      updates.push(`nickname = $${idx}`);
+      params.push(nickname.trim());
+      idx++;
+    }
+    if (avatar_url !== undefined) {
+      if (avatar_url && typeof avatar_url === 'string' && avatar_url.length > 0) {
+        if (avatar_url.length > 500) return res.status(400).json({ error: '头像URL过长' });
+        try {
+          const parsed = new URL(avatar_url);
+          if (!['http:', 'https:', 'data:'].includes(parsed.protocol)) {
+            return res.status(400).json({ error: '不支持的URL协议' });
+          }
+        } catch {
+          return res.status(400).json({ error: '头像URL格式无效' });
+        }
+      }
+      updates.push(`avatar_url = $${idx}`);
+      params.push(avatar_url || '');
+      idx++;
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: '没有需要更新的字段' });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    params.push(req.user.id);
+
+    await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`, params);
+
+    // Return updated user
+    const result = await pool.query(
+      'SELECT id, username, nickname, avatar_url, role, created_at, subscription_status, subscription_end FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    const user = result.rows[0];
+    const subStatus = user.role === 'admin' ? 'premium' : (user.subscription_status || 'free');
+    const subEnd = user.role === 'admin' ? '2099-12-31' : user.subscription_end;
+
+    res.json({
+      success: true,
+      message: '个人信息更新成功',
+      user: { id: user.id, username: user.username, nickname: user.nickname, avatar_url: user.avatar_url || '', role: user.role || 'user', created_at: user.created_at, subscription_status: subStatus, subscription_end: subEnd },
+    });
+  } catch (error) {
+    console.error('更新个人信息失败:', error.message);
+    res.status(500).json({ error: '更新个人信息失败' });
+  }
+});
+
+// GET /api/auth/login-history — get current user's recent login history
+router.get('/login-history', authMiddleware, async (req, res) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT id, login_ip, user_agent, browser, os, status, created_at
+       FROM login_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
+      [req.user.id]
+    );
+    res.json({ logs: result.rows });
+  } catch (error) {
+    console.error('获取登录历史失败:', error.message);
+    res.status(500).json({ error: '获取登录历史失败' });
   }
 });
 
@@ -325,15 +492,18 @@ router.post('/alipay/mock-login', strictLimit, async (req, res) => {
     const avatarUrl = '';
 
     const existing = await pool.query(
-      'SELECT u.id, u.username, u.nickname FROM oauth_accounts oa JOIN users u ON oa.user_id = u.id WHERE oa.provider = $1 AND oa.provider_user_id = $2',
+      'SELECT u.id, u.username, u.nickname, u.role, u.subscription_status, u.subscription_end FROM oauth_accounts oa JOIN users u ON oa.user_id = u.id WHERE oa.provider = $1 AND oa.provider_user_id = $2',
       ['alipay', mockUserId]
     );
 
-    let userId, username;
+    let userId, username, userRole = 'user', subStatus = 'free', subEnd = null;
 
     if (existing.rows.length > 0) {
       userId = existing.rows[0].id;
       username = existing.rows[0].username;
+      userRole = existing.rows[0].role || 'user';
+      subStatus = userRole === 'admin' ? 'premium' : (existing.rows[0].subscription_status || 'free');
+      subEnd = userRole === 'admin' ? '2099-12-31' : existing.rows[0].subscription_end;
     } else {
       username = 'alipay_demo_user';
       const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
@@ -348,7 +518,6 @@ router.post('/alipay/mock-login', strictLimit, async (req, res) => {
       );
     }
 
-    const userRole = 'user';
     const token = jwt.sign(
       { id: userId, username, nickname, role: userRole },
       JWT_SECRET,
@@ -357,7 +526,7 @@ router.post('/alipay/mock-login', strictLimit, async (req, res) => {
 
     res.json({
       token,
-      user: { id: userId, username, nickname, avatar_url: avatarUrl, role: userRole },
+      user: { id: userId, username, nickname, avatar_url: avatarUrl, role: userRole, subscription_status: subStatus, subscription_end: subEnd },
       mock: true,
     });
   } catch (error) {
@@ -412,15 +581,18 @@ router.get('/alipay/callback', async (req, res) => {
     const pool = getPool();
 
     const existing = await pool.query(
-      'SELECT u.id, u.username, u.nickname, u.avatar_url FROM oauth_accounts oa JOIN users u ON oa.user_id = u.id WHERE oa.provider = $1 AND oa.provider_user_id = $2',
+      'SELECT u.id, u.username, u.nickname, u.avatar_url, u.role, u.subscription_status, u.subscription_end FROM oauth_accounts oa JOIN users u ON oa.user_id = u.id WHERE oa.provider = $1 AND oa.provider_user_id = $2',
       ['alipay', user_id]
     );
 
-    let userId, username, nickname, avatarUrl;
+    let userId, username, nickname, avatarUrl, oauthRole = 'user', oauthSubStatus = 'free', oauthSubEnd = null;
 
     if (existing.rows.length > 0) {
       const row = existing.rows[0];
       userId = row.id; username = row.username; nickname = row.nickname; avatarUrl = row.avatar_url;
+      oauthRole = row.role || 'user';
+      oauthSubStatus = oauthRole === 'admin' ? 'premium' : (row.subscription_status || 'free');
+      oauthSubEnd = oauthRole === 'admin' ? '2099-12-31' : row.subscription_end;
       await pool.query('UPDATE oauth_accounts SET access_token = $1 WHERE provider = $2 AND provider_user_id = $3',
         [encryptToken(access_token), 'alipay', user_id]);
     } else {
@@ -447,13 +619,12 @@ router.get('/alipay/callback', async (req, res) => {
       );
     }
 
-    const oauthRole = 'user';
     const token = jwt.sign({ id: userId, username, nickname, role: oauthRole }, JWT_SECRET, { expiresIn: '7d' });
 
     // Store the result so the PC frontend can poll for it
     pendingAuth.set(state, {
       token,
-      user: { id: userId, username, nickname, avatar_url: avatarUrl || '', role: oauthRole },
+      user: { id: userId, username, nickname, avatar_url: avatarUrl || '', role: oauthRole, subscription_status: oauthSubStatus, subscription_end: oauthSubEnd },
       createdAt: Date.now(),
     });
 
@@ -502,6 +673,49 @@ router.get('/alipay/check', (req, res) => {
   res.json({ status: 'success', token: result.token, user: result.user });
 });
 
+// Subscription middleware (must be used after authMiddleware)
+const subCache = new Map();
+const SUB_CACHE_TTL = 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [uid, entry] of subCache) {
+    if (now > entry.expiresAt) subCache.delete(uid);
+  }
+}, 2 * 60 * 1000);
+
+async function subscriptionMiddleware(req, res, next) {
+  if (!req.user || !req.user.id) {
+    return res.status(403).json({ error: '需要登录', code: 'LOGIN_REQUIRED' });
+  }
+  // 管理员直接放行
+  if (req.user.role === 'admin') return next();
+  const now = Date.now();
+  const cached = subCache.get(req.user.id);
+  let isPremium = false;
+  if (cached && now < cached.ttl) {
+    isPremium = cached.isPremium;
+  } else {
+    try {
+      const pool = getPool();
+      const result = await pool.query(
+        'SELECT subscription_status, subscription_end FROM users WHERE id = $1',
+        [req.user.id]
+      );
+      const row = result.rows[0];
+      isPremium = row && row.subscription_status === 'premium' && row.subscription_end && new Date(row.subscription_end) > new Date();
+      subCache.set(req.user.id, { isPremium, ttl: now + SUB_CACHE_TTL });
+    } catch (e) {
+      console.warn('[subscriptionMiddleware] DB check failed:', e.message);
+    }
+  }
+  if (!isPremium) {
+    return res.status(403).json({ error: '此功能需要开通会员', code: 'SUBSCRIPTION_REQUIRED' });
+  }
+  next();
+}
+
 module.exports = router;
 module.exports.authMiddleware = authMiddleware;
 module.exports.adminMiddleware = adminMiddleware;
+module.exports.subscriptionMiddleware = subscriptionMiddleware;

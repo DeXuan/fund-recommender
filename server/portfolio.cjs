@@ -7,7 +7,16 @@ const { authMiddleware } = require('./auth.cjs');
 const fundService = require('./fund-service.cjs');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 512 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 512 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== 'text/csv' && !file.originalname.endsWith('.csv')) {
+      return cb(new Error('只允许上传CSV文件'));
+    }
+    cb(null, true);
+  },
+});
 
 router.use(authMiddleware);
 
@@ -345,9 +354,7 @@ async function fetchAndStoreHistoricalNav(pool, fundCode, fundName, year) {
     const nav = parseFloat(item.DWJZ);
     if (!navDate || isNaN(nav)) continue;
 
-    // Only store data for the target year
-    if (!navDate.startsWith(String(year))) continue;
-
+    // 存储所有返回的数据（API返回最近365天，可能跨年）
     await pool.query(
       `INSERT INTO fund_nav (fund_code, nav, total_nav, nav_date)
        VALUES ($1, $2, $3, $4)
@@ -356,7 +363,7 @@ async function fetchAndStoreHistoricalNav(pool, fundCode, fundName, year) {
     );
     inserted++;
   }
-  console.log(`[收益地图] ${fundCode} 获取并存储 ${inserted} 条历史净值`);
+  console.log(`[VIP分析] ${fundCode} 获取并存储 ${inserted} 条历史净值`);
 }
 
 // GET /api/portfolio/summary
@@ -701,7 +708,7 @@ router.post('/import-alipay', upload.single('file'), async (req, res) => {
     res.json({ imported, errors, skipped, total: dataLines.length });
   } catch (error) {
     console.error('支付宝导入失败:', error.message);
-    res.status(500).json({ error: '导入失败: ' + error.message });
+    res.status(500).json({ error: '导入失败，请检查文件格式是否正确' });
   }
 });
 
@@ -1274,6 +1281,22 @@ router.post('/refresh-nav', async (req, res) => {
       });
     }
 
+    // 对仍然缺失的代码，从 cmb_zhaoyin_nav 表补充（招行理财产品）
+    const stillMissing = fundCodes.filter(code => !navMap.has(code));
+    if (stillMissing.length > 0) {
+      const cmbNavResult = await pool.query(
+        `SELECT DISTINCT ON (product_code) product_code, unit_nav, nav_date
+         FROM cmb_zhaoyin_nav WHERE product_code = ANY($1)
+         ORDER BY product_code, nav_date DESC`,
+        [stillMissing]
+      );
+      cmbNavResult.rows.forEach(row => {
+        if (row.unit_nav) {
+          navMap.set(row.product_code, { nav: parseFloat(row.unit_nav), date: row.nav_date });
+        }
+      });
+    }
+
     let updated = 0;
     const warnings = [];
 
@@ -1322,6 +1345,436 @@ router.post('/refresh-nav', async (req, res) => {
   } catch (error) {
     console.error('手动刷新净值失败:', error.message);
     res.status(500).json({ error: '刷新失败' });
+  }
+});
+
+// ============ VIP 智能分析 ============
+
+const { subscriptionMiddleware } = require('./auth.cjs');
+
+// GET /api/portfolio/vip-insights — VIP 专属智能分析
+router.get('/vip-insights', subscriptionMiddleware, async (req, res) => {
+  try {
+    const pool = getPool();
+
+    // 1. 获取用户持仓（含预计算盈亏字段）
+    const recordsResult = await pool.query(
+      `SELECT fr.id, fr.user_id, fr.fund_code, fr.fund_name, fr.shares, fr.cost_price,
+              fr.buy_date, fr.buy_fee, fr.notes,
+              fr.current_nav, fr.market_value, fr.pnl, fr.pnl_percent, fr.nav_updated_at,
+              f.industry, f.type
+       FROM fund_records fr
+       LEFT JOIN funds f ON fr.fund_code = f.code
+       WHERE fr.user_id = $1 ORDER BY fr.buy_date`,
+      [req.user.id]
+    );
+    if (recordsResult.rows.length === 0) {
+      return res.json({
+        healthScore: 0, healthLevel: '暂无数据', dataQuality: 'empty',
+        metrics: { annualizedReturn: 0, maxDrawdown: 0, sharpeRatio: 0, calmarRatio: 0, volatility: 0, winRate: 0, profitLossRatio: 0, avgHoldingDays: 0 },
+        totalCost: 0, totalValue: 0, totalPnl: 0, totalReturn: 0,
+        attribution: [], monthlyReturns: [], riskMetrics: [], alerts: [], aiAdvice: [],
+      });
+    }
+
+    const records = recordsResult.rows;
+
+    // 2. 检查是否有预计算的盈亏数据（refresh-nav 执行过）
+    const hasPrecomputed = records.some(r => r.current_nav && parseFloat(r.current_nav) > 0);
+
+    // 如果没有预计算数据，尝试从 fund_nav 表获取最新净值补充
+    if (!hasPrecomputed) {
+      const fundCodes = [...new Set(records.map(r => r.fund_code))];
+      const latestNavResult = await pool.query(
+        `SELECT DISTINCT ON (fund_code) fund_code, nav, nav_date
+         FROM fund_nav WHERE fund_code = ANY($1)
+         ORDER BY fund_code, nav_date DESC`,
+        [fundCodes]
+      );
+      const latestNavMap = {};
+      for (const row of latestNavResult.rows) {
+        latestNavMap[row.fund_code] = { nav: parseFloat(row.nav), date: row.nav_date };
+      }
+
+      // 对 fund_nav 表中没有的代码，从 cmb_zhaoyin_nav 表补充（招行理财产品）
+      const missingCodes = fundCodes.filter(code => !latestNavMap[code]);
+      if (missingCodes.length > 0) {
+        const cmbNavResult = await pool.query(
+          `SELECT DISTINCT ON (product_code) product_code, unit_nav, nav_date
+           FROM cmb_zhaoyin_nav WHERE product_code = ANY($1)
+           ORDER BY product_code, nav_date DESC`,
+          [missingCodes]
+        );
+        for (const row of cmbNavResult.rows) {
+          if (row.unit_nav) {
+            latestNavMap[row.product_code] = { nav: parseFloat(row.unit_nav), date: row.nav_date };
+          }
+        }
+      }
+
+      // 补充计算每条记录的 current_nav / market_value / pnl
+      for (const r of records) {
+        const nav = latestNavMap[r.fund_code];
+        if (nav && nav.nav > 0) {
+          r.current_nav = nav.nav;
+          const shares = parseFloat(r.shares);
+          const cost = parseFloat(r.cost_price);
+          const fee = parseFloat(r.buy_fee || 0);
+          r.market_value = parseFloat((shares * nav.nav).toFixed(2));
+          r.pnl = parseFloat((r.market_value - (shares * cost + fee)).toFixed(2));
+          r.pnl_percent = parseFloat(((r.pnl / (shares * cost + fee)) * 100).toFixed(2));
+        }
+      }
+    }
+
+    // 3. 按基金分组汇总
+    const grouped = {};
+    for (const r of records) {
+      const code = r.fund_code;
+      if (!grouped[code]) grouped[code] = { fund_code: code, fund_name: r.fund_name, records: [], industry: r.industry || '', type: r.type || '' };
+      grouped[code].records.push(r);
+    }
+
+    let totalCost = 0, totalValue = 0, totalPnl = 0;
+    const holdings = [];
+    const categoryMap = {};
+
+    for (const group of Object.values(grouped)) {
+      let shares = 0, cost = 0, mv = 0, pnl = 0, currentNav = 0;
+      for (const r of group.records) {
+        const s = parseFloat(r.shares);
+        const c = parseFloat(r.cost_price);
+        const fee = parseFloat(r.buy_fee || 0);
+        shares += s;
+        cost += s * c + fee;
+
+        const nav = parseFloat(r.current_nav || 0);
+        if (nav > 0) {
+          currentNav = nav;
+          const recordMV = parseFloat(r.market_value || (s * nav));
+          mv += recordMV;
+          pnl += parseFloat(r.pnl || (recordMV - s * c - fee));
+        } else {
+          // 没有净值数据，用成本作为占位
+          mv += s * c;
+        }
+      }
+      totalCost += cost;
+      totalValue += mv;
+      totalPnl += pnl;
+
+      const cat = classifyAsset(group.fund_code, group.fund_name, group.industry, group.type);
+      const avgCostPrice = shares > 0 ? cost / shares : 0;
+      holdings.push({
+        fund_code: group.fund_code, fund_name: group.fund_name,
+        total_shares: shares, avg_cost_price: parseFloat(avgCostPrice.toFixed(4)),
+        total_cost: parseFloat(cost.toFixed(2)), current_nav: parseFloat(currentNav.toFixed(4)),
+        market_value: parseFloat(mv.toFixed(2)), pnl: parseFloat(pnl.toFixed(2)),
+        pnl_percent: cost > 0 ? parseFloat(((pnl / cost) * 100).toFixed(2)) : 0,
+        category: cat, records: group.records,
+      });
+
+      if (!categoryMap[cat]) categoryMap[cat] = { category: cat, weight: 0, pnl: 0, cost: 0, value: 0, funds: [] };
+      categoryMap[cat].weight += mv;
+      categoryMap[cat].pnl += pnl;
+      categoryMap[cat].cost += cost;
+      categoryMap[cat].value += mv;
+      categoryMap[cat].funds.push({ code: group.fund_code, name: group.fund_name, value: parseFloat(mv.toFixed(2)), pnl: parseFloat(pnl.toFixed(2)), pnlPercent: cost > 0 ? parseFloat(((pnl / cost) * 100).toFixed(2)) : 0 });
+    }
+
+    const totalReturn = totalCost > 0 ? parseFloat(((totalPnl / totalCost) * 100).toFixed(2)) : 0;
+
+    // 4. 收益归因
+    const attribution = Object.values(categoryMap).map(c => ({
+      category: c.category,
+      contribution: totalPnl !== 0 ? parseFloat(((c.pnl / totalPnl) * 100).toFixed(1)) : 0,
+      weight: totalValue > 0 ? parseFloat(((c.value / totalValue) * 100).toFixed(1)) : 0,
+      pnl: parseFloat(c.pnl.toFixed(2)),
+      value: parseFloat(c.value.toFixed(2)),
+      funds: c.funds,
+    })).sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
+
+    // 5. 获取历史净值，自动补充缺失数据
+    const fundCodes = Object.keys(grouped);
+
+    // 从最早的买入日期开始算（而非固定1年）
+    const earliestBuyDate = records.reduce((min, r) => {
+      const d = r.buy_date instanceof Date ? r.buy_date : new Date(r.buy_date);
+      return d < min ? d : min;
+    }, new Date());
+    const startDate = earliestBuyDate.toISOString().slice(0, 10);
+
+    // 检查每只基金从买入日起有多少历史净值
+    const navCountResult = await pool.query(
+      `SELECT fund_code, COUNT(*) as cnt FROM fund_nav
+       WHERE fund_code = ANY($1) AND nav_date >= $2
+       GROUP BY fund_code`,
+      [fundCodes, startDate]
+    );
+    const navCountMap = {};
+    for (const row of navCountResult.rows) {
+      navCountMap[row.fund_code] = parseInt(row.cnt);
+    }
+
+    // 对数据不足的基金自动获取历史净值（API返回最近365天，每只基金调一次即可）
+    const fundsToFetch = fundCodes.filter(code => (navCountMap[code] || 0) < 10);
+    if (fundsToFetch.length > 0) {
+      console.log(`[VIP分析] 自动获取 ${fundsToFetch.length} 只基金的历史净值`);
+      for (const code of fundsToFetch) {
+        try {
+          const fundName = grouped[code].fund_name;
+          await fetchAndStoreHistoricalNav(pool, code, fundName, new Date().getFullYear());
+        } catch (e) {
+          console.warn(`[VIP分析] 获取 ${code} 历史净值失败:`, e.message);
+        }
+      }
+    }
+
+    // 重新查询历史净值
+    const navResult = await pool.query(
+      `SELECT fund_code, nav, nav_date FROM fund_nav
+       WHERE fund_code = ANY($1) AND nav_date >= $2
+       ORDER BY nav_date`,
+      [fundCodes, startDate]
+    );
+
+    // 按日期分组
+    const navByDate = {};
+    for (const row of navResult.rows) {
+      const dateStr = row.nav_date instanceof Date ? row.nav_date.toISOString().slice(0, 10) : String(row.nav_date);
+      if (!navByDate[dateStr]) navByDate[dateStr] = {};
+      navByDate[dateStr][row.fund_code] = parseFloat(row.nav);
+    }
+
+    const tradingDates = Object.keys(navByDate).sort();
+
+    // 计算组合每日市值
+    // 只从最后一笔买入之后开始计算，避免建仓过程被误算为收益
+    const latestBuyDate = records.reduce((max, r) => {
+      const d = r.buy_date instanceof Date ? r.buy_date : new Date(r.buy_date);
+      return d > max ? d : max;
+    }, new Date(0));
+    const portfolioStartDate = latestBuyDate.toISOString().slice(0, 10);
+
+    const dailyValues = [];
+    for (const dateStr of tradingDates) {
+      if (dateStr < portfolioStartDate) continue; // 跳过建仓期
+      let dayValue = 0;
+      for (const group of Object.values(grouped)) {
+        const nav = navByDate[dateStr]?.[group.fund_code];
+        if (!nav) continue;
+        let shares = 0;
+        for (const r of group.records) {
+          const buyDate = r.buy_date instanceof Date ? r.buy_date.toISOString().slice(0, 10) : String(r.buy_date);
+          if (buyDate <= dateStr) shares += parseFloat(r.shares);
+        }
+        if (shares > 0) dayValue += shares * nav;
+      }
+      if (dayValue > 0) dailyValues.push({ date: dateStr, value: dayValue });
+    }
+
+    // 6. 计算高级指标
+    let annualizedReturn = 0, maxDrawdown = 0, sharpeRatio = 0, calmarRatio = 0;
+    let volatility = 0, winRate = 0, profitLossRatio = 0;
+    let returnPeriod = ''; // 标记收益计算区间
+    const dailyReturns = [];
+
+    if (dailyValues.length >= 2) {
+      for (let i = 1; i < dailyValues.length; i++) {
+        dailyReturns.push((dailyValues[i].value - dailyValues[i - 1].value) / dailyValues[i - 1].value);
+      }
+
+      const totalDays = dailyValues.length;
+      const totalPeriodReturn = (dailyValues[dailyValues.length - 1].value - dailyValues[0].value) / dailyValues[0].value;
+      const calendarDays = Math.round((new Date(dailyValues[dailyValues.length-1].date) - new Date(dailyValues[0].date)) / 86400000);
+
+      // 年化收益率：只有数据跨>=200个交易日(~1年)才年化，否则显示期间收益率
+      if (totalDays >= 200) {
+        const rawAnnualized = (Math.pow(1 + totalPeriodReturn, 252 / totalDays) - 1) * 100;
+        annualizedReturn = parseFloat(Math.max(-99, Math.min(500, rawAnnualized)).toFixed(2));
+        returnPeriod = '年化';
+      } else {
+        // 数据不足1年，显示期间收益率（不年化，避免误导）
+        annualizedReturn = parseFloat((totalPeriodReturn * 100).toFixed(2));
+        returnPeriod = `${calendarDays}天`;
+      }
+
+      // 最大回撤
+      let peak = dailyValues[0].value;
+      for (const d of dailyValues) {
+        if (d.value > peak) peak = d.value;
+        const dd = (peak - d.value) / peak;
+        if (dd > maxDrawdown) maxDrawdown = dd;
+      }
+      maxDrawdown = parseFloat((maxDrawdown * 100).toFixed(2));
+
+      // 波动率（年化）
+      const avgReturn = dailyReturns.reduce((s, r) => s + r, 0) / dailyReturns.length;
+      const variance = dailyReturns.reduce((s, r) => s + Math.pow(r - avgReturn, 2), 0) / dailyReturns.length;
+      volatility = parseFloat(Math.min(200, Math.sqrt(variance) * Math.sqrt(252) * 100).toFixed(2));
+
+      // 夏普比率（无风险利率2%）
+      const riskFreeDaily = 0.02 / 252;
+      const excessReturns = dailyReturns.map(r => r - riskFreeDaily);
+      const avgExcess = excessReturns.reduce((s, r) => s + r, 0) / excessReturns.length;
+      const stdExcess = Math.sqrt(excessReturns.reduce((s, r) => s + Math.pow(r - avgExcess, 2), 0) / excessReturns.length);
+      const rawSharpe = stdExcess > 0 ? (avgExcess / stdExcess * Math.sqrt(252)) : 0;
+      sharpeRatio = parseFloat(Math.max(-5, Math.min(10, rawSharpe)).toFixed(2));
+
+      // 卡玛比率
+      calmarRatio = maxDrawdown > 0 ? parseFloat(Math.max(-20, Math.min(20, annualizedReturn / maxDrawdown)).toFixed(2)) : 0;
+
+      // 胜率
+      const profitDays = dailyReturns.filter(r => r > 0).length;
+      winRate = parseFloat(((profitDays / dailyReturns.length) * 100).toFixed(2));
+
+      // 盈亏比
+      const avgProfit = dailyReturns.filter(r => r > 0).reduce((s, r) => s + r, 0) / (profitDays || 1);
+      const lossDays = dailyReturns.length - profitDays;
+      const avgLoss = lossDays > 0 ? Math.abs(dailyReturns.filter(r => r < 0).reduce((s, r) => s + r, 0) / lossDays) : 0;
+      profitLossRatio = avgLoss > 0 ? parseFloat(Math.min(20, avgProfit / avgLoss).toFixed(2)) : 0;
+    }
+
+    // 平均持仓天数
+    const now = new Date();
+    const holdingDays = records.map(r => {
+      const buyDate = r.buy_date instanceof Date ? r.buy_date : new Date(r.buy_date);
+      return Math.floor((now.getTime() - buyDate.getTime()) / 86400000);
+    });
+    const avgHoldingDays = holdingDays.length > 0 ? Math.round(holdingDays.reduce((s, d) => s + d, 0) / holdingDays.length) : 0;
+
+    // 7. 月度收益
+    const monthlyReturns = [];
+    const monthMap = {};
+    for (const d of dailyValues) {
+      const month = d.date.slice(0, 7);
+      if (!monthMap[month]) monthMap[month] = { first: d.value, last: d.value, firstDate: d.date };
+      monthMap[month].last = d.value;
+    }
+    for (const [month, vals] of Object.entries(monthMap).sort()) {
+      const ret = vals.first > 0 ? ((vals.last - vals.first) / vals.first * 100) : 0;
+      monthlyReturns.push({ month: month.slice(5) + '月', return: parseFloat(ret.toFixed(2)), value: vals.last });
+    }
+
+    // 8. 风险雷达（基于真实数据归一化到0-100）
+    const riskMetrics = [
+      { name: '收益能力', value: Math.round(Math.min(100, Math.max(0, (annualizedReturn + 10) * 3))), benchmark: 50, status: '' },
+      { name: '风控能力', value: Math.round(Math.min(100, Math.max(0, 100 - maxDrawdown * 2))), benchmark: 60, status: '' },
+      { name: '稳定性', value: Math.round(Math.min(100, Math.max(0, 100 - volatility * 1.5))), benchmark: 55, status: '' },
+      { name: '择时能力', value: Math.round(Math.min(100, Math.max(0, winRate * 1.2))), benchmark: 50, status: '' },
+      { name: '分散度', value: Math.round(Math.min(100, holdings.length * 18)), benchmark: 60, status: '' },
+      { name: '持仓耐力', value: Math.round(Math.min(100, Math.max(0, avgHoldingDays / 2))), benchmark: 50, status: '' },
+    ];
+    for (const m of riskMetrics) {
+      m.status = m.value >= m.benchmark ? 'good' : 'warning';
+    }
+
+    // 9. 组合健康评分
+    const scoreComponents = [
+      { score: Math.min(30, Math.max(0, (annualizedReturn + 5) * 1.5)), max: 30 },
+      { score: Math.min(25, Math.max(0, 25 - maxDrawdown * 0.5)), max: 25 },
+      { score: Math.min(20, Math.max(0, sharpeRatio * 8 + 4)), max: 20 },
+      { score: Math.min(15, holdings.length * 3), max: 15 },
+      { score: Math.min(10, winRate * 0.12), max: 10 },
+    ];
+    const healthScore = Math.round(scoreComponents.reduce((s, c) => s + c.score, 0));
+    const healthLevel = healthScore >= 80 ? '优秀' : healthScore >= 60 ? '良好' : healthScore >= 40 ? '一般' : '需改善';
+
+    // 10. 数据质量标记
+    const dataQuality = dailyValues.length >= 200 ? 'excellent' : dailyValues.length >= 60 ? 'good' : dailyValues.length >= 10 ? 'fair' : 'poor';
+
+    // 11. 智能预警
+    const alerts = [];
+
+    for (const h of holdings) {
+      const weight = totalValue > 0 ? (h.market_value / totalValue) * 100 : 0;
+      if (weight > 35) {
+        alerts.push({ type: 'risk', level: 'warning', title: `持仓集中: ${h.fund_name}`, detail: `单只基金占比 ${weight.toFixed(1)}%，集中度过高，建议分散投资。`, action: '查看分散建议' });
+      }
+    }
+
+    const bigLoss = holdings.filter(h => h.pnl_percent < -15);
+    if (bigLoss.length > 0) {
+      alerts.push({ type: 'warning', level: 'error', title: '大额亏损预警', detail: `${bigLoss.length}只基金亏损超过15%，最大跌幅 ${Math.min(...bigLoss.map(h => h.pnl_percent)).toFixed(1)}%。`, action: '查看止损建议' });
+    }
+
+    if (maxDrawdown > 20) {
+      alerts.push({ type: 'risk', level: 'warning', title: '回撤偏大', detail: `最大回撤 ${maxDrawdown.toFixed(1)}%，超过20%警戒线。建议增配固收类资产降低波动。`, action: '查看调仓建议' });
+    }
+
+    const stockWeight = attribution.filter(a => a.category.includes('股')).reduce((s, a) => s + a.weight, 0);
+    if (stockWeight > 85) {
+      alerts.push({ type: 'risk', level: 'warning', title: '权益仓位过重', detail: `股票类资产占比 ${stockWeight.toFixed(0)}%，建议保留10-20%的固收或货币基金作为安全垫。`, action: '查看配置建议' });
+    }
+
+    if (holdings.length > 0) {
+      const noNavFunds = holdings.filter(h => h.current_nav <= 0);
+      if (noNavFunds.length > 0) {
+        alerts.push({ type: 'info', level: 'info', title: '部分基金净值待更新', detail: `${noNavFunds.map(h => h.fund_name).join('、')} 暂无最新净值数据，点击"刷新净值"可更新。`, action: '刷新净值' });
+      }
+    }
+
+    if (alerts.length === 0) {
+      alerts.push({ type: 'success', level: 'info', title: '组合状态健康', detail: '当前各项指标正常，无风险预警。继续保持投资纪律！', action: '' });
+    }
+
+    // 12. AI 投资建议
+    const aiAdvice = [];
+
+    if (annualizedReturn < 5 && totalCost > 10000 && dailyValues.length >= 30) {
+      aiAdvice.push({ priority: 'high', title: '收益率偏低', detail: `年化收益仅 ${annualizedReturn}%，低于货币基金。建议审视持仓结构，减少低效资产。`, impact: '预期提升年化收益2-5%' });
+    }
+
+    if (maxDrawdown > 15 && stockWeight > 60) {
+      aiAdvice.push({ priority: 'high', title: '优化回撤控制', detail: `最大回撤 ${maxDrawdown.toFixed(1)}%，建议增配债券基金（10-20%）平滑波动。`, impact: '预期降低回撤5-10%' });
+    }
+
+    if (holdings.length < 4) {
+      aiAdvice.push({ priority: 'medium', title: '建议增加分散度', detail: `当前仅持有 ${holdings.length} 只基金，建议配置4-6只不同风格的基金降低非系统性风险。`, impact: '降低单一基金风险暴露' });
+    }
+
+    if (holdings.length > 10) {
+      aiAdvice.push({ priority: 'medium', title: '持仓数量偏多', detail: `当前持有 ${holdings.length} 只基金，管理成本高且可能过度分散。建议精选5-8只核心基金。`, impact: '降低管理复杂度，提升收益效率' });
+    }
+
+    if (sharpeRatio >= 1) {
+      aiAdvice.push({ priority: 'low', title: '风险收益比优秀', detail: `夏普比率 ${sharpeRatio}，说明每承担1单位风险获得了较好的超额收益。可适当增加投入金额放大收益。`, impact: '放大收益的同时保持风险可控' });
+    }
+
+    const overseasWeight = attribution.find(a => a.category === '海外股')?.weight || 0;
+    if (overseasWeight < 10 && stockWeight > 30) {
+      aiAdvice.push({ priority: 'medium', title: '建议增配海外资产', detail: '海外资产占比偏低，配置纳斯达克100或标普500可提升地域分散度。', impact: '降低A股单一市场风险' });
+    }
+
+    if (avgHoldingDays < 30 && holdings.length > 0) {
+      aiAdvice.push({ priority: 'medium', title: '持仓周期偏短', detail: `平均持仓仅 ${avgHoldingDays} 天，频繁交易会增加手续费损耗。建议坚持长期持有（至少6个月）。`, impact: '减少交易成本，提升实际收益' });
+    }
+
+    const bondWeight = (categoryMap['固收']?.weight || 0) + (categoryMap['货币基金']?.weight || 0);
+    if (stockWeight > 70 && bondWeight < 10) {
+      aiAdvice.push({ priority: 'high', title: '缺少安全垫资产', detail: `固收+货币仅占 ${bondWeight.toFixed(0)}%，建议至少配置10%的债券或货币基金作为安全垫。`, impact: '在市场大跌时减少回撤' });
+    }
+
+    if (aiAdvice.length === 0) {
+      aiAdvice.push({ priority: 'low', title: '组合管理良好', detail: '当前配置均衡，风险可控。建议定期（每季度）检视一次组合适配性。', impact: '持续优化长期收益' });
+    }
+
+    res.json({
+      healthScore, healthLevel, dataQuality,
+      totalCost: parseFloat(totalCost.toFixed(2)),
+      totalValue: parseFloat(totalValue.toFixed(2)),
+      totalPnl: parseFloat(totalPnl.toFixed(2)),
+      totalReturn,
+      metrics: { annualizedReturn, maxDrawdown, sharpeRatio, calmarRatio, volatility, winRate, profitLossRatio, avgHoldingDays, returnPeriod },
+      attribution,
+      monthlyReturns: monthlyReturns.slice(-12),
+      riskMetrics,
+      alerts,
+      aiAdvice,
+    });
+  } catch (error) {
+    console.error('VIP分析失败:', error.message, error.stack);
+    res.status(500).json({ error: 'VIP分析失败，请稍后重试' });
   }
 });
 

@@ -163,7 +163,7 @@ export default function MarketAnalysis() {
         <Tag color={text === '优先配置' ? 'green' : text === '逢低布局' ? 'orange' : 'default'}>{text || '--'}</Tag>
       ),
     },
-    { title: '推荐逻辑', dataIndex: 'logic', key: 'logic', ellipsis: true, render: (text: string) => <span style={{ fontSize: 13, color: '#666' }}>{text || '--'}</span> },
+    { title: '推荐逻辑', dataIndex: 'logic', key: 'logic', ellipsis: true, render: (text: string) => <span style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>{text || '--'}</span> },
   ];
 
   const tabItems = [
@@ -201,9 +201,9 @@ export default function MarketAnalysis() {
             <Row gutter={16}>
               {recommendations.slice(0, 4).map((rec, i) => (
                 <Col xs={24} sm={12} md={6} key={rec.industry || i}>
-                  <Card size="small" style={{ background: '#f5f5f5' }}>
+                  <Card size="small" style={{ background: isDark ? '#1f1f1f' : '#f5f5f5' }}>
                     <strong>{rec.industry || '--'}</strong>
-                    <p style={{ fontSize: 13, color: '#666', margin: '8px 0 0' }}>{rec.logic || '--'}</p>
+                    <p style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', margin: '8px 0 0' }}>{rec.logic || '--'}</p>
                   </Card>
                 </Col>
               ))}
@@ -217,7 +217,7 @@ export default function MarketAnalysis() {
       label: '分批建仓',
       children: (
         <div>
-          <Card title="分批建仓方案" extra={<span style={{ fontSize: 12, color: '#666' }}>核心策略：高低切换 + 分批建仓 + 估值优先</span>}>
+          <Card title="分批建仓方案" extra={<span style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>核心策略：高低切换 + 分批建仓 + 估值优先</span>}>
             <Timeline
               items={batchPlans.map((plan: any) => ({
                 color: 'blue',
@@ -227,10 +227,10 @@ export default function MarketAnalysis() {
                       <strong>第 {plan.batch} 批</strong>
                       <Tag color="green">{plan.ratio || plan.percentage}%</Tag>
                     </div>
-                    <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}><strong>时间：</strong>{plan.time}</div>
+                    <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', marginBottom: 4 }}><strong>时间：</strong>{plan.time}</div>
                     <div style={{ fontSize: 13, marginBottom: 4 }}><strong>买入标的：</strong>{Array.isArray(plan.funds) ? plan.funds.join('、') : plan.targets}</div>
                     <div style={{ fontSize: 13, marginBottom: 4 }}><strong>操作方式：</strong>{plan.method}</div>
-                    <div style={{ fontSize: 13, color: '#666' }}><strong>理由：</strong>{plan.reason}</div>
+                    <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}><strong>理由：</strong>{plan.reason}</div>
                   </Card>
                 ),
               }))}
@@ -322,7 +322,7 @@ export default function MarketAnalysis() {
                   style={{ height: 250 }}
                   opts={{ renderer: 'svg' }}
                 />
-                <div style={{ textAlign: 'center', fontSize: 13, color: '#595959', marginTop: 8 }}>
+                <div style={{ textAlign: 'center', fontSize: 13, color: isDark ? '#a0a0a0' : '#595959', marginTop: 8 }}>
                   当前估值：<span style={{ fontWeight: 600, color: getValuationColor(idx.current_valuation) }}>{idx.current_valuation}</span>
                   <span style={{ marginLeft: 16 }}>建议：{idx.current_suggestion}</span>
                 </div>
@@ -333,7 +333,7 @@ export default function MarketAnalysis() {
               暂无估值趋势数据
             </Card>
           )}
-          <Card size="small" style={{ marginTop: 16, background: '#e6f4ff', border: '1px solid #91caff' }}>
+          <Card size="small" style={{ marginTop: 16, background: isDark ? '#111a2c' : '#e6f4ff', border: '1px solid #91caff' }}>
             <strong style={{ color: '#1677ff' }}>估值趋势说明</strong>
             <ul style={{ margin: '8px 0 0', paddingLeft: 16, lineHeight: 2, fontSize: 13 }}>
               <li>PE分位越低，表示当前估值越便宜，投资价值越高</li>

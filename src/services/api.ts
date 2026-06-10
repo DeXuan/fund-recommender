@@ -149,6 +149,10 @@ export const fundApi = {
   getCmbProductNavHistory: (code: string) =>
     fetchApi<any>(`/cmb-products/${encodeURIComponent(code)}/nav-history`),
 
+  // 按产品代码查询招行理财产品（用于添加持仓时自动关联）
+  lookupCMBProduct: (code: string) =>
+    fetchApi<any>(`/cmb-products/lookup/${encodeURIComponent(code)}`),
+
   // 从支付宝获取易方达基金数据（经理、净值等）
   fetchYiFangDaData: () =>
     fetchApi<any>('/funds/fetch-yifangda', { method: 'POST' }),
@@ -212,6 +216,16 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ oldPassword, newPassword }),
     }),
+};
+
+export const profileApi = {
+  updateProfile: (data: { nickname?: string; avatar_url?: string }) =>
+    fetchApi<{ success: boolean; message: string; user: any }>('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  getLoginHistory: () =>
+    fetchApi<{ logs: any[] }>('/auth/login-history'),
 };
 
 export const portfolioApi = {
@@ -295,6 +309,7 @@ export const portfolioApi = {
     fetchApi<{ updated: number; validated: number; warnings: string[]; message: string }>('/portfolio/refresh-nav', {
       method: 'POST',
     }),
+  getVIPInsights: () => fetchApi<any>('/portfolio/vip-insights'),
 };
 
 export const watchlistApi = {
@@ -317,6 +332,88 @@ export const alertsApi = {
   getAlerts: () => fetchApi<any[]>('/alerts'),
 };
 
+export const marketEventsApi = {
+  getEvents: (params?: { month?: number; category?: string; impact?: string }) => {
+    const query = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') query.append(key, String(value));
+      });
+    }
+    return fetchApi<{
+      events: any[];
+      byMonth: Record<number, any[]>;
+      categoryConfig: Record<string, any>;
+      impactConfig: Record<string, any>;
+      total: number;
+    }>(`/market-events?${query.toString()}`);
+  },
+};
+
+export const newsApi = {
+  getNews: (params?: { category?: string; impact?: string; keyword?: string; page?: number; pageSize?: number }) => {
+    const query = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') query.append(key, String(value));
+      });
+    }
+    return fetchApi<{
+      items: any[];
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+      lastFetchTime: string;
+      categories: Record<string, any>;
+    }>(`/news?${query.toString()}`);
+  },
+  getStats: () => fetchApi<any>('/news/stats'),
+  getPersonalNews: () => fetchApi<{
+    items: any[];
+    total: number;
+    holdings: any[];
+    watchlist: any[];
+    matchedIndustries: string[];
+  }>('/news/personal'),
+  refresh: () => fetchApi<any>('/news/refresh', { method: 'POST' }),
+  // SSE 连接（使用 fetch + ReadableStream 避免 token 泄露到 URL）
+  connectSSE: (onMessage: (data: any) => void) => {
+    const token = localStorage.getItem('token');
+    const controller = new AbortController();
+
+    const connect = async () => {
+      try {
+        const res = await fetch('/api/news/stream', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body) return;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                onMessage(data);
+              } catch {}
+            }
+          }
+        }
+      } catch {}
+    };
+    connect();
+    return controller;
+  },
+};
+
 export const adminApi = {
   // User management
   getUsers: (params?: { search?: string; role?: string; status?: string; page?: number; pageSize?: number; sort?: string; order?: string }) => {
@@ -326,6 +423,19 @@ export const adminApi = {
   },
   getUserStats: () => fetchApi<any>('/admin/users/stats'),
   getUserDetail: (id: number) => fetchApi<any>(`/admin/users/${id}`),
+  editUser: (id: number, data: { nickname?: string; avatar_url?: string }) =>
+    fetchApi<{ success: boolean; message: string }>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  // VIP management
+  grantVip: (id: number, days?: number, plan_name?: string) =>
+    fetchApi<{ success: boolean; message: string; expiresAt: string }>(`/admin/users/${id}/vip`, { method: 'PUT', body: JSON.stringify({ action: 'grant', days: days || 30, plan_name }) }),
+  revokeVip: (id: number) =>
+    fetchApi<{ success: boolean; message: string }>(`/admin/users/${id}/vip`, { method: 'PUT', body: JSON.stringify({ action: 'revoke' }) }),
+  extendVip: (id: number, days?: number) =>
+    fetchApi<{ success: boolean; message: string; expiresAt: string }>(`/admin/users/${id}/vip`, { method: 'PUT', body: JSON.stringify({ action: 'extend', days: days || 30 }) }),
+  getVipDetail: (id: number) =>
+    fetchApi<any>(`/admin/users/${id}/vip`),
+  getSubscriptions: () =>
+    fetchApi<{ plans: any[]; stats: any }>('/admin/subscriptions'),
   updateUserRole: (id: number, role: string) =>
     fetchApi<{ success: boolean; message: string }>(`/admin/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
   updateUserStatus: (id: number, status: string) =>
@@ -336,12 +446,72 @@ export const adminApi = {
     fetchApi<{ success: boolean; message: string }>(`/admin/users/${id}`, { method: 'DELETE' }),
   batchOperation: (ids: number[], action: string, role?: string) =>
     fetchApi<{ success: boolean; message: string }>('/admin/users/batch', { method: 'POST', body: JSON.stringify({ ids, action, role }) }),
+  exportUsers: async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/admin/users/export', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('导出失败');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `users_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  },
+
+  // User notes
+  getUserNotes: (id: number) => fetchApi<{ notes: any[] }>(`/admin/users/${id}/notes`),
+  addUserNote: (id: number, content: string) =>
+    fetchApi<{ success: boolean; note: any }>(`/admin/users/${id}/notes`, { method: 'POST', body: JSON.stringify({ content }) }),
+  deleteNote: (id: number) => fetchApi<{ success: boolean }>(`/admin/notes/${id}`, { method: 'DELETE' }),
+
+  // Login logs
+  getLoginLogs: (params?: { user_id?: number; status?: string; page?: number; pageSize?: number }) => {
+    const query = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') query.append(k, String(v)); });
+    return fetchApi<any>(`/admin/login-logs?${query.toString()}`);
+  },
+
+  // Online users
+  getOnlineUsers: () => fetchApi<any>('/admin/online-users'),
 
   // Audit logs
   getAuditLogs: (params?: { action?: string; admin_id?: number; page?: number; pageSize?: number }) => {
     const query = new URLSearchParams();
     if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') query.append(k, String(v)); });
     return fetchApi<any>(`/admin/audit-logs?${query.toString()}`);
+  },
+
+  // System settings
+  getSettings: () => fetchApi<{ config: Record<string, { value: string; description: string }> }>('/admin/settings'),
+  updateSettings: (settings: Record<string, string>) =>
+    fetchApi<{ success: boolean; message: string }>('/admin/settings', { method: 'PUT', body: JSON.stringify({ settings }) }),
+
+  // Alert rules
+  getAlertRules: () => fetchApi<{ rules: any[] }>('/admin/alerts/rules'),
+  createAlertRule: (rule: any) => fetchApi<{ success: boolean; rule: any }>('/admin/alerts/rules', { method: 'POST', body: JSON.stringify(rule) }),
+  updateAlertRule: (id: number, rule: any) => fetchApi<{ success: boolean }>(`/admin/alerts/rules/${id}`, { method: 'PUT', body: JSON.stringify(rule) }),
+  deleteAlertRule: (id: number) => fetchApi<{ success: boolean }>(`/admin/alerts/rules/${id}`, { method: 'DELETE' }),
+  getAlertHistory: (params?: { status?: string; severity?: string; page?: number; pageSize?: number }) => {
+    const query = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') query.append(k, String(v)); });
+    return fetchApi<any>(`/admin/alerts/history?${query.toString()}`);
+  },
+  resolveAlert: (id: number) => fetchApi<{ success: boolean }>(`/admin/alerts/history/${id}/resolve`, { method: 'POST' }),
+
+  // API stats
+  getApiStats: (hours?: number) => fetchApi<any>(`/admin/api-stats${hours ? `?hours=${hours}` : ''}`),
+
+  // Health check
+  getHealthCheck: () => fetchApi<any>('/admin/health-check'),
+
+  // System events
+  getSystemEvents: (params?: { type?: string; page?: number; pageSize?: number }) => {
+    const query = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') query.append(k, String(v)); });
+    return fetchApi<any>(`/admin/system-events?${query.toString()}`);
   },
 
   // System monitoring
@@ -354,4 +524,33 @@ export const adminApi = {
     if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') query.append(k, String(v)); });
     return fetchApi<any>(`/admin/logs?${query.toString()}`);
   },
+};
+
+export const subscriptionApi = {
+  getPlans: () => fetchApi<{ plans: any[] }>('/subscription/plans'),
+  createOrder: (planId?: number) =>
+    fetchApi<{ orderId: number; outTradeNo: string; amount: number; planName: string; qrCodeUrl: string; qrCodeBase64: string }>(
+      '/subscription/create-order', { method: 'POST', body: JSON.stringify({ planId }) }
+    ),
+  checkOrder: (outTradeNo: string) =>
+    fetchApi<{ paid: boolean }>('/subscription/check-order', { method: 'POST', body: JSON.stringify({ outTradeNo }) }),
+  getStatus: () => fetchApi<{ isPremium: boolean; expiresAt: string; planName: string; daysRemaining: number }>('/subscription/status'),
+  getOrders: () => fetchApi<{ orders: any[] }>('/subscription/orders'),
+};
+
+export const stockPickerApi = {
+  rankFunds: (params: { industry?: string; type?: string; limit?: number; factors?: Record<string, { weight: number }> }) =>
+    fetchApi<{ ranked: any[]; total: number; factors: any; industryStats: any }>('/stock-picker/rank', { method: 'POST', body: JSON.stringify(params) }),
+  getFactors: () => fetchApi<{ factors: any }>('/stock-picker/factors'),
+  backtest: (codes: string[], days?: number) =>
+    fetchApi<{ dates: string[]; portfolio: number[]; benchmark: number[]; summary: any }>('/stock-picker/backtest', { method: 'POST', body: JSON.stringify({ codes, days }) }),
+  buildPortfolio: (params: { topN?: number; budget?: number; strategy?: string }) =>
+    fetchApi<{ allocation: any[]; totalBudget: number; perFund: number; strategy: string }>('/stock-picker/portfolio', { method: 'POST', body: JSON.stringify(params) }),
+};
+
+export const fundCompareApi = {
+  analyze: (codes: string[]) =>
+    fetchApi<{ funds: any[]; navHistories: Record<string, any[]> }>('/fund-compare/analyze', { method: 'POST', body: JSON.stringify({ codes }) }),
+  premiumAnalyze: (codes: string[]) =>
+    fetchApi<{ results: any[]; attribution: any; recommendation: any }>('/fund-compare/premium', { method: 'POST', body: JSON.stringify({ codes }) }),
 };

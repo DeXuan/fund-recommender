@@ -8,7 +8,7 @@ const fundService = require('./fund-service.cjs');
 const authRoutes = require('./auth.cjs');
 const portfolioRoutes = require('./portfolio.cjs');
 const adminRoutes = require('./admin.cjs');
-const { incrementRequestCount, resetQpsCounter } = require('./admin.cjs');
+const { incrementRequestCount, resetQpsCounter, recordApiStat } = require('./admin.cjs');
 const { createRateLimit } = require('./utils/rate-limiter.cjs');
 const { scheduleDaily } = require('./utils/scheduler.cjs');
 const { spawn } = require('child_process');
@@ -20,7 +20,11 @@ const {
   runDailyDataUpdate, fetchYiFangDaFundData, fetchGoldFundData,
   defaultIndices,
 } = require('./data-fetcher.cjs');
-const { router: apiRoutes, createStatusRoute, createUpdateRoute, createYiFangDaRoute, createGoldFundRoute } = require('./routes/api.cjs');
+const { router: apiRoutes, createStatusRoute, createUpdateRoute, createYiFangDaRoute, createGoldFundRoute, createNewsRefreshRoute } = require('./routes/api.cjs');
+const { fetchAllNews, handleSSEConnection, FETCH_INTERVAL_MS } = require('./news-fetcher.cjs');
+const subscriptionRoutes = require('./routes/subscription.cjs');
+const stockPickerRoutes = require('./routes/stock-picker.cjs');
+const fundCompareRoutes = require('./routes/fund-compare.cjs');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -77,9 +81,17 @@ app.use((req, res, next) => {
   next();
 });
 
-// Request counter for QPS metrics
+// Request counter for QPS metrics + API stats tracking
 app.use((req, res, next) => {
   incrementRequestCount();
+  const startTime = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    // Only track API endpoints, skip static assets
+    if (req.path.startsWith('/api/')) {
+      recordApiStat(req.method, req.path, res.statusCode, duration);
+    }
+  });
   next();
 });
 
@@ -109,9 +121,18 @@ createStatusRoute(dataUpdateStatus);
 createUpdateRoute(() => fetchUpdateAllFundData(allFunds, dataUpdateStatus, isTradingDay, getNextUpdateTime, () => updateAllFundReturns(allFunds)));
 createYiFangDaRoute(fetchYiFangDaFundData);
 createGoldFundRoute(fetchGoldFundData);
+createNewsRefreshRoute(fetchAllNews);
+
+// SSE 实时新闻推送端点
+app.get('/api/news/stream', (req, res) => {
+  handleSSEConnection(req, res);
+});
 
 // API 路由
 app.use(apiRoutes);
+app.use(subscriptionRoutes);
+app.use(stockPickerRoutes);
+app.use(fundCompareRoutes);
 
 // 定时更新资金流向（使用递归 setTimeout 避免堆叠）
 function scheduleCapitalFlowUpdate() {
@@ -220,6 +241,17 @@ async function startServer() {
       // 启动自动更新（开盘时间每15分钟更新净值+指数）
       startAutoUpdate();
       scheduleCapitalFlowUpdate();
+
+      // 启动新闻定时抓取（每3分钟）
+      try {
+        await fetchAllNews();
+        console.log('[新闻] 初始抓取完成');
+      } catch (e) {
+        console.warn('[新闻] 初始抓取失败:', e.message);
+      }
+      setInterval(async () => {
+        try { await fetchAllNews(); } catch (e) { console.warn('[新闻] 定时抓取失败:', e.message); }
+      }, FETCH_INTERVAL_MS);
 
       // 启动时获取一次易方达基金数据（经理、净值等）
       fetchYiFangDaFundData().catch(err => {

@@ -297,7 +297,7 @@ async function getAllFundsWithNav(filters = {}) {
 
   // 分页
   const page = parseInt(filters.page) || 1;
-  const pageSize = Math.min(parseInt(filters.pageSize) || 100, 500);
+  const pageSize = Math.min(parseInt(filters.pageSize) || 100, 2000);
   const offset = (page - 1) * pageSize;
 
   // 总数（去掉外层SELECT * 和 ORDER BY/LIMIT）

@@ -18,6 +18,12 @@
 | 持仓管理 | `/web/portfolio` | 持仓记录、盈亏统计、定投计划、基准对比（需登录） |
 | 自选基金 | `/web/watchlist` | 收藏基金、实时行情、一键跳转详情（需登录） |
 | 用户登录 | `/web/login` | 用户名密码登录、支付宝扫码登录（新用户自动注册） |
+| 个人中心 | `/web/profile` | 个人信息编辑、账户安全、登录历史、会员状态（需登录） |
+| 基金对比 | `/web/fund-compare` | 多只基金横向对比分析 |
+| AI 选股 | `/web/stock-picker` | 多因子量化选股模型（需登录） |
+| 事件日历 | `/web/events` | 市场事件日历与新闻推送 |
+| 招行理财 | `/web/cmb-products` | 招商银行理财产品净值追踪 |
+| 订阅会员 | `/web/subscription` | VIP 会员开通与管理（需登录） |
 
 ## 技术栈
 
@@ -303,13 +309,60 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 - 输入参数校验（基金代码格式、ID 正整数、搜索长度、数值范围）
 - 环境变量敏感信息保护（.env 已 gitignore）
 - SQL 参数化查询（全量使用 $1, $2 占位符，防止 SQL 注入）
+- API 统计查询参数化 INTERVAL（防止 SQL 注入）
 - 持仓操作 ID 正整数校验（防止无效参数导致数据库错误）
 - OAuth 用户密码使用 crypto.randomBytes 生成（非 Math.random）
 - React ErrorBoundary 全局错误捕获（防止白屏）
 - 路由懒加载（代码分割，减小初始包体积）
 - 404 路由兜底（未知路径重定向首页）
+- authMiddleware 数据库故障时拒绝访问（fail-closed 策略）
+- 用户头像 URL 协议白名单校验（仅允许 http/https/data）
+- CSV 导出公式注入防护（转义 =、+、-、@ 前缀）
+- 系统配置项白名单校验（仅允许修改已定义的配置键）
+- 文件上传类型校验（multer fileFilter 仅允许 CSV）
+- 错误消息不暴露内部实现细节（通用错误提示 + 服务端详细日志）
+- SSE 实时推送使用 Authorization Header（token 不再暴露在 URL 中）
+- 分页参数上限约束（pageSize 最大 100，防止恶意大查询）
+- 自选基金批量查询数组长度限制（最多 100 个基金代码）
+- 订阅订单创建速率限制（5 次/分钟/用户）
+- 支付轮询速率限制（30 次/分钟/用户）
+- OAuth token 注入防护（URL 参数 token 先验证再存储）
+- 管理员批量删除用户使用数据库事务（防止部分删除导致数据不一致）
 
 ## 版本更新记录
+
+### v0.7 (2026-06-11)
+
+**新增功能**
+- 个人中心页面：用户头像下拉菜单新增「个人中心」入口，包含基本信息编辑、账户安全（密码修改、登录历史）、会员状态三大模块
+- 基金对比路由：`/web/fund-compare` 路由正式上线，支持多只基金横向对比分析
+- 用户个人资料 API：`PUT /api/auth/profile` 支持在线修改昵称和头像
+- 登录历史 API：`GET /api/auth/login-history` 返回最近 20 条登录记录（含浏览器、系统、IP）
+
+**安全加固（全面安全审查 + 修复）**
+- authMiddleware 数据库故障时拒绝访问（fail-closed），防止禁用用户在 DB 异常时绕过检查
+- 用户头像 URL 协议白名单校验（仅允许 http/https/data），防止 javascript: 协议注入
+- API 统计查询改用参数化 INTERVAL，消除 SQL 注入风险
+- CSV 导出公式注入防护（转义 =、+、-、@ 前缀），防止 Excel 公式执行
+- 系统配置项白名单校验，管理员只能修改已定义的配置键和合法值范围
+- 文件上传类型校验（multer fileFilter 仅允许 CSV 文件）
+- 错误消息统一为通用提示，不暴露数据库表名、列名等内部细节
+- SSE 实时推送改用 fetch + ReadableStream + Authorization Header，JWT 不再暴露在 URL 中
+- 分页参数上限约束（pageSize 最大 100），防止恶意大查询
+- 自选基金批量查询数组长度限制（最多 100 个）
+- 订阅订单创建速率限制（5 次/分钟/用户）
+- 支付轮询速率限制（30 次/分钟/用户）
+- OAuth token 注入防护（URL 参数 token 先验证用户信息再存储）
+- 管理员批量删除用户使用数据库事务（防止部分删除导致数据不一致）
+- StockPicker 改用统一 API 客户端（不再绕过 auth headers）
+
+**数据库**
+- `users` 表新增 `updated_at` 字段（自动记录最后更新时间）
+- 新增 `updated_at` 列迁移（ALTER TABLE IF EXISTS 兼容已有数据）
+
+**路由优化**
+- 新增 `/web/profile` 路由（需登录）
+- 新增 `/web/fund-compare` 路由
 
 ### v0.6 (2026-06-09)
 
@@ -537,6 +590,23 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 | 2026-06-09 | LOW | UPDATE_GUIDE.md 缺少更新后验证步骤 | 添加 .env 验证、后端日志、API 响应、前端访问 4 步检查 |
 | 2026-06-09 | HIGH | 禁用用户仍可使用现有 JWT 令牌访问系统（最长 7 天） | authMiddleware 新增数据库用户状态检查（30 秒 TTL 缓存），禁用用户的所有请求立即返回 403 |
 | 2026-06-09 | MEDIUM | adminMiddleware 输出用户敏感信息到控制台（用户名、ID、角色、状态） | 移除 console.log 调试输出，避免生产环境泄露用户隐私 |
+| 2026-06-11 | HIGH | authMiddleware 数据库查询失败时默认放行（fail-open），禁用用户可在 DB 异常时绕过检查 | 改为 fail-closed 策略，DB 查询失败时返回 503 拒绝访问 |
+| 2026-06-11 | HIGH | SSE EventSource 将 JWT 改用 fetch + ReadableStream + Authorization Header，token 不再暴露在 URL 中 | 改用 fetch + ReadableStream + Authorization Header，token 不再暴露在 URL 中 |
+| 2026-06-11 | MEDIUM | 用户个人资料 API 无头像 URL 验证，可注入 javascript: 协议 | 添加 URL 格式校验 + 协议白名单（http/https/data）+ 长度限制 500 字符 |
+| 2026-06-11 | MEDIUM | API 统计查询使用字符串拼接 INTERVAL，存在 SQL 注入风险 | 改用参数化查询 `($1 || ' hours')::interval` |
+| 2026-06-11 | MEDIUM | CSV 用户导出未转义公式前缀，存在 Excel 公式注入风险 | 添加 escapeCsv 函数，转义 =、+、-、@ 前缀和双引号 |
+| 2026-06-11 | MEDIUM | 系统配置 API 接受任意 key-value，管理员可插入恶意配置 | 添加 ALLOWED_CONFIG 白名单，仅允许修改已定义的配置键和合法值范围 |
+| 2026-06-11 | MEDIUM | 文件上传未校验 MIME 类型，可上传任意文件 | 添加 multer fileFilter，仅允许 CSV 文件（text/csv 或 .csv 扩展名） |
+| 2026-06-11 | MEDIUM | 错误响应暴露数据库错误详情（表名、列名） | 统一为通用错误提示，详细错误仅记录到服务端日志 |
+| 2026-06-11 | MEDIUM | 分页参数无上限，pageSize=999999 可获取全表数据 | 添加 Math.min(100) 上限约束，pageSize 最大 100 |
+| 2026-06-11 | MEDIUM | 自选基金批量查询无数组长度限制 | 添加 codes.length > 100 校验 |
+| 2026-06-11 | MEDIUM | 订阅订单创建无速率限制，可批量创建垃圾订单 | 添加用户级速率限制（5 次/分钟） |
+| 2026-06-11 | MEDIUM | 支付轮询无速率限制 | 添加用户级速率限制（30 次/分钟） |
+| 2026-06-11 | MEDIUM | OAuth 回调 token 直接存入 localStorage，未验证有效性 | 先调用 getMe() 验证用户信息，成功后才存储 token |
+| 2026-06-11 | MEDIUM | 管理员批量删除用户未使用事务，部分失败导致数据不一致 | 包装在 BEGIN/COMMIT 事务中，失败时 ROLLBACK |
+| 2026-06-11 | MEDIUM | 基金对比 premium 端点无 LIMIT，可返回全量历史数据 | 添加 LIMIT 1000 限制 |
+| 2026-06-11 | LOW | StockPicker 使用 raw fetch 绕过统一 API 客户端 | 改用 fundApi.getIndustries() |
+| 2026-06-11 | LOW | FundCompare 页面存在但无路由，用户无法访问 | 添加 /web/fund-compare 路由 |
 
 ## License
 

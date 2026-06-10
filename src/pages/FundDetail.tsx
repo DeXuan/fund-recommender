@@ -219,7 +219,7 @@ export default function FundDetail() {
             </Col>
           </Row>
 
-          <Card size="small" style={{ marginTop: 16, background: '#f5f5f5' }}>
+          <Card size="small" style={{ marginTop: 16, background: isDark ? '#1f1f1f' : '#f5f5f5' }}>
             <h4 style={{ marginBottom: 12 }}>持有人结构</h4>
             <Progress
               percent={Number(fund.individualHold)}
@@ -290,32 +290,32 @@ export default function FundDetail() {
             <Col xs={12} sm={6}>
               <Card size="small" style={{ textAlign: 'center' }}>
                 <Statistic title="PE(TTM)" value={fund.pe} valueStyle={{ fontSize: 28 }} />
-                <div style={{ fontSize: 12, color: '#666' }}>市盈率</div>
+                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>市盈率</div>
               </Card>
             </Col>
             <Col xs={12} sm={6}>
               <Card size="small" style={{ textAlign: 'center' }}>
                 <Statistic title="PB" value={fund.pb} valueStyle={{ fontSize: 28 }} />
-                <div style={{ fontSize: 12, color: '#666' }}>市净率</div>
+                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>市净率</div>
               </Card>
             </Col>
             <Col xs={12} sm={6}>
               <Card size="small" style={{ textAlign: 'center' }}>
                 <Statistic title="PE历史分位" value={fund.pePercentile} suffix="%" valueStyle={{ fontSize: 28 }} />
                 <Progress percent={Number(fund.pePercentile)} showInfo={false} size="small" />
-                <div style={{ fontSize: 12, color: '#666' }}>比 {fund.pePercentile}% 的时间便宜</div>
+                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>比 {fund.pePercentile}% 的时间便宜</div>
               </Card>
             </Col>
             <Col xs={12} sm={6}>
               <Card size="small" style={{ textAlign: 'center' }}>
                 <Statistic title="PB历史分位" value={fund.pbPercentile} suffix="%" valueStyle={{ fontSize: 28 }} />
                 <Progress percent={Number(fund.pbPercentile)} showInfo={false} size="small" />
-                <div style={{ fontSize: 12, color: '#666' }}>比 {fund.pbPercentile}% 的时间便宜</div>
+                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>比 {fund.pbPercentile}% 的时间便宜</div>
               </Card>
             </Col>
           </Row>
 
-          <Card size="small" style={{ marginTop: 16, background: '#f5f5f5' }}>
+          <Card size="small" style={{ marginTop: 16, background: isDark ? '#1f1f1f' : '#f5f5f5' }}>
             <h4 style={{ marginBottom: 12 }}>估值判断</h4>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{
@@ -326,7 +326,7 @@ export default function FundDetail() {
               }}>
                 {getValuationText(fund.valuation)}
               </div>
-              <p style={{ flex: 1, lineHeight: 1.6, color: '#333', margin: 0 }}>
+              <p style={{ flex: 1, lineHeight: 1.6, color: isDark ? '#e8e8e8' : '#333', margin: 0 }}>
                 {fund.valuation === 'very_low' || fund.valuation === 'low'
                   ? '当前估值处于历史低位，具有较好的投资价值，适合逢低布局或定投配置。'
                   : fund.valuation === 'reasonable'
@@ -350,7 +350,7 @@ export default function FundDetail() {
               {fund.topHoldings.map((holding, index) => (
                 <div key={index} style={{
                   display: 'flex', alignItems: 'center', marginBottom: 8,
-                  padding: '10px 16px', background: index % 2 === 0 ? '#fafafa' : 'white', borderRadius: 8,
+                  padding: '10px 16px', background: index % 2 === 0 ? (isDark ? '#262626' : '#fafafa') : 'white', borderRadius: 8,
                 }}>
                   <Tag color={index < 3 ? 'blue' : 'default'} style={{ marginRight: 12 }}>{index + 1}</Tag>
                   <span style={{ flex: 1, fontWeight: 500 }}>{holding.name}</span>
@@ -479,16 +479,16 @@ export default function FundDetail() {
         <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>投资建议</h3>
         <Row gutter={20}>
           <Col xs={24} md={12}>
-            <div style={{ color: '#666', fontSize: 13, marginBottom: 4 }}>推荐理由</div>
+            <div style={{ color: isDark ? '#a0a0a0' : '#666', fontSize: 13, marginBottom: 4 }}>推荐理由</div>
             <p style={{ lineHeight: 1.6 }}>{fund.recommendation}</p>
           </Col>
           <Col xs={24} md={12}>
-            <div style={{ color: '#666', fontSize: 13, marginBottom: 4 }}>适合人群</div>
+            <div style={{ color: isDark ? '#a0a0a0' : '#666', fontSize: 13, marginBottom: 4 }}>适合人群</div>
             <p style={{ lineHeight: 1.6 }}>{fund.suitableFor}</p>
           </Col>
         </Row>
         <Card size="small" style={{ marginTop: 12, background: 'rgba(255,255,255,0.7)' }}>
-          <div style={{ color: '#666', fontSize: 13, marginBottom: 4 }}>操作建议</div>
+          <div style={{ color: isDark ? '#a0a0a0' : '#666', fontSize: 13, marginBottom: 4 }}>操作建议</div>
           <p style={{ lineHeight: 1.6, margin: 0 }}>{fund.investmentAdvice}</p>
         </Card>
       </Card>

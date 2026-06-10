@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Layout, Spin } from 'antd';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 import DataStatus from './components/DataStatus';
 import ErrorBoundary from './components/ErrorBoundary';
 import GsapEnhancer from './components/GsapEnhancer';
@@ -19,10 +20,14 @@ const CMBProductDetail = lazy(() => import('./pages/CMBProductDetail'));
 
 const Login = lazy(() => import('./pages/Login'));
 const Portfolio = lazy(() => import('./pages/Portfolio'));
-const Watchlist = lazy(() => import('./pages/Watchlist'));
+const MarketEvents = lazy(() => import('./pages/MarketEvents'));
 
 const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
 const SystemMonitor = lazy(() => import('./pages/admin/SystemMonitor'));
+const Subscription = lazy(() => import('./pages/Subscription'));
+const StockPicker = lazy(() => import('./pages/StockPicker'));
+const Profile = lazy(() => import('./pages/Profile'));
+const FundCompare = lazy(() => import('./pages/FundCompare'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -51,12 +56,16 @@ function AppRoutes() {
         <Route path="/dca-calculator" element={<Navigate to="/portfolio" replace />} />
         <Route path="/market" element={<Navigate to="/industry" replace />} />
         <Route path="/industry" element={<IndustryAnalysis />} />
+        <Route path="/events" element={<MarketEvents />} />
         <Route path="/hs300" element={<HS300Analysis />} />
         <Route path="/cmb-products" element={<CMBProducts />} />
         <Route path="/cmb-products/:code" element={<CMBProductDetail />} />
         <Route path="/login" element={<Login />} />
         <Route path="/portfolio" element={<ProtectedRoute><Portfolio /></ProtectedRoute>} />
-        <Route path="/watchlist" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
+        <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+        <Route path="/stock-picker" element={<ProtectedRoute><StockPicker /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/fund-compare" element={<FundCompare />} />
         <Route path="/admin/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
         <Route path="/admin/monitor" element={<AdminRoute><SystemMonitor /></AdminRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -80,6 +89,7 @@ function App() {
               <AppRoutes />
             </ErrorBoundary>
           </Layout.Content>
+          <Footer />
         </Layout>
       </AuthProvider>
     </Router>

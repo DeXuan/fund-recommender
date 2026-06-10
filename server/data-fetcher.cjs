@@ -1029,8 +1029,8 @@ async function fetchSingleFundFromAlipay(code) {
   // B. 从东方财富历史净值API获取最新净值和收益率
   try {
     const lsjzRes = await axios.get(
-      `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=260`,
-      { timeout: 8000, headers: { Referer: 'https://fund.eastmoney.com/', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
+      'https://api.fund.eastmoney.com/f10/lsjz',
+      { params: { fundCode: code, pageIndex: 1, pageSize: 20 }, timeout: 8000, headers: { Referer: 'https://fund.eastmoney.com/', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
     );
     const list = lsjzRes.data?.Data?.LSJZList;
     if (list && list.length > 0) {
@@ -1139,6 +1139,8 @@ const GOLD_FUND_CODES = [
   '159880', '007874', '012520',
   // 行业 - 光伏
   '011102',
+  // 行业 - 酒店旅游（含航空产业链）
+  '159766', '562510', '159257', '159392', '159208', '159227', '024766', '024767',
   // 固收 - 债券
   '000171', '000172', '002611', '003327',
 ];
@@ -1173,6 +1175,7 @@ function classifyGoldCategory(name, indexName, fundType) {
   if (n.includes('红利')) return '策略-红利';
   if (n.includes('光伏')) return '行业-光伏';
   if (n.includes('机器人')) return '行业-机器人';
+  if (n.includes('旅游') || n.includes('酒店') || n.includes('航空产业')) return '行业-酒店旅游';
   if (n.includes('债券') || n.includes('固收')) return '固收-债券';
   if (fundType === 'ETF联接' || fundType === 'ETF') return '指数-其他';
   return '其他';
@@ -1204,6 +1207,7 @@ function inferIndustry(name, goldCategory) {
   if (goldCategory.includes('红利')) return '沪深300';
   if (goldCategory.includes('光伏')) return '新能源';
   if (goldCategory.includes('机器人')) return '人工智能';
+  if (goldCategory.includes('酒店旅游')) return '酒店旅游';
   if (goldCategory.includes('债券')) return '债券';
   return '其他';
 }

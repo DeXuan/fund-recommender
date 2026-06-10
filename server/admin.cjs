@@ -75,9 +75,14 @@ router.get('/users', async (req, res) => {
       params.push(status);
       idx++;
     }
+    if (req.query.vip === 'true') {
+      where.push(`(u.subscription_status = 'premium' AND u.subscription_end > NOW())`);
+    } else if (req.query.vip === 'false') {
+      where.push(`(u.subscription_status IS NULL OR u.subscription_status = 'free' OR u.subscription_end IS NULL OR u.subscription_end <= NOW())`);
+    }
 
     const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
-    const allowedSort = ['created_at', 'username', 'last_login_at', 'role'];
+    const allowedSort = ['created_at', 'username', 'last_login_at', 'role', 'subscription_status'];
     const sortCol = allowedSort.includes(sort) ? sort : 'created_at';
     const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
 
@@ -92,6 +97,7 @@ router.get('/users', async (req, res) => {
 
     const result = await pool.query(
       `SELECT u.id, u.username, u.nickname, u.avatar_url, u.role, u.status, u.created_at, u.last_login_at,
+              u.subscription_status, u.subscription_end, u.subscription_plan_id,
               COUNT(DISTINCT oa.id) AS oauth_count,
               COUNT(DISTINCT fr.id) AS record_count,
               COALESCE(SUM(fr.shares * fr.cost_price), 0) AS total_invested
@@ -128,7 +134,8 @@ router.get('/users/stats', async (req, res) => {
         COUNT(*) FILTER (WHERE last_login_at > NOW() - INTERVAL '7 days') AS active_7d,
         COUNT(*) FILTER (WHERE last_login_at > NOW() - INTERVAL '30 days') AS active_30d,
         COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') AS new_7d,
-        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') AS new_30d
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') AS new_30d,
+        COUNT(*) FILTER (WHERE subscription_status = 'premium' AND subscription_end > NOW()) AS vip_count
       FROM users
     `);
 
@@ -319,17 +326,27 @@ router.post('/users/batch', async (req, res) => {
     const safeIds = ids.filter(id => id !== req.user.id);
 
     if (action === 'delete') {
-      for (const id of safeIds) {
-        const u = await pool.query('SELECT username FROM users WHERE id = $1', [id]);
-        await pool.query('DELETE FROM watchlist WHERE user_id = $1', [id]);
-        await pool.query('DELETE FROM fund_records WHERE user_id = $1', [id]);
-        await pool.query('DELETE FROM dca_plans WHERE user_id = $1', [id]);
-        await pool.query('DELETE FROM risk_profiles WHERE user_id = $1', [id]);
-        await pool.query('DELETE FROM oauth_accounts WHERE user_id = $1', [id]);
-        await pool.query('DELETE FROM users WHERE id = $1', [id]);
-        if (u.rows.length > 0) {
-          await auditLog(req.user.id, req.user.username, 'batch_delete', id, u.rows[0].username, '', req.ip);
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const id of safeIds) {
+          const u = await client.query('SELECT username FROM users WHERE id = $1', [id]);
+          await client.query('DELETE FROM watchlist WHERE user_id = $1', [id]);
+          await client.query('DELETE FROM fund_records WHERE user_id = $1', [id]);
+          await client.query('DELETE FROM dca_plans WHERE user_id = $1', [id]);
+          await client.query('DELETE FROM risk_profiles WHERE user_id = $1', [id]);
+          await client.query('DELETE FROM oauth_accounts WHERE user_id = $1', [id]);
+          await client.query('DELETE FROM users WHERE id = $1', [id]);
+          if (u.rows.length > 0) {
+            await auditLog(req.user.id, req.user.username, 'batch_delete', id, u.rows[0].username, '', req.ip);
+          }
         }
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
       }
     } else if (action === 'disable' || action === 'enable') {
       const newStatus = action === 'disable' ? 'disabled' : 'active';
@@ -395,6 +412,7 @@ router.delete('/users/:id', async (req, res) => {
     await pool.query('DELETE FROM dca_plans WHERE user_id = $1', [id]);
     await pool.query('DELETE FROM risk_profiles WHERE user_id = $1', [id]);
     await pool.query('DELETE FROM oauth_accounts WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM user_notes WHERE user_id = $1', [id]);
     await pool.query('DELETE FROM users WHERE id = $1', [id]);
     await auditLog(req.user.id, req.user.username, 'delete_user', parseInt(id), user.rows[0].username, '', req.ip);
     logger.info(`管理员 ${req.user.username} 删除了用户 ${user.rows[0].username} (ID=${id})`);
@@ -402,6 +420,767 @@ router.delete('/users/:id', async (req, res) => {
   } catch (error) {
     logger.error(`删除用户失败: ${error.message}`);
     res.status(500).json({ error: '删除用户失败' });
+  }
+});
+
+// PUT /api/admin/users/:id — edit user profile
+router.put('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nickname, avatar_url, email, phone } = req.body;
+    const pool = getPool();
+    const target = await pool.query('SELECT username FROM users WHERE id = $1', [id]);
+    if (target.rows.length === 0) return res.status(404).json({ error: '用户不存在' });
+
+    const updates = [];
+    const params = [];
+    let idx = 1;
+    if (nickname !== undefined) {
+      if (typeof nickname !== 'string' || !nickname.trim()) return res.status(400).json({ error: '昵称不能为空' });
+      if (nickname.length > 30) return res.status(400).json({ error: '昵称不能超过30个字符' });
+      updates.push(`nickname = $${idx}`); params.push(nickname.trim()); idx++;
+    }
+    if (avatar_url !== undefined) {
+      if (avatar_url && typeof avatar_url === 'string' && avatar_url.length > 0) {
+        try { new URL(avatar_url); } catch { return res.status(400).json({ error: '头像URL格式无效' }); }
+      }
+      updates.push(`avatar_url = $${idx}`); params.push(avatar_url || ''); idx++;
+    }
+    if (updates.length === 0) return res.status(400).json({ error: '没有要更新的字段' });
+
+    params.push(id);
+    await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`, params);
+    await auditLog(req.user.id, req.user.username, 'edit_user', parseInt(id), target.rows[0].username, `更新: ${Object.keys(req.body).join(', ')}`, req.ip);
+    res.json({ success: true, message: '用户信息已更新' });
+  } catch (error) {
+    logger.error(`编辑用户失败: ${error.message}`);
+    res.status(500).json({ error: '编辑用户失败' });
+  }
+});
+
+// PUT /api/admin/users/:id/vip — grant/revoke VIP
+router.put('/users/:id/vip', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, days, plan_name } = req.body;
+    const pool = getPool();
+    const target = await pool.query('SELECT username, subscription_status, subscription_end FROM users WHERE id = $1', [id]);
+    if (target.rows.length === 0) return res.status(404).json({ error: '用户不存在' });
+
+    const user = target.rows[0];
+
+    if (action === 'grant') {
+      // Grant VIP: set premium status with expiration
+      const grantDays = parseInt(days) || 30;
+      const startDate = new Date();
+      // If user already has active VIP, extend from current end date
+      let endDate;
+      if (user.subscription_status === 'premium' && user.subscription_end && new Date(user.subscription_end) > new Date()) {
+        endDate = new Date(new Date(user.subscription_end).getTime() + grantDays * 86400000);
+      } else {
+        endDate = new Date(Date.now() + grantDays * 86400000);
+      }
+
+      // Get or create a default plan
+      let planId = null;
+      if (plan_name) {
+        const planResult = await pool.query('SELECT id FROM subscription_plans WHERE name = $1', [plan_name]);
+        if (planResult.rows.length > 0) planId = planResult.rows[0].id;
+      }
+      if (!planId) {
+        const defaultPlan = await pool.query("SELECT id FROM subscription_plans WHERE is_active = true ORDER BY price DESC LIMIT 1");
+        planId = defaultPlan.rows[0]?.id || null;
+      }
+
+      await pool.query(
+        `UPDATE users SET subscription_status = 'premium', subscription_plan_id = $1, subscription_start = NOW(), subscription_end = $2 WHERE id = $3`,
+        [planId, endDate, id]
+      );
+
+      // Create an order record for tracking
+      const outTradeNo = `ADMIN_GRANT_${Date.now()}_${id}`;
+      await pool.query(
+        `INSERT INTO subscription_orders (user_id, plan_id, out_trade_no, amount, status, paid_at)
+         VALUES ($1, $2, $3, 0, 'admin_granted', NOW())`,
+        [id, planId, outTradeNo]
+      ).catch(() => {}); // non-critical
+
+      await auditLog(req.user.id, req.user.username, 'grant_vip', parseInt(id), user.username, `授予VIP ${grantDays}天，到期 ${endDate.toLocaleDateString('zh-CN')}`, req.ip);
+      logger.info(`管理员 ${req.user.username} 授予用户 ${user.username} VIP ${grantDays}天`);
+      res.json({ success: true, message: `已授予VIP ${grantDays}天`, expiresAt: endDate });
+    } else if (action === 'revoke') {
+      // Revoke VIP
+      await pool.query(
+        `UPDATE users SET subscription_status = 'free', subscription_plan_id = NULL, subscription_start = NULL, subscription_end = NULL WHERE id = $1`,
+        [id]
+      );
+      await auditLog(req.user.id, req.user.username, 'revoke_vip', parseInt(id), user.username, '撤销VIP', req.ip);
+      logger.info(`管理员 ${req.user.username} 撤销了用户 ${user.username} 的VIP`);
+      res.json({ success: true, message: 'VIP已撤销' });
+    } else if (action === 'extend') {
+      // Extend VIP
+      const extendDays = parseInt(days) || 30;
+      if (!user.subscription_end || new Date(user.subscription_end) <= new Date()) {
+        return res.status(400).json({ error: '用户不是VIP，无法延期' });
+      }
+      const newEnd = new Date(new Date(user.subscription_end).getTime() + extendDays * 86400000);
+      await pool.query('UPDATE users SET subscription_end = $1 WHERE id = $2', [newEnd, id]);
+      await auditLog(req.user.id, req.user.username, 'extend_vip', parseInt(id), user.username, `延期${extendDays}天至 ${newEnd.toLocaleDateString('zh-CN')}`, req.ip);
+      res.json({ success: true, message: `VIP已延期${extendDays}天`, expiresAt: newEnd });
+    } else {
+      return res.status(400).json({ error: '无效操作，支持: grant, revoke, extend' });
+    }
+  } catch (error) {
+    logger.error(`VIP操作失败: ${error.message}`);
+    res.status(500).json({ error: 'VIP操作失败' });
+  }
+});
+
+// GET /api/admin/users/:id/vip — get VIP detail
+router.get('/users/:id/vip', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = getPool();
+    const userResult = await pool.query(
+      `SELECT id, username, subscription_status, subscription_plan_id, subscription_start, subscription_end FROM users WHERE id = $1`, [id]
+    );
+    if (userResult.rows.length === 0) return res.status(404).json({ error: '用户不存在' });
+
+    const user = userResult.rows[0];
+    let plan = null;
+    if (user.subscription_plan_id) {
+      const planResult = await pool.query('SELECT * FROM subscription_plans WHERE id = $1', [user.subscription_plan_id]);
+      plan = planResult.rows[0] || null;
+    }
+
+    // Order history
+    const orders = await pool.query(
+      `SELECT so.*, sp.name AS plan_name FROM subscription_orders so
+       LEFT JOIN subscription_plans sp ON so.plan_id = sp.id
+       WHERE so.user_id = $1 ORDER BY so.created_at DESC LIMIT 20`, [id]
+    );
+
+    const isActive = user.subscription_status === 'premium' && user.subscription_end && new Date(user.subscription_end) > new Date();
+    const daysRemaining = isActive ? Math.ceil((new Date(user.subscription_end).getTime() - Date.now()) / 86400000) : 0;
+
+    res.json({
+      status: user.subscription_status || 'free',
+      isActive,
+      plan,
+      startDate: user.subscription_start,
+      endDate: user.subscription_end,
+      daysRemaining,
+      orders: orders.rows,
+    });
+  } catch (error) {
+    logger.error(`获取VIP详情失败: ${error.message}`);
+    res.status(500).json({ error: '获取VIP详情失败' });
+  }
+});
+
+// GET /api/admin/subscriptions — list all subscription plans
+router.get('/subscriptions', async (req, res) => {
+  try {
+    const pool = getPool();
+    const plans = await pool.query('SELECT * FROM subscription_plans ORDER BY price');
+    const stats = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE subscription_status = 'premium' AND subscription_end > NOW()) AS active_vip,
+        COUNT(*) FILTER (WHERE subscription_status = 'premium' AND subscription_end <= NOW()) AS expired_vip,
+        COUNT(*) FILTER (WHERE subscription_status = 'free' OR subscription_status IS NULL) AS free_users
+      FROM users
+    `);
+    res.json({ plans: plans.rows, stats: stats.rows[0] });
+  } catch (error) {
+    logger.error(`获取订阅信息失败: ${error.message}`);
+    res.status(500).json({ error: '获取订阅信息失败' });
+  }
+});
+
+// GET /api/admin/login-logs — login history
+router.get('/login-logs', async (req, res) => {
+  try {
+    const { user_id, status, page = 1, pageSize = 50 } = req.query;
+    const pool = getPool();
+    let where = [];
+    let params = [];
+    let idx = 1;
+    if (user_id) { where.push(`l.user_id = $${idx}`); params.push(parseInt(user_id)); idx++; }
+    if (status && ['success', 'failed', 'locked'].includes(status)) { where.push(`l.status = $${idx}`); params.push(status); idx++; }
+    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+    const pg = Math.max(1, parseInt(page));
+    const size = Math.min(200, Math.max(1, parseInt(pageSize)));
+
+    const countResult = await pool.query(`SELECT COUNT(*) AS total FROM login_logs l ${whereClause}`, params);
+    const total = parseInt(countResult.rows[0].total);
+
+    const result = await pool.query(
+      `SELECT l.*, u.nickname FROM login_logs l LEFT JOIN users u ON l.user_id = u.id ${whereClause} ORDER BY l.created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...params, size, (pg - 1) * size]
+    );
+
+    // Stats
+    const statsResult = await pool.query(`
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE status = 'success') AS success_count,
+        COUNT(*) FILTER (WHERE status = 'failed') AS failed_count,
+        COUNT(*) FILTER (WHERE status = 'locked') AS locked_count,
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') AS last_24h,
+        COUNT(DISTINCT login_ip) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') AS unique_ips_24h
+      FROM login_logs
+    `);
+
+    res.json({ logs: result.rows, total, page: pg, pageSize: size, totalPages: Math.ceil(total / size), stats: statsResult.rows[0] });
+  } catch (error) {
+    logger.error(`获取登录日志失败: ${error.message}`);
+    res.status(500).json({ error: '获取登录日志失败' });
+  }
+});
+
+// GET /api/admin/online-users — currently active users (logged in within last 15 minutes)
+router.get('/online-users', async (req, res) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query(`
+      SELECT u.id, u.username, u.nickname, u.avatar_url, u.role, u.last_login_at, u.last_login_ip,
+             l.browser, l.os, l.device
+      FROM users u
+      LEFT JOIN LATERAL (
+        SELECT browser, os, device FROM login_logs WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1
+      ) l ON true
+      WHERE u.last_login_at > NOW() - INTERVAL '15 minutes' AND u.status = 'active'
+      ORDER BY u.last_login_at DESC
+    `);
+
+    const totalCount = await pool.query("SELECT COUNT(*) AS count FROM users WHERE last_login_at > NOW() - INTERVAL '15 minutes' AND status = 'active'");
+
+    // Session stats
+    const sessionStats = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE last_login_at > NOW() - INTERVAL '5 minutes') AS last_5min,
+        COUNT(*) FILTER (WHERE last_login_at > NOW() - INTERVAL '15 minutes') AS last_15min,
+        COUNT(*) FILTER (WHERE last_login_at > NOW() - INTERVAL '1 hour') AS last_1hour,
+        COUNT(*) FILTER (WHERE last_login_at > NOW() - INTERVAL '24 hours') AS last_24hour
+      FROM users WHERE status = 'active'
+    `);
+
+    res.json({ users: result.rows, total: parseInt(totalCount.rows[0].count), sessionStats: sessionStats.rows[0] });
+  } catch (error) {
+    logger.error(`获取在线用户失败: ${error.message}`);
+    res.status(500).json({ error: '获取在线用户失败' });
+  }
+});
+
+// GET /api/admin/users/export — export users as CSV
+router.get('/users/export', async (req, res) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query(`
+      SELECT u.id, u.username, u.nickname, u.role, u.status, u.created_at, u.last_login_at, u.last_login_ip,
+             COUNT(DISTINCT fr.id) AS record_count,
+             COALESCE(SUM(fr.shares * fr.cost_price), 0) AS total_invested
+      FROM users u
+      LEFT JOIN fund_records fr ON fr.user_id = u.id
+      GROUP BY u.id
+      ORDER BY u.created_at DESC
+    `);
+
+    const header = 'ID,用户名,昵称,角色,状态,注册时间,最后登录,最后IP,持仓数,总投入\n';
+    const escapeCsv = (val) => {
+      const s = String(val ?? '');
+      if (s.includes('"') || s.includes(',') || s.includes('\n') || s.startsWith('=') || s.startsWith('+') || s.startsWith('-') || s.startsWith('@')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return '"' + s + '"';
+    };
+    const csv = result.rows.map(r =>
+      [r.id, r.username, r.nickname || '', r.role, r.status, new Date(r.created_at).toLocaleString('zh-CN'), r.last_login_at ? new Date(r.last_login_at).toLocaleString('zh-CN') : '', r.last_login_ip || '', r.record_count, parseFloat(r.total_invested).toFixed(2)].map(escapeCsv).join(',')
+    ).join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=users_${new Date().toISOString().slice(0, 10)}.csv`);
+    res.send('﻿' + header + csv);
+  } catch (error) {
+    logger.error(`导出用户失败: ${error.message}`);
+    res.status(500).json({ error: '导出用户失败' });
+  }
+});
+
+// POST /api/admin/users/:id/notes — add admin note
+router.post('/users/:id/notes', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+    if (!content || !content.trim()) return res.status(400).json({ error: '备注内容不能为空' });
+    const pool = getPool();
+    const result = await pool.query(
+      `INSERT INTO user_notes (user_id, admin_id, admin_username, content) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [id, req.user.id, req.user.username, content.trim()]
+    );
+    await auditLog(req.user.id, req.user.username, 'add_note', parseInt(id), '', content.trim().slice(0, 100), req.ip);
+    res.json({ success: true, note: result.rows[0] });
+  } catch (error) {
+    logger.error(`添加备注失败: ${error.message}`);
+    res.status(500).json({ error: '添加备注失败' });
+  }
+});
+
+// GET /api/admin/users/:id/notes — get user notes
+router.get('/users/:id/notes', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT * FROM user_notes WHERE user_id = $1 ORDER BY created_at DESC`, [id]
+    );
+    res.json({ notes: result.rows });
+  } catch (error) {
+    logger.error(`获取备注失败: ${error.message}`);
+    res.status(500).json({ error: '获取备注失败' });
+  }
+});
+
+// DELETE /api/admin/notes/:id — delete note
+router.delete('/notes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = getPool();
+    await pool.query('DELETE FROM user_notes WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error(`删除备注失败: ${error.message}`);
+    res.status(500).json({ error: '删除备注失败' });
+  }
+});
+
+// ========== System Settings ==========
+
+// GET /api/admin/settings — get system config
+router.get('/settings', async (req, res) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query('SELECT key, value, description FROM system_config ORDER BY key');
+    const config = {};
+    result.rows.forEach(r => { config[r.key] = { value: r.value, description: r.description }; });
+    res.json({ config });
+  } catch (error) {
+    logger.error(`获取系统配置失败: ${error.message}`);
+    res.status(500).json({ error: '获取系统配置失败' });
+  }
+});
+
+// Allowed system config keys with validation
+const ALLOWED_CONFIG = {
+  max_login_attempts: (v) => { const n = parseInt(v); return n >= 1 && n <= 100 ? String(n) : null; },
+  lockout_duration_minutes: (v) => { const n = parseInt(v); return n >= 1 && n <= 1440 ? String(n) : null; },
+  password_min_length: (v) => { const n = parseInt(v); return n >= 6 && n <= 128 ? String(n) : null; },
+  session_timeout_hours: (v) => { const n = parseInt(v); return n >= 1 && n <= 720 ? String(n) : null; },
+  maintenance_mode: (v) => { return ['true', 'false'].includes(String(v)) ? String(v) : null; },
+  registration_enabled: (v) => { return ['true', 'false'].includes(String(v)) ? String(v) : null; },
+};
+
+// PUT /api/admin/settings — update system config
+router.put('/settings', async (req, res) => {
+  try {
+    const { settings } = req.body;
+    if (!settings || typeof settings !== 'object') return res.status(400).json({ error: '无效的配置' });
+    const pool = getPool();
+    for (const [key, value] of Object.entries(settings)) {
+      const validator = ALLOWED_CONFIG[key];
+      if (!validator) return res.status(400).json({ error: `不允许修改配置项: ${key}` });
+      const safeValue = validator(value);
+      if (safeValue === null) return res.status(400).json({ error: `配置项 ${key} 的值无效` });
+      await pool.query(
+        `INSERT INTO system_config (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+        [key, safeValue]
+      );
+    }
+    await auditLog(req.user.id, req.user.username, 'update_settings', null, '', `更新: ${Object.keys(settings).join(', ')}`, req.ip);
+    res.json({ success: true, message: '配置已更新' });
+  } catch (error) {
+    logger.error(`更新系统配置失败: ${error.message}`);
+    res.status(500).json({ error: '更新系统配置失败' });
+  }
+});
+
+// ========== Alert Rules ==========
+
+// GET /api/admin/alerts/rules — list alert rules
+router.get('/alerts/rules', async (req, res) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query('SELECT * FROM alert_rules ORDER BY created_at DESC');
+    res.json({ rules: result.rows });
+  } catch (error) {
+    logger.error(`获取告警规则失败: ${error.message}`);
+    res.status(500).json({ error: '获取告警规则失败' });
+  }
+});
+
+// POST /api/admin/alerts/rules — create alert rule
+router.post('/alerts/rules', async (req, res) => {
+  try {
+    const { name, metric, operator, threshold, duration, severity, enabled, notify_channels } = req.body;
+    if (!name || !metric || !operator || threshold === undefined) {
+      return res.status(400).json({ error: '缺少必填字段' });
+    }
+    const pool = getPool();
+    const result = await pool.query(
+      `INSERT INTO alert_rules (name, metric, operator, threshold, duration, severity, enabled, notify_channels, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [name, metric, operator, threshold, duration || 0, severity || 'warning', enabled !== false, JSON.stringify(notify_channels || ['web']), req.user.id]
+    );
+    await auditLog(req.user.id, req.user.username, 'create_alert_rule', null, '', name, req.ip);
+    res.json({ success: true, rule: result.rows[0] });
+  } catch (error) {
+    logger.error(`创建告警规则失败: ${error.message}`);
+    res.status(500).json({ error: '创建告警规则失败' });
+  }
+});
+
+// PUT /api/admin/alerts/rules/:id — update alert rule
+router.put('/alerts/rules/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, metric, operator, threshold, duration, severity, enabled, notify_channels } = req.body;
+    const pool = getPool();
+    await pool.query(
+      `UPDATE alert_rules SET name=$1, metric=$2, operator=$3, threshold=$4, duration=$5, severity=$6, enabled=$7, notify_channels=$8, updated_at=NOW() WHERE id=$9`,
+      [name, metric, operator, threshold, duration || 0, severity || 'warning', enabled !== false, JSON.stringify(notify_channels || ['web']), id]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    logger.error(`更新告警规则失败: ${error.message}`);
+    res.status(500).json({ error: '更新告警规则失败' });
+  }
+});
+
+// DELETE /api/admin/alerts/rules/:id — delete alert rule
+router.delete('/alerts/rules/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = getPool();
+    await pool.query('DELETE FROM alert_rules WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error(`删除告警规则失败: ${error.message}`);
+    res.status(500).json({ error: '删除告警规则失败' });
+  }
+});
+
+// GET /api/admin/alerts/history — alert history
+router.get('/alerts/history', async (req, res) => {
+  try {
+    const { status, severity, page = 1, pageSize = 50 } = req.query;
+    const pool = getPool();
+    let where = [];
+    let params = [];
+    let idx = 1;
+    if (status && ['firing', 'resolved'].includes(status)) { where.push(`status = $${idx}`); params.push(status); idx++; }
+    if (severity && ['info', 'warning', 'critical'].includes(severity)) { where.push(`severity = $${idx}`); params.push(severity); idx++; }
+    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+    const pg = Math.max(1, parseInt(page));
+    const size = Math.min(200, Math.max(1, parseInt(pageSize)));
+
+    const countResult = await pool.query(`SELECT COUNT(*) AS total FROM alert_history ${whereClause}`, params);
+    const total = parseInt(countResult.rows[0].total);
+
+    const result = await pool.query(
+      `SELECT * FROM alert_history ${whereClause} ORDER BY created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...params, size, (pg - 1) * size]
+    );
+
+    // Stats
+    const statsResult = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'firing') AS firing_count,
+        COUNT(*) FILTER (WHERE status = 'resolved') AS resolved_count,
+        COUNT(*) FILTER (WHERE severity = 'critical') AS critical_count,
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') AS last_24h
+      FROM alert_history
+    `);
+
+    res.json({ history: result.rows, total, page: pg, pageSize: size, stats: statsResult.rows[0] });
+  } catch (error) {
+    logger.error(`获取告警历史失败: ${error.message}`);
+    res.status(500).json({ error: '获取告警历史失败' });
+  }
+});
+
+// POST /api/admin/alerts/history/:id/resolve — resolve alert
+router.post('/alerts/history/:id/resolve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = getPool();
+    await pool.query("UPDATE alert_history SET status = 'resolved', resolved_at = NOW() WHERE id = $1", [id]);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error(`解决告警失败: ${error.message}`);
+    res.status(500).json({ error: '解决告警失败' });
+  }
+});
+
+// ========== API Statistics ==========
+
+// In-memory API stats collector
+const apiStatsBuffer = new Map(); // key: `${method}:${endpoint}` -> { count, errors, totalTime, maxTime, times[] }
+
+function recordApiStat(method, endpoint, statusCode, responseTimeMs) {
+  const key = `${method}:${endpoint}`;
+  if (!apiStatsBuffer.has(key)) {
+    apiStatsBuffer.set(key, { count: 0, errors: 0, totalTime: 0, maxTime: 0, times: [] });
+  }
+  const stat = apiStatsBuffer.get(key);
+  stat.count++;
+  if (statusCode >= 400) stat.errors++;
+  stat.totalTime += responseTimeMs;
+  stat.maxTime = Math.max(stat.maxTime, responseTimeMs);
+  stat.times.push(responseTimeMs);
+  // Keep only last 1000 times for p95 calculation
+  if (stat.times.length > 1000) stat.times = stat.times.slice(-1000);
+}
+
+// Flush API stats to database periodically (every 5 minutes)
+async function flushApiStats() {
+  if (apiStatsBuffer.size === 0) return;
+  try {
+    const pool = getPool();
+    const hourStart = new Date();
+    hourStart.setMinutes(0, 0, 0);
+
+    for (const [key, stat] of apiStatsBuffer.entries()) {
+      const [method, endpoint] = key.split(':');
+      const sorted = [...stat.times].sort((a, b) => a - b);
+      const p95 = sorted[Math.floor(sorted.length * 0.95)] || 0;
+      const avg = stat.count > 0 ? stat.totalTime / stat.count : 0;
+
+      await pool.query(
+        `INSERT INTO api_stats (hour_start, endpoint, method, request_count, error_count, avg_response_ms, max_response_ms, p95_response_ms)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (hour_start, endpoint, method) DO UPDATE SET
+           request_count = api_stats.request_count + $4,
+           error_count = api_stats.error_count + $5,
+           avg_response_ms = (api_stats.avg_response_ms + $6) / 2,
+           max_response_ms = GREATEST(api_stats.max_response_ms, $7),
+           p95_response_ms = GREATEST(api_stats.p95_response_ms, $8)`,
+        [hourStart, endpoint, method, stat.count, stat.errors, avg, stat.maxTime, p95]
+      );
+    }
+    apiStatsBuffer.clear();
+  } catch (e) {
+    logger.error(`Flush API stats failed: ${e.message}`);
+  }
+}
+setInterval(flushApiStats, 5 * 60 * 1000);
+
+// GET /api/admin/api-stats — API statistics
+router.get('/api-stats', async (req, res) => {
+  try {
+    const pool = getPool();
+    const { hours = 24 } = req.query;
+
+    // From database (historical)
+    const dbStats = await pool.query(`
+      SELECT endpoint, method,
+             SUM(request_count) AS total_requests,
+             SUM(error_count) AS total_errors,
+             ROUND(AVG(avg_response_ms)::numeric, 2) AS avg_ms,
+             ROUND(MAX(max_response_ms)::numeric, 2) AS max_ms,
+             ROUND(AVG(p95_response_ms)::numeric, 2) AS p95_ms
+      FROM api_stats
+      WHERE hour_start > NOW() - ($1 || ' hours')::interval
+      GROUP BY endpoint, method
+      ORDER BY total_requests DESC
+      LIMIT 50
+    `, [String(parseInt(hours) || 24)]);
+
+    // From memory buffer (current)
+    const liveStats = [];
+    for (const [key, stat] of apiStatsBuffer.entries()) {
+      const [method, endpoint] = key.split(':');
+      const sorted = [...stat.times].sort((a, b) => a - b);
+      liveStats.push({
+        endpoint, method,
+        total_requests: stat.count,
+        total_errors: stat.errors,
+        avg_ms: stat.count > 0 ? (stat.totalTime / stat.count).toFixed(2) : 0,
+        max_ms: stat.maxTime.toFixed(2),
+        p95_ms: (sorted[Math.floor(sorted.length * 0.95)] || 0).toFixed(2),
+        live: true,
+      });
+    }
+
+    // Hourly trend
+    const trendResult = await pool.query(`
+      SELECT hour_start,
+             SUM(request_count) AS requests,
+             SUM(error_count) AS errors,
+             ROUND(AVG(avg_response_ms)::numeric, 2) AS avg_ms
+      FROM api_stats
+      WHERE hour_start > NOW() - ($1 || ' hours')::interval
+      GROUP BY hour_start
+      ORDER BY hour_start
+    `, [String(parseInt(hours) || 24)]);
+
+    // Error rate
+    const errorRate = await pool.query(`
+      SELECT
+        COALESCE(SUM(request_count), 0) AS total,
+        COALESCE(SUM(error_count), 0) AS errors,
+        CASE WHEN SUM(request_count) > 0 THEN ROUND(SUM(error_count) * 100.0 / SUM(request_count), 2) ELSE 0 END AS error_rate
+      FROM api_stats WHERE hour_start > NOW() - INTERVAL '24 hours'
+    `);
+
+    res.json({
+      endpoints: [...liveStats, ...dbStats.rows.filter(d => !liveStats.find(l => l.endpoint === d.endpoint && l.method === d.method))],
+      trend: trendResult.rows,
+      errorRate: errorRate.rows[0],
+    });
+  } catch (error) {
+    logger.error(`获取API统计失败: ${error.message}`);
+    res.status(500).json({ error: '获取API统计失败' });
+  }
+});
+
+// ========== Health Check ==========
+
+// GET /api/admin/health-check — comprehensive health check
+router.get('/health-check', async (req, res) => {
+  const checks = [];
+  const startTime = Date.now();
+
+  // 1. Database check
+  try {
+    const dbStart = Date.now();
+    const pool = getPool();
+    await pool.query('SELECT 1');
+    const dbLatency = Date.now() - dbStart;
+    checks.push({ name: 'PostgreSQL', status: 'healthy', latency: dbLatency, detail: `连接正常，延迟 ${dbLatency}ms` });
+  } catch (e) {
+    checks.push({ name: 'PostgreSQL', status: 'unhealthy', detail: e.message });
+  }
+
+  // 2. Memory check
+  const memUsage = process.memoryUsage();
+  const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+  const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
+  const heapPercent = Math.round(heapUsedMB / heapTotalMB * 100);
+  checks.push({
+    name: '堆内存',
+    status: heapPercent > 90 ? 'warning' : 'healthy',
+    detail: `${heapUsedMB}MB / ${heapTotalMB}MB (${heapPercent}%)`,
+    value: heapPercent,
+  });
+
+  // 3. System memory
+  const sysMemPercent = Math.round((os.totalmem() - os.freemem()) / os.totalmem() * 100);
+  checks.push({
+    name: '系统内存',
+    status: sysMemPercent > 90 ? 'critical' : sysMemPercent > 80 ? 'warning' : 'healthy',
+    detail: `${sysMemPercent}% 已使用`,
+    value: sysMemPercent,
+  });
+
+  // 4. Disk check
+  try {
+    const isWin = os.platform() === 'win32';
+    if (isWin) {
+      const diskRaw = await safeExecAsync('powershell -Command "Get-PSDrive -PSProvider FileSystem | Where-Object {$_.Used -ne $null} | ForEach-Object { $_.Name + \\",\\" + $_.Used + \\",\\" + $_.Free }"');
+      diskRaw.split('\n').filter(l => l.trim()).forEach(line => {
+        const p = line.trim().split(',');
+        if (p.length >= 3) {
+          const used = parseInt(p[1]) || 0;
+          const free = parseInt(p[2]) || 0;
+          const total = used + free;
+          const percent = total > 0 ? Math.round(used / total * 100) : 0;
+          checks.push({
+            name: `磁盘 ${p[0].trim()}:`,
+            status: percent > 95 ? 'critical' : percent > 85 ? 'warning' : 'healthy',
+            detail: `${percent}% 已使用 (${formatBytes(used)} / ${formatBytes(total)})`,
+            value: percent,
+          });
+        }
+      });
+    } else {
+      const df = await safeExecAsync("df -h / | tail -1");
+      const parts = df.split(/\s+/);
+      if (parts.length >= 5) {
+        const percent = parseInt(parts[4]) || 0;
+        checks.push({ name: '磁盘 /', status: percent > 95 ? 'critical' : percent > 85 ? 'warning' : 'healthy', detail: `${percent} 已使用`, value: percent });
+      }
+    }
+  } catch { checks.push({ name: '磁盘', status: 'unknown', detail: '无法获取' }); }
+
+  // 5. Uptime
+  const uptimeSec = Math.floor(process.uptime());
+  checks.push({ name: '服务运行', status: 'healthy', detail: formatDuration(uptimeSec), value: uptimeSec });
+
+  // 6. Connection pool
+  try {
+    const pool = getPool();
+    const connResult = await pool.query("SELECT count(*) AS total FROM pg_stat_activity WHERE datname = current_database()");
+    const maxConn = await pool.query("SHOW max_connections");
+    const total = parseInt(connResult.rows[0].total);
+    const max = parseInt(maxConn.rows[0].max_connections);
+    const connPercent = Math.round(total / max * 100);
+    checks.push({
+      name: '数据库连接',
+      status: connPercent > 80 ? 'warning' : 'healthy',
+      detail: `${total} / ${max} (${connPercent}%)`,
+      value: connPercent,
+    });
+  } catch {}
+
+  const overallStatus = checks.some(c => c.status === 'unhealthy' || c.status === 'critical') ? 'critical'
+    : checks.some(c => c.status === 'warning') ? 'warning' : 'healthy';
+
+  res.json({ status: overallStatus, checks, totalLatency: Date.now() - startTime, timestamp: Date.now() });
+});
+
+// ========== System Events ==========
+
+// GET /api/admin/system-events — system events
+router.get('/system-events', async (req, res) => {
+  try {
+    const { type, page = 1, pageSize = 50 } = req.query;
+    const pool = getPool();
+    let where = [];
+    let params = [];
+    let idx = 1;
+    if (type) { where.push(`event_type = $${idx}`); params.push(type); idx++; }
+    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+    const pg = Math.max(1, parseInt(page));
+    const size = Math.min(200, Math.max(1, parseInt(pageSize)));
+
+    const countResult = await pool.query(`SELECT COUNT(*) AS total FROM system_events ${whereClause}`, params);
+    const total = parseInt(countResult.rows[0].total);
+
+    const result = await pool.query(
+      `SELECT * FROM system_events ${whereClause} ORDER BY created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...params, size, (pg - 1) * size]
+    );
+
+    res.json({ events: result.rows, total, page: pg, pageSize: size });
+  } catch (error) {
+    logger.error(`获取系统事件失败: ${error.message}`);
+    res.status(500).json({ error: '获取系统事件失败' });
+  }
+});
+
+// POST /api/admin/system-events — create system event
+router.post('/system-events', async (req, res) => {
+  try {
+    const { event_type, severity, title, detail, source } = req.body;
+    const pool = getPool();
+    const result = await pool.query(
+      `INSERT INTO system_events (event_type, severity, title, detail, source) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [event_type || 'custom', severity || 'info', title, detail || '', source || 'admin']
+    );
+    res.json({ success: true, event: result.rows[0] });
+  } catch (error) {
+    logger.error(`创建系统事件失败: ${error.message}`);
+    res.status(500).json({ error: '创建系统事件失败' });
   }
 });
 
@@ -1021,3 +1800,4 @@ module.exports = router;
 module.exports.incrementRequestCount = incrementRequestCount;
 module.exports.incrementSlowQueryCount = incrementSlowQueryCount;
 module.exports.resetQpsCounter = resetQpsCounter;
+module.exports.recordApiStat = recordApiStat;

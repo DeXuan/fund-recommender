@@ -58,7 +58,7 @@ rsync -avz --delete dist/ ${REMOTE_DIR}/dist/
 
 # 上传后端代码
 info "  上传 server/..."
-rsync -avz server/index.cjs server/db.cjs server/fund-service.cjs server/fund-data.cjs server/auth.cjs server/portfolio.cjs server/data-fetcher.cjs server/admin.cjs ${REMOTE_DIR}/server/
+rsync -avz server/index.cjs server/db.cjs server/fund-service.cjs server/fund-data.cjs server/auth.cjs server/portfolio.cjs server/data-fetcher.cjs server/admin.cjs server/market-events.cjs server/news-fetcher.cjs server/subscription-service.cjs ${REMOTE_DIR}/server/
 rsync -avz server/utils/ ${REMOTE_DIR}/server/utils/
 rsync -avz server/routes/ ${REMOTE_DIR}/server/routes/
 

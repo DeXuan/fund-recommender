@@ -227,6 +227,16 @@ const allFunds = [
   { code: '009342', name: '易方达优质企业三年持有期混合', type: '混合', industry: '消费', index: '混合基金', managementFee: 1.50, custodyFee: 0.25, serviceFee: 0.00, totalFee: 1.75, scale: 120.60, rating: 4, buySuggestion: '长期持有', dailyLimit: 0 },
   { code: '161131', name: '易方达科润混合(LOF)', type: '混合', industry: '科技', index: '混合基金', managementFee: 1.50, custodyFee: 0.25, serviceFee: 0.00, totalFee: 1.75, scale: 45.20, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
   { code: '110005', name: '易方达积极成长混合', type: '混合', industry: '混合', index: '混合基金', managementFee: 1.50, custodyFee: 0.25, serviceFee: 0.00, totalFee: 1.75, scale: 55.80, rating: 3, buySuggestion: '适合定投', dailyLimit: 0 },
+  // 酒店旅游行业基金
+  { code: '159766', name: '富国中证旅游主题ETF', type: 'ETF', industry: '酒店旅游', index: '中证旅游主题', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 56.76, rating: 3, buySuggestion: '逢低布局', dailyLimit: 0 },
+  { code: '562510', name: '华夏中证旅游主题ETF', type: 'ETF', industry: '酒店旅游', index: '中证旅游主题', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 5.02, rating: 3, buySuggestion: '逢低布局', dailyLimit: 0 },
+  { code: '159257', name: '汇添富中证航空产业ETF', type: 'ETF', industry: '酒店旅游', index: '中证航空产业', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 1.50, rating: 3, buySuggestion: '逢低布局', dailyLimit: 0 },
+  { code: '159392', name: '富国中证航空产业ETF', type: 'ETF', industry: '酒店旅游', index: '中证航空产业', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 2.06, rating: 3, buySuggestion: '逢低布局', dailyLimit: 0 },
+  { code: '159208', name: '国证航空航天ETF万家', type: 'ETF', industry: '酒店旅游', index: '国证航空航天', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 3.06, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
+  { code: '159227', name: '国证航空航天ETF华夏', type: 'ETF', industry: '酒店旅游', index: '国证航空航天', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 37.90, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
+  { code: '024766', name: '华宝国证通用航空产业ETF联接A', type: 'ETF联接', industry: '酒店旅游', index: '国证通用航空', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 0.20, rating: 3, buySuggestion: '逢低布局', dailyLimit: 0 },
+  { code: '024767', name: '华宝国证通用航空产业ETF联接C', type: 'ETF联接', industry: '酒店旅游', index: '国证通用航空', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 1.00, rating: 3, buySuggestion: '逢低布局', dailyLimit: 0 },
+  { code: '980059', name: '航空出行指数', type: '指数', industry: '酒店旅游', index: '航空出行', managementFee: 0.00, custodyFee: 0.00, serviceFee: 0.00, totalFee: 0.00, scale: 0, rating: 3, buySuggestion: '关注', dailyLimit: 0 },
 ];
 
 // 基金经理映射（基金代码 → 基金经理）

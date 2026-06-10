@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { fundApi } from '../services/api';
 import type { HS300Analysis as HS300AnalysisType, HS300Fund, HS300Holding } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function HS300Analysis() {
+  const { isDark } = useTheme();
   const [data, setData] = useState<HS300AnalysisType | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('funds');
@@ -76,7 +78,7 @@ export default function HS300Analysis() {
     if (v.includes('偏低')) return '#73d13d';
     if (v.includes('合理')) return '#1677ff';
     if (v.includes('偏高') || v.includes('高')) return '#ff4d4f';
-    return '#666';
+    return isDark ? '#a0a0a0' : '#666';
   };
 
   if (loading) {
@@ -121,7 +123,7 @@ export default function HS300Analysis() {
 
       {/* 标签页导航 */}
       <div className="card" style={{ padding: 0 }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid #e8e8e8', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', borderBottom: isDark ? '1px solid #333' : '1px solid #e8e8e8', overflowX: 'auto' }}>
           {[
             { key: 'funds', label: `基金对比 (${data.funds.length})` },
             { key: 'holdings', label: `权重股分析 (${data.topHoldings.length})` },
@@ -136,7 +138,7 @@ export default function HS300Analysis() {
                 background: 'none',
                 cursor: 'pointer',
                 borderBottom: activeTab === tab.key ? '2px solid #1677ff' : '2px solid transparent',
-                color: activeTab === tab.key ? '#1677ff' : '#666',
+                color: activeTab === tab.key ? '#1677ff' : (isDark ? '#a0a0a0' : '#666'),
                 fontWeight: activeTab === tab.key ? 600 : 400,
                 whiteSpace: 'nowrap',
               }}
@@ -153,7 +155,7 @@ export default function HS300Analysis() {
           {/* 筛选按钮 */}
           <div className="card" style={{ padding: '12px 20px' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 13, color: '#666', marginRight: 8 }}>筛选：</span>
+              <span style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', marginRight: 8 }}>筛选：</span>
               {[
                 { key: 'all', label: '全部' },
                 { key: 'etf', label: 'ETF' },
@@ -165,10 +167,10 @@ export default function HS300Analysis() {
                   onClick={() => setFundFilter(f.key as any)}
                   style={{
                     padding: '4px 12px',
-                    border: fundFilter === f.key ? '1px solid #1677ff' : '1px solid #d9d9d9',
+                    border: fundFilter === f.key ? '1px solid #1677ff' : (isDark ? '1px solid #444' : '1px solid #d9d9d9'),
                     borderRadius: 4,
-                    background: fundFilter === f.key ? '#e6f4ff' : 'white',
-                    color: fundFilter === f.key ? '#1677ff' : '#666',
+                    background: fundFilter === f.key ? (isDark ? '#111a2c' : '#e6f4ff') : (isDark ? '#1a1a1a' : 'white'),
+                    color: fundFilter === f.key ? '#1677ff' : (isDark ? '#a0a0a0' : '#666'),
                     cursor: 'pointer',
                     fontSize: 13,
                   }}
@@ -180,15 +182,15 @@ export default function HS300Analysis() {
           </div>
 
           {/* 首选推荐 */}
-          <div className="card" style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
+          <div className="card" style={{ background: isDark ? '#162312' : '#f6ffed', border: '1px solid #b7eb8f' }}>
             <h4 style={{ color: '#52c41a', marginBottom: 12 }}>首选推荐</h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
               {data.recommendation.bestPicks.map(pick => (
-                <div key={pick.code} style={{ background: 'white', padding: 12, borderRadius: 8 }}>
+                <div key={pick.code} style={{ background: isDark ? '#1a1a1a' : 'white', padding: 12, borderRadius: 8 }}>
                   <Link to={`/funds/${pick.code}`} style={{ fontWeight: 600, color: '#1677ff' }}>
                     {pick.name} ({pick.code})
                   </Link>
-                  <p style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{pick.reason}</p>
+                  <p style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>{pick.reason}</p>
                 </div>
               ))}
             </div>
@@ -314,7 +316,7 @@ export default function HS300Analysis() {
           </div>
 
           {/* 权重股小结 */}
-          <div style={{ marginTop: 20, padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
+          <div style={{ marginTop: 20, padding: 16, background: isDark ? '#1f1f1f' : '#f5f5f5', borderRadius: 8 }}>
             <h4 style={{ marginBottom: 8 }}>权重股基本面小结</h4>
             <div style={{ fontSize: 13, lineHeight: 1.8 }}>
               <p><strong>强势股：</strong>宁德时代(EPS+30%)、比亚迪(EPS+43%)、紫金矿业(EPS+36%)、中芯国际(EPS+45%) — 新能源/半导体/资源品景气度高</p>
@@ -332,15 +334,15 @@ export default function HS300Analysis() {
           <div className="card">
             <h3 className="card-title">投资策略建议</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
-              <div style={{ padding: 16, background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
+              <div style={{ padding: 16, background: isDark ? '#162312' : '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
                 <h4 style={{ color: '#52c41a', marginBottom: 8 }}>短期（3个月）</h4>
                 <p style={{ fontSize: 13 }}>{data.recommendation.strategy.shortTerm}</p>
               </div>
-              <div style={{ padding: 16, background: '#e6f4ff', borderRadius: 8, border: '1px solid #91caff' }}>
+              <div style={{ padding: 16, background: isDark ? '#111a2c' : '#e6f4ff', borderRadius: 8, border: '1px solid #91caff' }}>
                 <h4 style={{ color: '#1677ff', marginBottom: 8 }}>中期（6个月）</h4>
                 <p style={{ fontSize: 13 }}>{data.recommendation.strategy.mediumTerm}</p>
               </div>
-              <div style={{ padding: 16, background: '#fff7e6', borderRadius: 8, border: '1px solid #ffd591' }}>
+              <div style={{ padding: 16, background: isDark ? '#2b2111' : '#fff7e6', borderRadius: 8, border: '1px solid #ffd591' }}>
                 <h4 style={{ color: '#fa8c16', marginBottom: 8 }}>长期（1年）</h4>
                 <p style={{ fontSize: 13 }}>{data.recommendation.strategy.longTerm}</p>
               </div>
@@ -371,7 +373,7 @@ export default function HS300Analysis() {
           <div className="card">
             <h3 className="card-title">分批建仓方案</h3>
             <div style={{ position: 'relative', paddingLeft: 30 }}>
-              <div style={{ position: 'absolute', left: 15, top: 0, bottom: 0, width: 2, background: '#e8e8e8' }}></div>
+              <div style={{ position: 'absolute', left: 15, top: 0, bottom: 0, width: 2, background: isDark ? '#333' : '#e8e8e8' }}></div>
               {[
                 { batch: 1, time: '本周', pct: 20, action: '首批建仓20%，优选低费率ETF联接基金', reason: 'PE分位87.8%偏高，先建小仓位试探' },
                 { batch: 2, time: '2-3周后', pct: 25, action: '第二批25%，定投方式买入增强型基金', reason: '观察回调幅度，逢低加仓' },
@@ -384,14 +386,14 @@ export default function HS300Analysis() {
                     borderRadius: '50%', background: '#1677ff', border: '2px solid white',
                     boxShadow: '0 0 0 2px #1677ff',
                   }}></div>
-                  <div style={{ background: 'white', padding: 16, borderRadius: 8, border: '1px solid #e8e8e8' }}>
+                  <div style={{ background: isDark ? '#1a1a1a' : 'white', padding: 16, borderRadius: 8, border: isDark ? '1px solid #333' : '1px solid #e8e8e8' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                       <h4>第 {plan.batch} 批</h4>
                       <span className="badge badge-success">{plan.pct}%</span>
                     </div>
-                    <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}><strong>时间：</strong>{plan.time}</div>
+                    <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', marginBottom: 4 }}><strong>时间：</strong>{plan.time}</div>
                     <div style={{ fontSize: 13, marginBottom: 4 }}><strong>操作：</strong>{plan.action}</div>
-                    <div style={{ fontSize: 13, color: '#666' }}><strong>理由：</strong>{plan.reason}</div>
+                    <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}><strong>理由：</strong>{plan.reason}</div>
                   </div>
                 </div>
               ))}
@@ -429,7 +431,7 @@ export default function HS300Analysis() {
                 </tbody>
               </table>
             </div>
-            <p style={{ marginTop: 12, fontSize: 13, color: '#666' }}>
+            <p style={{ marginTop: 12, fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>
               当前沪深300 PE分位约 <strong style={{ color: '#ff4d4f' }}>{data.valuation.pePercentile}%</strong>，
               处于<strong style={{ color: '#ff4d4f' }}>{data.valuation.valuation}</strong>区间，
               {data.valuation.suggestion}。

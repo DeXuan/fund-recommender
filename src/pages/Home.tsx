@@ -286,10 +286,10 @@ export default function Home() {
             {portfolioSummary.holdings.slice(0, 4).map((h: any) => (
               <Col xs={12} sm={6} key={h.fund_code}>
                 <Link to={`/funds/${h.fund_code}`} style={{ textDecoration: 'none' }}>
-                  <Card size="small" style={{ borderRadius: 8, border: '1px solid #f0f0f0' }} hoverable>
+                  <Card size="small" style={{ borderRadius: 8, border: `1px solid ${isDark ? '#333' : '#f0f0f0'}` }} hoverable>
                     <div style={{ fontWeight: 600, fontSize: 13, color: '#1677ff', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.fund_name}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>¥{h.market_value?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      <span style={{ fontSize: 12, color: isDark ? '#6b6b6b' : '#8c8c8c' }}>¥{h.market_value?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                       <Tag color={h.pnl_percent >= 0 ? 'red' : 'green'} style={{ margin: 0, fontSize: 11 }}>
                         {h.pnl_percent >= 0 ? '+' : ''}{h.pnl_percent?.toFixed(2)}%
                       </Tag>
@@ -308,7 +308,7 @@ export default function Home() {
         <Col xs={24} lg={10}>
           <Card
             title={<span style={{ fontWeight: 600 }}>今日板块轮动</span>}
-            extra={<span style={{ fontSize: 12, color: '#8c8c8c' }}>TOP13</span>}
+            extra={<span style={{ fontSize: 12, color: isDark ? '#6b6b6b' : '#8c8c8c' }}>TOP13</span>}
             style={{ borderRadius: 12 }}
             styles={{ body: { padding: 0 } }}
           >
@@ -320,7 +320,7 @@ export default function Home() {
               size="small"
             />
             {sectors.length > 13 && (
-              <div style={{ textAlign: 'center', padding: '8px 0', borderTop: '1px solid #f0f0f0' }}>
+              <div style={{ textAlign: 'center', padding: '8px 0', borderTop: `1px solid ${isDark ? '#333' : '#f0f0f0'}` }}>
                 <a onClick={() => setShowAllSectors(true)} style={{ color: '#1677ff', cursor: 'pointer', fontSize: 13 }}>
                   查看全部 {sectors.length} 个板块 →
                 </a>
@@ -469,12 +469,12 @@ export default function Home() {
                         style={{ height: 200 }}
                         opts={{ renderer: 'svg' }}
                       />
-                      <div style={{ textAlign: 'center', fontSize: 11, color: '#8c8c8c', marginTop: 4 }}>
+                      <div style={{ textAlign: 'center', fontSize: 11, color: isDark ? '#6b6b6b' : '#8c8c8c', marginTop: 4 }}>
                         红色=净流入 | 绿色=净流出（基于涨跌幅估算）
                       </div>
                     </>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: 40, color: '#8c8c8c' }}>暂无主力资金数据</div>
+                    <div style={{ textAlign: 'center', padding: 40, color: isDark ? '#6b6b6b' : '#8c8c8c' }}>暂无主力资金数据</div>
                   )}
                 </Card>
               </Col>
@@ -517,17 +517,17 @@ export default function Home() {
             <Col xs={24} sm={12} key={rec.industry}>
               <Card
                 size="small"
-                style={{ marginBottom: 0, borderRadius: 10, border: '1px solid #f0f0f0', cursor: 'pointer' }}
+                style={{ marginBottom: 0, borderRadius: 10, border: `1px solid ${isDark ? '#333' : '#f0f0f0'}`, cursor: 'pointer' }}
                 hoverable
                 onClick={() => sectorKey && navigate(`/industry?sector=${encodeURIComponent(sectorKey)}`)}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <strong style={{ fontSize: 16, color: '#1f1f1f' }}>{rec.industry}</strong>
+                  <strong style={{ fontSize: 16, color: isDark ? '#e8e8e8' : '#1f1f1f' }}>{rec.industry}</strong>
                   <Tag color={rec.buySuggestion === '优先配置' ? 'red' : rec.buySuggestion === '限大额配置' ? 'orange' : 'green'} style={{ borderRadius: 6, fontWeight: 500 }}>
                     {rec.buySuggestion}
                   </Tag>
                 </div>
-                <div style={{ fontSize: 13, color: '#595959', marginBottom: 12, lineHeight: 1.6 }}>{rec.logic}</div>
+                <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#595959', marginBottom: 12, lineHeight: 1.6 }}>{rec.logic}</div>
                 <Space size={8} wrap>
                   {rec.funds?.slice(0, 2).map((fund: any) => (
                     <Link
@@ -550,9 +550,9 @@ export default function Home() {
         <Row gutter={[16, 16]}>
           {indices.map((index) => (
             <Col xs={24} sm={12} key={index.code}>
-              <Card size="small" style={{ marginBottom: 0, borderRadius: 10, border: '1px solid #f0f0f0' }}>
+              <Card size="small" style={{ marginBottom: 0, borderRadius: 10, border: `1px solid ${isDark ? '#333' : '#f0f0f0'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <strong style={{ fontSize: 15, color: '#1f1f1f' }}>{index.name}</strong>
+                  <strong style={{ fontSize: 15, color: isDark ? '#e8e8e8' : '#1f1f1f' }}>{index.name}</strong>
                   <Tag color={index.valuation.includes('低') ? 'green' : index.valuation.includes('高') ? 'red' : 'blue'} style={{ borderRadius: 6, fontWeight: 500 }}>
                     {index.valuation}
                   </Tag>
@@ -563,7 +563,7 @@ export default function Home() {
                   style={{ height: 180 }}
                   opts={{ renderer: 'svg' }}
                 />
-                <div style={{ textAlign: 'center', fontSize: 12, color: '#595959', marginTop: 4 }}>
+                <div style={{ textAlign: 'center', fontSize: 12, color: isDark ? '#a0a0a0' : '#595959', marginTop: 4 }}>
                   PE分位: <span style={{ fontWeight: 600, color: '#1677ff' }}>{index.pePercentile}%</span> | {index.suggestion}
                 </div>
               </Card>
@@ -576,7 +576,7 @@ export default function Home() {
       <Card title={<span style={{ fontWeight: 600 }}>今日操作建议</span>} style={{ marginBottom: 20, borderRadius: 12 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={8}>
-            <Card size="small" style={{ background: 'linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%)', border: '1px solid #b7eb8f', borderRadius: 10 }}>
+            <Card size="small" style={{ background: isDark ? 'linear-gradient(135deg, #162312 0%, #274916 100%)' : 'linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%)', border: '1px solid ' + (isDark ? '#274916' : '#b7eb8f'), borderRadius: 10 }}>
               <h4 style={{ color: '#52c41a', marginBottom: 8, fontSize: 15 }}>适合买入</h4>
               <ul style={{ fontSize: 13, lineHeight: 2, margin: 0, paddingLeft: 16 }}>
                 <li>医药指数基金（估值极低）</li>
@@ -586,7 +586,7 @@ export default function Home() {
             </Card>
           </Col>
           <Col xs={24} sm={8}>
-            <Card size="small" style={{ background: 'linear-gradient(135deg, #fffbe6 0%, #fff1b8 100%)', border: '1px solid #ffe58f', borderRadius: 10 }}>
+            <Card size="small" style={{ background: isDark ? 'linear-gradient(135deg, #2b2111 0%, #594214 100%)' : 'linear-gradient(135deg, #fffbe6 0%, #fff1b8 100%)', border: '1px solid ' + (isDark ? '#594214' : '#ffe58f'), borderRadius: 10 }}>
               <h4 style={{ color: '#faad14', marginBottom: 8, fontSize: 15 }}>观望等待</h4>
               <ul style={{ fontSize: 13, lineHeight: 2, margin: 0, paddingLeft: 16 }}>
                 <li>AI/人工智能（估值偏高）</li>

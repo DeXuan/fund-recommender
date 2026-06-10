@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Card, Input, Select, Table, Tag, Button, Space, Spin, AutoComplete, Alert, Row, Col, Tooltip, message } from 'antd';
 import { SearchOutlined, SwapOutlined, CloseCircleOutlined, StarOutlined, StarFilled, SyncOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
-import { fundApi, watchlistApi } from '../services/api';
+import { fundApi, watchlistApi, fundCompareApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { getEchartsTheme } from '../utils/echarts-theme';
@@ -65,6 +65,7 @@ export default function FundList() {
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState('全部');
   const [goldOnly, setGoldOnly] = useState(false);
+  const [watchlistOnly, setWatchlistOnly] = useState(false);
   const [goldStats, setGoldStats] = useState<any>(null);
   const [showGoldStats, setShowGoldStats] = useState(false);
   const [fetchingGold, setFetchingGold] = useState(false);
@@ -92,6 +93,9 @@ export default function FundList() {
   // 多因子筛选后的基金列表
   const filteredFunds = useMemo(() => {
     let list = goldOnly ? funds.filter(f => f.isGoldSelected) : funds;
+    if (watchlistOnly) {
+      list = list.filter(f => watchedCodes.has(f.code));
+    }
     if (selectedManager) {
       list = list.filter(f => f.manager === selectedManager);
     }
@@ -112,7 +116,7 @@ export default function FundList() {
       if (!isNaN(max)) list = list.filter(f => (f.totalFee ?? 0) <= max);
     }
     return list;
-  }, [funds, goldOnly, selectedManager, filterReturn1y, filterScaleMin, filterScaleMax, filterFeeMax]);
+  }, [funds, goldOnly, watchlistOnly, watchedCodes, selectedManager, filterReturn1y, filterScaleMin, filterScaleMax, filterFeeMax]);
 
   // 对比功能状态
   const [selectedCodes, setSelectedCodes] = useState<string[]>(initialCodes);
@@ -123,6 +127,8 @@ export default function FundList() {
   const [compareSearchCode, setCompareSearchCode] = useState('');
   const [allFunds, setAllFunds] = useState<Fund[]>([]);
   const [navHistory, setNavHistory] = useState<Record<string, any[]>>({});
+  const [premiumData, setPremiumData] = useState<any>(null);
+  const [premiumLoading, setPremiumLoading] = useState(false);
   const [navHistoryLoading, setNavHistoryLoading] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -154,6 +160,7 @@ export default function FundList() {
       setCompareError(null);
       setNavHistory({});
     }
+    setPremiumData(null);
   }, [selectedCodes, showCompare]);
 
   const loadIndustries = async () => {
@@ -229,7 +236,7 @@ export default function FundList() {
       const res = await fundApi.getFunds({
         industry: industry !== '全部' ? industry : undefined,
         search: search || undefined,
-        pageSize: 500,
+        pageSize: 2000,
       });
       setFunds(Array.isArray(res) ? res : (res as any).data || []);
     } catch (error) {
@@ -405,6 +412,24 @@ export default function FundList() {
     };
   }, [navHistory, compareData, allFunds]);
 
+  // 深度分析
+  const handlePremium = async () => {
+    if (selectedCodes.length < 2) return;
+    setPremiumLoading(true);
+    try {
+      const data = await fundCompareApi.premiumAnalyze(selectedCodes);
+      setPremiumData(data);
+    } catch (e: any) {
+      if (e.message?.includes('会员')) {
+        message.warning('深度分析需要开通会员');
+      } else {
+        message.error(e.message || '深度分析失败');
+      }
+    } finally {
+      setPremiumLoading(false);
+    }
+  };
+
   // 图表配置
   const compareChartOption = useMemo(() => {
     if (compareData.length < 2) return null;
@@ -579,7 +604,7 @@ export default function FundList() {
         }
 
         if (record.key === 'dailyLimit') {
-          return <span style={{ fontWeight: 600, color: val === '暂停' ? '#ff4d4f' : '#333' }}>{val}</span>;
+          return <span style={{ fontWeight: 600, color: val === '暂停' ? '#ff4d4f' : isDark ? '#e8e8e8' : '#333' }}>{val}</span>;
         }
 
         if (['recommendation', 'investmentAdvice'].includes(record.key)) {
@@ -619,7 +644,7 @@ export default function FundList() {
             >
               {watchedCodes.has(record.code)
                 ? <StarFilled style={{ color: '#faad14' }} />
-                : <StarOutlined style={{ color: '#d9d9d9' }} />}
+                : <StarOutlined style={{ color: isDark ? '#444' : '#d9d9d9' }} />}
             </span>
           )}
           <Link to={`/funds/${record.code}`} style={{ color: '#1677ff', fontWeight: 500 }}>{name}</Link>
@@ -750,6 +775,15 @@ export default function FundList() {
           >
             {goldOnly ? '★ 仅看金选' : '☆ 金选基金'}
           </Button>
+          {user && (
+            <Button
+              type={watchlistOnly ? 'primary' : 'default'}
+              style={watchlistOnly ? { background: '#faad14', borderColor: '#faad14' } : {}}
+              onClick={() => setWatchlistOnly(!watchlistOnly)}
+            >
+              {watchlistOnly ? '★ 仅看自选' : '☆ 自选基金'}
+            </Button>
+          )}
           <Button
             type={showGoldStats ? 'primary' : 'default'}
             style={showGoldStats ? { background: '#faad14', borderColor: '#faad14' } : {}}
@@ -806,7 +840,7 @@ export default function FundList() {
       {showStarManagers && starManagers.length > 0 && (
         <Card
           title={<span style={{ fontWeight: 600 }}>明星基金经理</span>}
-          extra={<span style={{ fontSize: 12, color: '#8c8c8c' }}>点击经理筛选其管理的基金</span>}
+          extra={<span style={{ fontSize: 12, color: isDark ? '#6b6b6b' : '#8c8c8c' }}>点击经理筛选其管理的基金</span>}
           style={{ marginBottom: 16 }}
         >
           <Row gutter={[16, 16]}>
@@ -816,7 +850,7 @@ export default function FundList() {
                   size="small"
                   hoverable
                   style={{
-                    border: selectedManager === mgr.name ? '2px solid #722ed1' : '1px solid #f0f0f0',
+                    border: selectedManager === mgr.name ? '2px solid #722ed1' : `1px solid ${isDark ? '#262626' : '#f0f0f0'}`,
                     borderRadius: 12,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
@@ -834,13 +868,13 @@ export default function FundList() {
                     </div>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 15 }}>{mgr.name}</div>
-                      <div style={{ fontSize: 12, color: '#8c8c8c' }}>{mgr.company}</div>
+                      <div style={{ fontSize: 12, color: isDark ? '#6b6b6b' : '#8c8c8c' }}>{mgr.company}</div>
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginBottom: 4 }}>
                     <strong>职位：</strong>{mgr.title}
                   </div>
-                  <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginBottom: 4 }}>
                     <strong>经验：</strong>{mgr.experience} | <strong>擅长：</strong>{mgr.specialty}
                   </div>
                   <div style={{ fontSize: 12, color: '#999', marginBottom: 8, lineHeight: 1.5 }}>
@@ -867,32 +901,32 @@ export default function FundList() {
               <span style={{ fontWeight: 600 }}>金选基金统计概览</span>
             </Space>
           }
-          extra={<span style={{ fontSize: 12, color: '#8c8c8c' }}>来自支付宝精选基金池</span>}
+          extra={<span style={{ fontSize: 12, color: isDark ? '#6b6b6b' : '#8c8c8c' }}>来自支付宝精选基金池</span>}
           style={{ marginBottom: 16, border: '1px solid #faad14' }}
         >
           <Row gutter={[16, 16]}>
             <Col xs={12} sm={6}>
-              <div style={{ textAlign: 'center', padding: 16, background: '#fffbe6', borderRadius: 8 }}>
+              <div style={{ textAlign: 'center', padding: 16, background: isDark ? '#2b2111' : '#fffbe6', borderRadius: 8 }}>
                 <div style={{ fontSize: 28, fontWeight: 700, color: '#faad14' }}>{goldStats.total}</div>
-                <div style={{ fontSize: 12, color: '#666' }}>金选基金总数</div>
+                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>金选基金总数</div>
               </div>
             </Col>
             <Col xs={12} sm={6}>
-              <div style={{ textAlign: 'center', padding: 16, background: '#f6ffed', borderRadius: 8 }}>
+              <div style={{ textAlign: 'center', padding: 16, background: isDark ? '#162312' : '#f6ffed', borderRadius: 8 }}>
                 <div style={{ fontSize: 28, fontWeight: 700, color: '#52c41a' }}>{goldStats.returns?.avg1y || '-'}%</div>
-                <div style={{ fontSize: 12, color: '#666' }}>平均近1年收益</div>
+                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>平均近1年收益</div>
               </div>
             </Col>
             <Col xs={12} sm={6}>
-              <div style={{ textAlign: 'center', padding: 16, background: '#e6f4ff', borderRadius: 8 }}>
+              <div style={{ textAlign: 'center', padding: 16, background: isDark ? '#111a2c' : '#e6f4ff', borderRadius: 8 }}>
                 <div style={{ fontSize: 28, fontWeight: 700, color: '#1677ff' }}>{goldStats.fees?.avg ? (goldStats.fees.avg * 100).toFixed(2) : '-'}%</div>
-                <div style={{ fontSize: 12, color: '#666' }}>平均综合费率</div>
+                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>平均综合费率</div>
               </div>
             </Col>
             <Col xs={12} sm={6}>
-              <div style={{ textAlign: 'center', padding: 16, background: '#fff2f0', borderRadius: 8 }}>
+              <div style={{ textAlign: 'center', padding: 16, background: isDark ? '#2c1618' : '#fff2f0', borderRadius: 8 }}>
                 <div style={{ fontSize: 28, fontWeight: 700, color: '#ff4d4f' }}>{goldStats.scale?.total || '-'}亿</div>
-                <div style={{ fontSize: 12, color: '#666' }}>总规模</div>
+                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>总规模</div>
               </div>
             </Col>
           </Row>
@@ -913,10 +947,10 @@ export default function FundList() {
 
       <Card>
         {showFilters && (
-          <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f5f5f5', borderRadius: 8, display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
-            <span style={{ fontWeight: 600, fontSize: 13, color: '#333' }}>筛选条件：</span>
+          <div style={{ marginBottom: 16, padding: '12px 16px', background: isDark ? '#1f1f1f' : '#f5f5f5', borderRadius: 8, display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+            <span style={{ fontWeight: 600, fontSize: 13, color: isDark ? '#e8e8e8' : '#333' }}>筛选条件：</span>
             <div>
-              <span style={{ fontSize: 12, color: '#666', marginRight: 4 }}>近1年收益 ≥</span>
+              <span style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginRight: 4 }}>近1年收益 ≥</span>
               <Input
                 size="small"
                 style={{ width: 80 }}
@@ -927,7 +961,7 @@ export default function FundList() {
               />
             </div>
             <div>
-              <span style={{ fontSize: 12, color: '#666', marginRight: 4 }}>规模</span>
+              <span style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginRight: 4 }}>规模</span>
               <Input
                 size="small"
                 style={{ width: 70 }}
@@ -946,7 +980,7 @@ export default function FundList() {
               />
             </div>
             <div>
-              <span style={{ fontSize: 12, color: '#666', marginRight: 4 }}>综合费率 ≤</span>
+              <span style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginRight: 4 }}>综合费率 ≤</span>
               <Input
                 size="small"
                 style={{ width: 80 }}
@@ -956,14 +990,20 @@ export default function FundList() {
                 suffix="%"
               />
             </div>
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+            <span style={{ fontSize: 12, color: isDark ? '#6b6b6b' : '#8c8c8c' }}>
               筛选结果 <strong style={{ color: '#1677ff' }}>{filteredFunds.length}</strong> 只
             </span>
           </div>
         )}
         {goldOnly && !showFilters && (
-          <div style={{ marginBottom: 12, fontSize: 13, color: '#666' }}>
+          <div style={{ marginBottom: 12, fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>
             ★ 金选基金 <span style={{ fontWeight: 600, color: '#faad14' }}>{funds.filter(f => f.isGoldSelected).length}</span> 只
+            （共 {funds.length} 只基金）
+          </div>
+        )}
+        {watchlistOnly && !showFilters && (
+          <div style={{ marginBottom: 12, fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>
+            ★ 自选基金 <span style={{ fontWeight: 600, color: '#faad14' }}>{funds.filter(f => watchedCodes.has(f.code)).length}</span> 只
             （共 {funds.length} 只基金）
           </div>
         )}
@@ -999,7 +1039,7 @@ export default function FundList() {
               <Button
                 type="text"
                 icon={<CloseCircleOutlined />}
-                onClick={() => { setShowCompare(false); setSelectedCodes([]); }}
+                onClick={() => { setShowCompare(false); setSelectedCodes([]); setPremiumData(null); }}
               >
                 关闭对比
               </Button>
@@ -1029,7 +1069,7 @@ export default function FundList() {
               </Button>
             </Space>
             <div style={{ marginTop: 12 }}>
-              <span style={{ color: '#666', fontSize: 13 }}>已添加 {selectedCodes.length}/5 只基金</span>
+              <span style={{ color: isDark ? '#a0a0a0' : '#666', fontSize: 13 }}>已添加 {selectedCodes.length}/5 只基金</span>
               {selectedCodes.length > 0 && (
                 <Space size={8} wrap style={{ marginTop: 8 }}>
                   {selectedCodes.map((code) => {
@@ -1076,7 +1116,7 @@ export default function FundList() {
                   extra={navHistoryLoading ? <Spin size="small" /> : null}
                 >
                   <ReactECharts theme={getEchartsTheme(isDark)} option={navChartOption} style={{ height: 350 }} opts={{ renderer: 'svg' }} />
-                  <div style={{ textAlign: 'center', fontSize: 12, color: '#8c8c8c' }}>
+                  <div style={{ textAlign: 'center', fontSize: 12, color: isDark ? '#6b6b6b' : '#8c8c8c' }}>
                     起点归一化为0%，展示各基金相对收益走势
                   </div>
                 </Card>
@@ -1120,6 +1160,40 @@ export default function FundList() {
                   );
                 })()}
               </Card>
+
+              {/* 深度分析按钮 */}
+              <div style={{ textAlign: 'center', margin: '16px 0' }}>
+                <Button type="primary" loading={premiumLoading} onClick={handlePremium}
+                  disabled={selectedCodes.length < 2}>
+                  深度分析（会员）
+                </Button>
+              </div>
+
+              {/* 深度分析结果 */}
+              {premiumData && (
+                <>
+                  <Card title="风险指标" style={{ marginBottom: 16 }}>
+                    <Table dataSource={premiumData.results} rowKey="code" size="small" pagination={false}
+                      columns={[
+                        { title: '基金', dataIndex: 'name' },
+                        { title: '年化波动率', render: (_: any, r: any) => `${r.riskMetrics.volatility}%` },
+                        { title: '最大回撤', render: (_: any, r: any) => <span style={{ color: '#ff4d4f' }}>{r.riskMetrics.maxDrawdown}%</span> },
+                        { title: '夏普比率', render: (_: any, r: any) => <span style={{ color: r.riskMetrics.sharpeRatio > 0 ? '#52c41a' : '#ff4d4f' }}>{r.riskMetrics.sharpeRatio}</span> },
+                        { title: '卡玛比率', render: (_: any, r: any) => r.riskMetrics.calmarRatio },
+                        { title: '3年持有成本', render: (_: any, r: any) => `${r.feeComparison.cost3y}%` },
+                      ]}
+                    />
+                  </Card>
+                  <Card title="投资建议" style={{ marginBottom: 16 }}>
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <div><Tag color="blue">短期</Tag> {premiumData.recommendation.shortTerm}</div>
+                      <div><Tag color="green">中期</Tag> {premiumData.recommendation.mediumTerm}</div>
+                      <div><Tag color="purple">长期</Tag> {premiumData.recommendation.longTerm}</div>
+                      <div><Tag color="orange">低费率</Tag> {premiumData.recommendation.lowestFee}</div>
+                    </Space>
+                  </Card>
+                </>
+              )}
             </>
           )}
 

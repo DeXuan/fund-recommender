@@ -3,12 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, Form, Input, Button, Tabs, message, Divider, Space, Modal, Spin, Result } from 'antd';
 import { UserOutlined, LockOutlined, AlipayOutlined, CheckCircleOutlined, ScanOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { authApi, portfolioApi } from '../services/api';
 
 export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, login, register, setUser } = useAuth();
+  const { isDark: isDarkTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('login');
   const [loading, setLoading] = useState(false);
   const [alipayLoading, setAlipayLoading] = useState(false);
@@ -27,15 +29,23 @@ export default function Login() {
   // Handle Alipay callback token (real OAuth redirect)
   useEffect(() => {
     const token = searchParams.get('token');
-    if (token) {
+    if (token && token.length > 20 && token.length < 2000 && !token.includes(' ')) {
+      // 先验证 token 有效性再存储，防止恶意注入
+      // 临时设置以供 getMe 使用，验证失败即清除
       localStorage.setItem('token', token);
       authApi.getMe()
         .then(data => {
+          if (!data.user || !data.user.id) {
+            localStorage.removeItem('token');
+            message.error('登录验证失败：无效的用户信息');
+            return;
+          }
           setUser(data.user);
           message.success('支付宝登录成功');
           initDemoAndRedirect();
         })
         .catch(() => {
+          localStorage.removeItem('token');
           message.error('登录验证失败');
         });
     }
@@ -275,7 +285,7 @@ export default function Login() {
       <Card style={{ width: 420, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <h2 style={{ margin: 0, color: '#1677ff' }}>基金推荐助手</h2>
-          <p style={{ color: '#666', margin: '8px 0 0' }}>登录后使用理财记账功能</p>
+          <p style={{ color: isDarkTheme ? '#a0a0a0' : '#666', margin: '8px 0 0' }}>登录后使用理财记账功能</p>
         </div>
 
         <Tabs
@@ -288,7 +298,7 @@ export default function Login() {
           ]}
         />
 
-        <Divider plain style={{ color: '#999' }}>其他登录方式</Divider>
+        <Divider plain style={{ color: isDarkTheme ? '#6b6b6b' : '#999' }}>其他登录方式</Divider>
 
         <Space direction="vertical" style={{ width: '100%' }}>
           <Button
@@ -351,10 +361,10 @@ export default function Login() {
           ) : (
             <div style={{ padding: '32px 0' }}>
               <Spin size="large" />
-              <div style={{ marginTop: 20, color: '#666', fontSize: 14 }}>
+              <div style={{ marginTop: 20, color: isDarkTheme ? '#a0a0a0' : '#666', fontSize: 14 }}>
                 请在弹出的支付宝窗口中完成授权
               </div>
-              <div style={{ marginTop: 8, color: '#999', fontSize: 12 }}>
+              <div style={{ marginTop: 8, color: isDarkTheme ? '#6b6b6b' : '#999', fontSize: 12 }}>
                 授权完成后将自动登录
               </div>
             </div>
@@ -396,7 +406,7 @@ export default function Login() {
           ) : mockScanning ? (
             <div style={{ padding: '24px 0' }}>
               <Spin size="large" />
-              <div style={{ marginTop: 16, color: '#666' }}>正在验证登录...</div>
+              <div style={{ marginTop: 16, color: isDarkTheme ? '#a0a0a0' : '#666' }}>正在验证登录...</div>
             </div>
           ) : (
             <>
@@ -406,7 +416,7 @@ export default function Login() {
                 height: 200,
                 margin: '0 auto 16px',
                 background: '#fff',
-                border: '1px solid #e8e8e8',
+                border: isDarkTheme ? '1px solid #333' : '1px solid #e8e8e8',
                 borderRadius: 8,
                 display: 'flex',
                 flexDirection: 'column',
@@ -452,7 +462,7 @@ export default function Login() {
                 </div>
               </div>
 
-              <div style={{ color: '#999', fontSize: 12, marginBottom: 16 }}>
+              <div style={{ color: isDarkTheme ? '#6b6b6b' : '#999', fontSize: 12, marginBottom: 16 }}>
                 <ScanOutlined style={{ marginRight: 4 }} />
                 演示模式 · 点击下方按钮模拟扫码
               </div>

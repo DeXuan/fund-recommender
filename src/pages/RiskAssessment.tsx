@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, Steps, Radio, Button, Progress, Space, Spin, Row, Col, Statistic, Alert, message } from 'antd';
 import { fundApi, portfolioApi } from '../services/api';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface RiskProfile {
   age: string;
@@ -19,6 +20,7 @@ interface Recommendation {
 }
 
 export default function RiskAssessment() {
+  const { isDark } = useTheme();
   const [step, setStep] = useState(0);
   const [profile, setProfile] = useState<RiskProfile>({
     age: '', investmentAmount: '', investmentPeriod: '', riskTolerance: 'balanced', lossTolerance: '',
@@ -138,13 +140,13 @@ export default function RiskAssessment() {
                     <Card
                       hoverable
                       style={{
-                        border: profile.riskTolerance === option.value ? '2px solid #1677ff' : '1px solid #e8e8e8',
+                        border: profile.riskTolerance === option.value ? '2px solid #1677ff' : isDark ? '1px solid #333' : '1px solid #e8e8e8',
                         cursor: 'pointer',
                       }}
                       onClick={() => setProfile({ ...profile, riskTolerance: option.value as any })}
                     >
                       <strong>{option.label}</strong>
-                      <p style={{ fontSize: 12, color: '#666', margin: '8px 0 0' }}>{option.desc}</p>
+                      <p style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', margin: '8px 0 0' }}>{option.desc}</p>
                     </Card>
                   </Col>
                 ))}
@@ -195,7 +197,7 @@ export default function RiskAssessment() {
                     <span style={{ color: '#1677ff', fontWeight: 600 }}>{item.percentage}%</span>
                   </div>
                   <Progress percent={item.percentage} showInfo={false} />
-                  <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>
+                  <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>
                     推荐基金：{item.funds.join('、')}
                   </div>
                 </div>

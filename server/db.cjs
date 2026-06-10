@@ -20,6 +20,7 @@ const pool = new Pool({
   connectionTimeoutMillis: 15000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
+  options: '--client_encoding=UTF8',
 });
 
 pool.on('error', (err) => {
@@ -45,8 +46,10 @@ async function initDatabase(retries = 3) {
         password_hash TEXT NOT NULL,
         nickname VARCHAR(100) DEFAULT '',
         avatar_url TEXT DEFAULT '',
-        created_at TIMESTAMP DEFAULT NOW()
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       )`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`,
       // 第三方登录表
       `CREATE TABLE IF NOT EXISTS oauth_accounts (
         id SERIAL PRIMARY KEY,
@@ -315,6 +318,149 @@ async function initDatabase(retries = 3) {
         rating INTEGER DEFAULT 3,
         updated_at TIMESTAMP DEFAULT NOW()
       )`,
+      // 订阅套餐表
+      `CREATE TABLE IF NOT EXISTS subscription_plans (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(50) NOT NULL,
+        price NUMERIC(10,2) NOT NULL,
+        duration_days INTEGER NOT NULL DEFAULT 30,
+        features JSONB DEFAULT '[]',
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`,
+      // 订阅订单表
+      `CREATE TABLE IF NOT EXISTS subscription_orders (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        plan_id INTEGER NOT NULL REFERENCES subscription_plans(id),
+        out_trade_no VARCHAR(64) UNIQUE NOT NULL,
+        trade_no VARCHAR(64) DEFAULT '',
+        amount NUMERIC(10,2) NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        paid_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_orders_user ON subscription_orders(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_orders_trade_no ON subscription_orders(out_trade_no)`,
+      `CREATE INDEX IF NOT EXISTS idx_orders_status ON subscription_orders(status)`,
+      // 用户订阅字段
+      `DO $$ BEGIN
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(20) DEFAULT 'free';
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_plan_id INTEGER;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_start TIMESTAMP;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_end TIMESTAMP;
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$`,
+      // 登录日志表
+      `CREATE TABLE IF NOT EXISTS login_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        username VARCHAR(50) NOT NULL,
+        login_ip VARCHAR(50) DEFAULT '',
+        user_agent TEXT DEFAULT '',
+        browser VARCHAR(100) DEFAULT '',
+        os VARCHAR(100) DEFAULT '',
+        device VARCHAR(50) DEFAULT '',
+        location VARCHAR(200) DEFAULT '',
+        status VARCHAR(20) DEFAULT 'success',
+        fail_reason TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_login_logs_user ON login_logs(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_login_logs_time ON login_logs(created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_login_logs_status ON login_logs(status)`,
+      // 用户备注表（管理员对用户的备注）
+      `CREATE TABLE IF NOT EXISTS user_notes (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        admin_id INTEGER NOT NULL REFERENCES users(id),
+        admin_username VARCHAR(50) NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_user_notes_user ON user_notes(user_id)`,
+      // 告警规则表
+      `CREATE TABLE IF NOT EXISTS alert_rules (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        metric VARCHAR(50) NOT NULL,
+        operator VARCHAR(10) NOT NULL,
+        threshold NUMERIC(12,2) NOT NULL,
+        duration INTEGER DEFAULT 0,
+        severity VARCHAR(20) DEFAULT 'warning',
+        enabled BOOLEAN DEFAULT true,
+        notify_channels JSONB DEFAULT '["web"]',
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      // 告警历史表
+      `CREATE TABLE IF NOT EXISTS alert_history (
+        id SERIAL PRIMARY KEY,
+        rule_id INTEGER REFERENCES alert_rules(id) ON DELETE SET NULL,
+        rule_name VARCHAR(100) NOT NULL,
+        metric VARCHAR(50) NOT NULL,
+        current_value NUMERIC(12,2),
+        threshold NUMERIC(12,2),
+        severity VARCHAR(20) DEFAULT 'warning',
+        message TEXT DEFAULT '',
+        status VARCHAR(20) DEFAULT 'firing',
+        resolved_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_alert_history_time ON alert_history(created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_alert_history_status ON alert_history(status)`,
+      // API 请求统计表（按小时聚合）
+      `CREATE TABLE IF NOT EXISTS api_stats (
+        id SERIAL PRIMARY KEY,
+        hour_start TIMESTAMP NOT NULL,
+        endpoint VARCHAR(200) NOT NULL,
+        method VARCHAR(10) DEFAULT 'GET',
+        request_count INTEGER DEFAULT 0,
+        error_count INTEGER DEFAULT 0,
+        avg_response_ms NUMERIC(10,2) DEFAULT 0,
+        max_response_ms NUMERIC(10,2) DEFAULT 0,
+        p95_response_ms NUMERIC(10,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(hour_start, endpoint, method)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_api_stats_hour ON api_stats(hour_start DESC)`,
+      // 用户字段扩展：登录失败次数、锁定时间
+      `DO $$ BEGIN
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS login_fail_count INTEGER DEFAULT 0;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_ip VARCHAR(50) DEFAULT '';
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$`,
+      // 系统配置表
+      `CREATE TABLE IF NOT EXISTS system_config (
+        key VARCHAR(100) PRIMARY KEY,
+        value TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      // 系统事件表
+      `CREATE TABLE IF NOT EXISTS system_events (
+        id SERIAL PRIMARY KEY,
+        event_type VARCHAR(50) NOT NULL,
+        severity VARCHAR(20) DEFAULT 'info',
+        title VARCHAR(200) NOT NULL,
+        detail TEXT DEFAULT '',
+        source VARCHAR(50) DEFAULT 'system',
+        created_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_system_events_time ON system_events(created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_system_events_type ON system_events(event_type)`,
+      // 种子数据：默认系统配置
+      `INSERT INTO system_config (key, value, description) VALUES
+        ('registration_enabled', 'true', '是否开放注册'),
+        ('max_login_attempts', '5', '最大登录失败次数'),
+        ('lockout_duration_minutes', '30', '账户锁定时长(分钟)'),
+        ('password_min_length', '8', '密码最小长度'),
+        ('session_timeout_hours', '168', '会话超时(小时)')
+      ON CONFLICT (key) DO NOTHING`,
     ];
 
     for (const sql of createStatements) {
@@ -323,6 +469,17 @@ async function initDatabase(retries = 3) {
       } catch (e) {
         console.warn('建表警告:', e.message);
       }
+    }
+
+    // 种子数据：默认订阅套餐
+    try {
+      await client.query(`
+        INSERT INTO subscription_plans (name, price, duration_days, features)
+        VALUES ('月度会员', 9.90, 30, '["AI选股助手","基金深度对比","行业深度分析","批量建仓方案"]')
+        ON CONFLICT DO NOTHING
+      `);
+    } catch (seedErr) {
+      console.warn('订阅套餐种子数据警告:', seedErr.message);
     }
 
     console.log('PostgreSQL 数据库初始化完成');

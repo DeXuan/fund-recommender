@@ -13,6 +13,7 @@ import {
   UserOutlined,
   LogoutOutlined,
   AccountBookOutlined,
+  IdcardOutlined,
   StarOutlined,
   BellOutlined,
   WarningOutlined,
@@ -26,6 +27,9 @@ import {
   DashboardOutlined,
   TeamOutlined,
   SettingOutlined,
+  CalendarOutlined,
+  ThunderboltOutlined,
+  CrownOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -40,6 +44,7 @@ const navItems = [
   { key: '/hs300', label: '沪深300', icon: <StockOutlined /> },
   { key: '/qdii', label: 'QDII基金', icon: <GlobalOutlined /> },
   { key: '/cmb-products', label: '招行理财', icon: <BankOutlined /> },
+  { key: '/events', label: '事件日历', icon: <CalendarOutlined /> },
 ];
 
 const DISMISSED_KEY = 'dismissed_alerts';
@@ -92,10 +97,16 @@ export default function Navbar() {
 
   useEffect(() => {
     if (user) {
-      alertsApi.getAlerts().then((data: any[]) => {
-        const dismissed = getDismissedAlerts();
-        setAlerts(data.filter(a => !dismissed.has(alertKey(a))));
-      }).catch(() => {});
+      const fetchAlerts = () => {
+        alertsApi.getAlerts().then((data: any[]) => {
+          const dismissed = getDismissedAlerts();
+          setAlerts(data.filter(a => !dismissed.has(alertKey(a))));
+        }).catch(() => {});
+      };
+      fetchAlerts();
+      // 每3分钟刷新提醒（与新闻抓取同步）
+      const interval = setInterval(fetchAlerts, 3 * 60 * 1000);
+      return () => clearInterval(interval);
     }
   }, [user]);
 
@@ -103,15 +114,16 @@ export default function Navbar() {
     const key = alertKey(item);
     dismissAlert(key);
     setAlerts(prev => prev.filter(a => alertKey(a) !== key));
-    if (item.fund_code) navigate(`/funds/${item.fund_code}`);
+    if (item.type?.startsWith('news_')) navigate('/events');
+    else if (item.fund_code) navigate(`/funds/${item.fund_code}`);
     else navigate('/industry');
   };
 
   const allNavItems = [
     ...navItems,
     ...(user ? [
-      { key: '/watchlist', label: '自选基金', icon: <StarOutlined /> },
       { key: '/portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
+      { key: '/stock-picker', label: 'AI选股', icon: <FundOutlined /> },
     ] : []),
     ...(user?.role === 'admin' ? [
       { key: '/admin/users', label: '用户管理', icon: <TeamOutlined /> },
@@ -184,13 +196,23 @@ export default function Navbar() {
                             onClick={() => handleDismissAlert(item)}
                           >
                             <div style={{ marginRight: 8, marginTop: 2 }}>
-                              {item.level === 'warning' ? <WarningOutlined style={{ color: '#faad14' }} /> :
+                              {item.type?.startsWith('news_accident') ? <WarningOutlined style={{ color: '#f5222d' }} /> :
+                               item.type?.startsWith('news_') ? <ThunderboltOutlined style={{ color: '#722ed1' }} /> :
+                               item.level === 'warning' ? <WarningOutlined style={{ color: '#faad14' }} /> :
                                item.level === 'success' ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> :
                                <InfoCircleOutlined style={{ color: '#1677ff' }} />}
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ fontWeight: 500, fontSize: 13 }}>{item.title}</div>
                               <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>{item.message}</div>
+                              {item.actionText && (
+                                <Tag
+                                  color={item.action === 'buy' ? 'green' : item.action === 'sell' ? 'red' : 'blue'}
+                                  style={{ marginTop: 4, fontSize: 11 }}
+                                >
+                                  {item.actionText}
+                                </Tag>
+                              )}
                             </div>
                           </List.Item>
                         )}
@@ -205,8 +227,9 @@ export default function Navbar() {
               </Dropdown>
               <Dropdown menu={{
                 items: [
+                  { key: 'profile', label: '个人中心', icon: <IdcardOutlined /> },
+                  { key: 'subscription', label: '会员中心', icon: <StarOutlined /> },
                   { key: 'portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
-                  { key: 'watchlist', label: '自选基金', icon: <StarOutlined /> },
                   ...(user?.role === 'admin' ? [
                     { type: 'divider' as const },
                     { key: '/admin/users', label: '用户管理', icon: <TeamOutlined /> },
@@ -218,13 +241,17 @@ export default function Navbar() {
                 ],
                 onClick: ({ key }) => {
                   if (key === 'logout') { logout(); navigate('/'); }
+                  if (key === 'profile') navigate('/profile');
                   if (key === 'portfolio') navigate('/portfolio');
-                  if (key === 'watchlist') navigate('/watchlist');
+                  if (key === 'subscription') navigate('/subscription');
                   if (key === '/admin/users' || key === '/admin/monitor') navigate(key);
                   if (key === 'changePassword') setPwdModalOpen(true);
                 },
               }}>
-                <Avatar size="small" icon={<UserOutlined />} src={user.avatar_url} style={{ cursor: 'pointer', background: user?.role === 'admin' ? '#722ed1' : '#1677ff' }} />
+                <Space size={4}>
+                  <Avatar size="small" icon={<UserOutlined />} src={user.avatar_url} style={{ cursor: 'pointer', background: user?.role === 'admin' ? '#722ed1' : '#1677ff' }} />
+                  {user?.subscription_status === 'premium' && <CrownOutlined style={{ color: '#ffd700', fontSize: 12 }} />}
+                </Space>
               </Dropdown>
               </>
             ) : (
@@ -297,12 +324,29 @@ export default function Navbar() {
                                  item.type === 'valuation_low' ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> :
                                  item.type === 'valuation_high' ? <WarningOutlined style={{ color: '#faad14' }} /> :
                                  item.type === 'qdii_limit' ? <InfoCircleOutlined style={{ color: '#1890ff' }} /> :
+                                 item.type?.startsWith('news_accident') ? <WarningOutlined style={{ color: '#f5222d' }} /> :
+                                 item.type?.startsWith('news_') ? <ThunderboltOutlined style={{ color: '#722ed1' }} /> :
                                  item.level === 'warning' ? <ExclamationCircleOutlined style={{ color: '#faad14' }} /> :
                                  <InfoCircleOutlined style={{ color: '#1677ff' }} />}
                               </div>
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontWeight: 500, fontSize: 13 }}>{item.title}</div>
                                 <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>{item.message}</div>
+                                {item.actionText && (
+                                  <Tag
+                                    color={item.action === 'buy' ? 'green' : item.action === 'sell' ? 'red' : item.action === 'watch' ? 'blue' : 'default'}
+                                    style={{ marginTop: 4, fontSize: 11 }}
+                                  >
+                                    {item.actionText}
+                                  </Tag>
+                                )}
+                                {item.relatedIndustries && item.relatedIndustries.length > 0 && (
+                                  <div style={{ marginTop: 3 }}>
+                                    {item.relatedIndustries.slice(0, 3).map((ind: string) => (
+                                      <Tag key={ind} style={{ fontSize: 10, margin: '0 2px 0 0' }}>{ind}</Tag>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </List.Item>
                           )}
@@ -317,8 +361,8 @@ export default function Navbar() {
                 </Dropdown>
                 <Dropdown menu={{
                   items: [
+                    { key: 'profile', label: '个人中心', icon: <IdcardOutlined /> },
                     { key: 'portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
-                    { key: 'watchlist', label: '自选基金', icon: <StarOutlined /> },
                     ...(user?.role === 'admin' ? [
                       { type: 'divider' as const },
                       { key: '/admin/users', label: '用户管理', icon: <TeamOutlined /> },
@@ -330,8 +374,8 @@ export default function Navbar() {
                   ],
                   onClick: ({ key }) => {
                     if (key === 'logout') { logout(); navigate('/'); }
+                    if (key === 'profile') navigate('/profile');
                     if (key === 'portfolio') navigate('/portfolio');
-                    if (key === 'watchlist') navigate('/watchlist');
                     if (key === '/admin/users' || key === '/admin/monitor') navigate(key);
                     if (key === 'changePassword') setPwdModalOpen(true);
                   },
@@ -339,6 +383,9 @@ export default function Navbar() {
                   <Space style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 8, transition: 'background 0.2s' }}>
                     <Avatar size="small" icon={<UserOutlined />} src={user.avatar_url} style={{ background: user?.role === 'admin' ? '#722ed1' : '#1677ff' }} />
                     <span style={{ color: 'var(--text-primary)', fontWeight: 500, fontSize: 14 }}>{user.nickname || user.username}</span>
+                    {user?.subscription_status === 'premium' && (
+                      <Tag icon={<CrownOutlined />} color="gold" style={{ marginLeft: 4, fontSize: 11, lineHeight: '18px' }}>VIP</Tag>
+                    )}
                     {user?.role === 'admin' && <Tag color="purple" style={{ marginLeft: 4, fontSize: 11, lineHeight: '18px' }}>管理员</Tag>}
                   </Space>
                 </Dropdown>
