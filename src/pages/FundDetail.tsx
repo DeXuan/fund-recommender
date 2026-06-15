@@ -95,7 +95,8 @@ export default function FundDetail() {
         setIsWatched(true);
         message.success('已添加自选');
       }
-    } catch {
+    } catch (e) {
+      console.error('自选操作失败:', e);
       message.error('操作失败');
     }
   };
@@ -539,8 +540,9 @@ export default function FundDetail() {
             message.success('已添加到持仓');
             setAddToPortfolioOpen(false);
             navigate('/portfolio');
-          } catch {
+          } catch (e) {
             // validation error
+            console.error('添加到持仓失败:', e);
           }
         }}
         onCancel={() => setAddToPortfolioOpen(false)}

@@ -5,6 +5,7 @@
  */
 
 const axios = require('axios');
+const { API_URLS } = require('./config/index.cjs');
 
 // 内存缓存
 let newsCache = [];
@@ -127,7 +128,7 @@ async function fetchCLSNews() {
 // 从东方财富抓取快讯
 async function fetchEastmoneyNews() {
   try {
-    const response = await axios.get('https://np-listapi.eastmoney.com/comm/web/getNewsByColumns', {
+    const response = await axios.get(API_URLS.EASTMONEY_NEWS, {
       params: {
         client: 'web',
         biz: 'web_home_channel',
@@ -177,7 +178,7 @@ async function fetchEastmoneyNews() {
 // 东方财富实时快讯备用API
 async function fetchEastmoneyLiveData() {
   try {
-    const response = await axios.get('https://np-anotice-stock.eastmoney.com/api/security/ann', {
+    const response = await axios.get(API_URLS.EASTMONEY_ANNOUNCEMENT, {
       params: {
         sr: '-1',
         page_size: '30',

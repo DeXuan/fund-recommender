@@ -73,8 +73,9 @@ export default function Login() {
   const initDemoAndRedirect = async () => {
     try {
       await portfolioApi.initDemo();
-    } catch {
+    } catch (e) {
       // ignore - user may already have data
+      console.error('初始化演示数据失败:', e);
     }
     navigate('/portfolio', { replace: true });
   };
@@ -123,8 +124,9 @@ export default function Login() {
           clearTimeout(expireTimer);
           handleAlipayAuthSuccess(data.token, data.user);
         }
-      } catch {
+      } catch (e) {
         // 忽略轮询错误，继续轮询
+        console.error('支付宝授权轮询错误:', e);
       }
     }, 2000);
   };
@@ -184,8 +186,9 @@ export default function Login() {
         // 开始轮询检查授权状态
         startPolling(data.state);
       }
-    } catch {
+    } catch (e) {
       // 网络错误也走模拟模式
+      console.error('支付宝授权请求失败:', e);
       setMockModalOpen(true);
       setMockScanning(false);
       setMockSuccess(false);
@@ -314,6 +317,23 @@ export default function Login() {
             }}
           >
             支付宝扫码登录
+          </Button>
+          <Button
+            block
+            size="large"
+            onClick={async () => {
+              try {
+                const data = await authApi.guestLogin();
+                localStorage.setItem('token', data.token);
+                setUser(data.user);
+                message.success('以游客身份体验');
+                await initDemoAndRedirect();
+              } catch (e: any) {
+                message.error(e.message || '游客登录失败');
+              }
+            }}
+          >
+            游客体验
           </Button>
         </Space>
       </Card>

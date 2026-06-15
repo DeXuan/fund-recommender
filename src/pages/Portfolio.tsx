@@ -81,8 +81,9 @@ export default function Portfolio() {
           try {
             const product = await fundApi.lookupCMBProduct(code);
             form.setFieldsValue({ fund_name: product.product_name });
-          } catch {
+          } catch (e) {
             // product not found, leave name empty for manual input
+            console.error('查询招行产品失败:', e);
           } finally {
             setLookupLoading(false);
           }
@@ -96,8 +97,9 @@ export default function Portfolio() {
           try {
             const fund = await fundApi.getFundDetail(code);
             form.setFieldsValue({ fund_name: fund.name });
-          } catch {
+          } catch (e) {
             // fund not found, leave name empty for manual input
+            console.error('查询基金代码失败:', e);
           } finally {
             setLookupLoading(false);
           }
@@ -116,7 +118,8 @@ export default function Portfolio() {
       setSummary(data);
       setDcaPlans(plans);
       setBenchmarkData(benchmark);
-    } catch {
+    } catch (e) {
+      console.error('加载持仓数据失败:', e);
       message.error('加载数据失败');
     } finally {
       setLoading(false);
@@ -140,7 +143,8 @@ export default function Portfolio() {
       }
       setLastRefreshTime(new Date().toLocaleTimeString('zh-CN'));
       loadData();
-    } catch {
+    } catch (e) {
+      console.error('刷新净值失败:', e);
       message.error('刷新净值失败');
     } finally {
       setRefreshing(false);
@@ -178,7 +182,8 @@ export default function Portfolio() {
       await portfolioApi.deleteRecord(id);
       message.success('删除成功');
       loadData();
-    } catch {
+    } catch (e) {
+      console.error('删除持仓记录失败:', e);
       message.error('删除失败');
     }
   };
@@ -200,8 +205,9 @@ export default function Portfolio() {
       }
       setModalOpen(false);
       loadData();
-    } catch {
+    } catch (e) {
       // validation error
+      console.error('提交持仓记录失败:', e);
     }
   };
 
@@ -215,7 +221,8 @@ export default function Portfolio() {
         message.warning(`${result.errors.length} 条记录导入失败`);
       }
       loadData();
-    } catch {
+    } catch (e) {
+      console.error('导入数据失败:', e);
       message.error('导入失败');
     }
     e.target.value = '';
@@ -300,7 +307,8 @@ export default function Portfolio() {
       await portfolioApi.deleteDcaPlan(id);
       message.success('删除定投计划成功');
       loadData();
-    } catch {
+    } catch (e) {
+      console.error('删除定投计划失败:', e);
       message.error('删除失败');
     }
   };
@@ -323,8 +331,9 @@ export default function Portfolio() {
       }
       setDcaModalOpen(false);
       loadData();
-    } catch {
+    } catch (e) {
       // validation error
+      console.error('提交持仓记录失败:', e);
     }
   };
 
@@ -338,7 +347,8 @@ export default function Portfolio() {
       } else {
         message.info(result.message);
       }
-    } catch {
+    } catch (e) {
+      console.error('同步定投计划失败:', e);
       message.error('同步定投失败');
     } finally {
       setSyncing(false);
@@ -368,7 +378,7 @@ export default function Portfolio() {
             expectedReturn: data.expectedReturn,
             allocation: data.allocation,
           });
-        } catch { /* 非登录用户忽略 */ }
+        } catch (e) { /* 非登录用户忽略 */ }
       }
     } catch (error) {
       console.error('风险评估失败:', error);
@@ -599,7 +609,8 @@ export default function Portfolio() {
               await Promise.all(holding.records.map(r => portfolioApi.deleteRecord(r.id)));
               message.success('删除成功');
               loadData();
-            } catch {
+            } catch (e) {
+              console.error('批量删除持仓记录失败:', e);
               message.error('删除失败');
             }
           }}>

@@ -480,7 +480,7 @@ function PersonalNewsPanel() {
       setHoldings(data.holdings || []);
       setWatchlist(data.watchlist || []);
       setMatchedIndustries(data.matchedIndustries || []);
-    } catch {} finally { setLoading(false); }
+    } catch (e) { console.error('加载个性化资讯失败:', e); } finally { setLoading(false); }
   };
 
   useEffect(() => {

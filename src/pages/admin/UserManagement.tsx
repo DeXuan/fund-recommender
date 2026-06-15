@@ -164,7 +164,7 @@ function UserNotes({ userId }: { userId: number }) {
       setLoading(true);
       const res = await adminApi.getUserNotes(userId);
       setNotes(res.notes);
-    } catch { message.error('获取备注失败'); }
+    } catch (e) { console.error('获取用户备注失败:', e); message.error('获取备注失败'); }
     finally { setLoading(false); }
   }, [userId]);
 
@@ -177,13 +177,13 @@ function UserNotes({ userId }: { userId: number }) {
       await adminApi.addUserNote(userId, newNote.trim());
       setNewNote('');
       fetchNotes();
-    } catch { message.error('添加备注失败'); }
+    } catch (e) { console.error('添加用户备注失败:', e); message.error('添加备注失败'); }
     finally { setSubmitting(false); }
   };
 
   const handleDelete = async (id: number) => {
     try { await adminApi.deleteNote(id); fetchNotes(); }
-    catch { message.error('删除备注失败'); }
+    catch (e) { console.error('删除用户备注失败:', e); message.error('删除备注失败'); }
   };
 
   return (
@@ -324,7 +324,7 @@ function LoginLogsTab() {
       setTotal(res.total);
       setStats(res.stats);
       setPage(pg);
-    } catch { message.error('获取登录日志失败'); }
+    } catch (e) { console.error('获取登录日志失败:', e); message.error('获取登录日志失败'); }
     finally { setLoading(false); }
   }, [statusFilter]);
 
@@ -393,7 +393,7 @@ function OnlineUsersTab() {
     try {
       setLoading(true);
       setData(await adminApi.getOnlineUsers());
-    } catch { message.error('获取在线用户失败'); }
+    } catch (e) { console.error('获取在线用户失败:', e); message.error('获取在线用户失败'); }
     finally { setLoading(false); }
   }, []);
 
@@ -459,7 +459,7 @@ function AuditLogTab() {
       setLogs(res.logs);
       setTotal(res.total);
       setPage(pg);
-    } catch { message.error('获取审计日志失败'); }
+    } catch (e) { console.error('获取审计日志失败:', e); message.error('获取审计日志失败'); }
     finally { setLoading(false); }
   }, [actionFilter]);
 
@@ -546,12 +546,12 @@ export default function UserManagement() {
       const data = await adminApi.getUsers(params);
       setUsers(data.users);
       setTotal(data.total);
-    } catch { message.error('获取用户列表失败'); }
+    } catch (e) { console.error('获取用户列表失败:', e); message.error('获取用户列表失败'); }
     finally { setLoading(false); }
   }, [page, pageSize, search, roleFilter, statusFilter, vipFilter, sortField, sortOrder]);
 
   const fetchStats = async () => {
-    try { setStats(await adminApi.getUserStats()); } catch { /* silent */ }
+    try { setStats(await adminApi.getUserStats()); } catch (e) { /* silent */ console.error('获取用户统计失败:', e); }
   };
 
   useEffect(() => { fetchUsers(1); fetchStats(); }, []);

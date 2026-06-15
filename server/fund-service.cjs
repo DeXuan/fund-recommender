@@ -1,4 +1,5 @@
 const { getPool } = require('./db.cjs');
+const { API_URLS, REQUEST_DEFAULTS } = require('./config/index.cjs');
 
 // ========== 基金基本信息 ==========
 
@@ -181,9 +182,9 @@ const RETURNS_CACHE_TTL = 30 * 60 * 1000; // 30分钟
 async function fetchReturnsFromAPI(code) {
   try {
     const axios = require('axios');
-    const resp = await axios.get(`https://fund.eastmoney.com/pingzhongdata/${code}.js`, {
+    const resp = await axios.get(`${API_URLS.EASTMONEY_FUND_DETAIL}${code}.js`, {
       timeout: 8000,
-      headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://fund.eastmoney.com/', Range: 'bytes=0-3000' },
+      headers: { 'User-Agent': REQUEST_DEFAULTS.USER_AGENT, Referer: REQUEST_DEFAULTS.REFERER_EASTMONEY, Range: 'bytes=0-3000' },
     });
     const text = resp.data || '';
     const extract = (key) => {

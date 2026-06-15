@@ -159,6 +159,7 @@ router.get('/api/recommendations/industry', async (req, res) => {
   try {
     const industryConfigs = [
       { industry: '人工智能/AI', match: '人工智能', trend: '强势上涨', valuation: '合理偏高', buySuggestion: '优先配置', logic: 'AI算力+应用双轮驱动，年度核心主线' },
+      { industry: '算力', match: '算力', trend: '强势上涨', valuation: '合理偏高', buySuggestion: '优先配置', logic: 'AI大模型训练推理需求爆发，算力基础设施为最确定性环节；覆盖AI芯片、服务器、数据中心、光通信、云计算' },
       { industry: '半导体/芯片', match: '半导体/芯片', trend: '震荡上行', valuation: '合理', buySuggestion: '优先配置', logic: '半导体国产替代+AI芯片需求爆发' },
       { industry: '纳斯达克100', match: '纳斯达克100', trend: '强势上涨', valuation: '合理偏高', buySuggestion: '限大额配置', logic: '美股科技龙头，QDII额度紧张' },
       { industry: '医药', match: '医药', trend: '底部反弹', valuation: '极低', buySuggestion: '左侧布局', logic: '估值历史极低，长期配置价值凸显' },
@@ -368,6 +369,34 @@ router.get('/api/industry-analysis/:industry', async (req, res) => {
     const industryMap = {
       '医药': { match: ['医药'], trend: '底部反弹', valuation: '极低', buySuggestion: '左侧布局', logic: '估值历史极低，长期配置价值凸显，集采政策边际缓和' },
       '人工智能': { match: ['人工智能'], trend: '强势上涨', valuation: '合理偏高', buySuggestion: '优先配置', logic: 'AI算力+应用双轮驱动，年度核心主线' },
+      '算力': {
+        match: ['算力'], trend: '强势上涨', valuation: '合理偏高', buySuggestion: '优先配置',
+        logic: 'AI大模型训练推理需求爆发式增长，算力基础设施为AI产业链最确定性环节；中证算力基础设施指数覆盖AI芯片、服务器、数据中心、光通信、云计算等核心赛道',
+        tradingVolumeAnalysis: {
+          summary: '算力板块交易量持续高位，AI大模型迭代加速驱动算力需求持续超预期',
+          reasons: [
+            { title: 'AI大模型训练需求爆发', detail: 'GPT-5、Gemini 2.0等大模型持续迭代，训练算力需求每3-4个月翻倍，远超摩尔定律增速', impact: 'high' },
+            { title: '国产算力替代加速', detail: '英伟达高端GPU出口受限，华为昇腾、寒武纪等国产AI芯片加速替代，国产算力产业链迎来发展机遇', impact: 'high' },
+            { title: '数据中心建设高峰', detail: '各大云厂商资本开支持续增长，2025-2026年为数据中心新建/扩建高峰期，服务器、光模块需求旺盛', impact: 'high' },
+            { title: '算力租赁商业模式成熟', detail: '算力租赁/智算中心模式逐步成熟，运营商和第三方IDC企业加速布局', impact: 'medium' },
+          ],
+        },
+        customBatchPlan: [
+          { batch: 1, time: '立即', percentage: 30, targets: '算力ETF联接A (019575) 或 算力ETF联接A (020046)', method: '支付宝申购A类', reason: '算力为AI产业链最确定性环节，先建底仓' },
+          { batch: 2, time: '2周后', percentage: 25, targets: '算力ETF联接C (019576)', method: '支付宝申购C类', reason: '观察AI大模型迭代和算力招标数据，确认趋势' },
+          { batch: 3, time: '1个月后', percentage: 25, targets: '芯片ETF联接A (013614)', method: '支付宝申购', reason: '分散到算力芯片层，覆盖AI芯片国产替代逻辑' },
+          { batch: 4, time: '2个月后', percentage: 20, targets: '表现最优基金', method: '加仓或调仓', reason: '根据实际表现调整，可搭配云计算ETF联接分散风险' },
+        ],
+        customRiskWarning: '1. 基金有风险，投资需谨慎。以上推荐基于数据分析，不构成投资建议。\n2. 算力板块属于高成长高波动赛道，短期涨幅较大时可能面临回调。\n3. 最大风险：AI大模型发展不及预期、算力产能过剩、芯片出口政策变化。\n4. 算力板块波动较大，建议占总仓位的10-15%，不超过20%。\n5. 止盈线建议设在25-30%，止损线-15%。\n6. 建议以A类+C类组合配置，长期持有用A类，短期波段用C类。',
+        investmentAdvice: {
+          shortTerm: '未来1-3个月：AI大模型持续迭代，算力需求旺盛，可积极配置。关注英伟达财报和国内算力招标数据。',
+          mediumTerm: '未来3-12个月：算力基础设施建设高峰期，国产替代加速，中长期看好。建议A类为主，降低持有成本。',
+          longTerm: '未来1年以上：算力是AI时代的核心基础设施，长期成长空间广阔。适合定投+逢低加仓策略。',
+          targetAllocation: '建议占总仓位的10-15%，不超过20%',
+          stopProfit: '25-30%',
+          stopLoss: '-15%',
+        },
+      },
       '半导体/芯片': { match: ['半导体/芯片'], trend: '震荡上行', valuation: '合理', buySuggestion: '优先配置', logic: '半导体国产替代+AI芯片需求爆发' },
       '证券': { match: ['证券'], trend: '底部反弹', valuation: '低估', buySuggestion: '逢低布局', logic: '资本市场改革持续推进，券商行业整合加速；市场回暖带动交易量提升，券商盈利有望改善' },
       '新能源': { match: ['新能源'], trend: '底部反弹', valuation: '低估', buySuggestion: '逢低布局', logic: '产能出清接近尾声，行业拐点将至' },

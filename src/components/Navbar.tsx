@@ -53,7 +53,7 @@ function getDismissedAlerts(): Set<string> {
   try {
     const raw = localStorage.getItem(DISMISSED_KEY);
     return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch { return new Set(); }
+  } catch (e) { console.error('解析已忽略告警数据失败:', e); return new Set(); }
 }
 
 function dismissAlert(key: string) {

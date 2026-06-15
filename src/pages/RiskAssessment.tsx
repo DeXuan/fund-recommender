@@ -46,7 +46,7 @@ export default function RiskAssessment() {
             expectedReturn: data.expectedReturn,
             allocation: data.allocation,
           });
-        } catch { /* 非登录用户忽略 */ }
+        } catch (e) { /* 非登录用户忽略 */ }
       }
     } catch (error) {
       console.error('风险评估失败:', error);

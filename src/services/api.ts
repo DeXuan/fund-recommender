@@ -1,14 +1,27 @@
+import type {
+  Fund, FundDetail, MarketIndex, IndustryRecommendation, BatchPlan,
+  RiskProfile, DCAInput, DCAOutput, IndustryAnalysis, HS300Analysis,
+  User, SubscriptionPlan, SubscriptionOrder, StockPickResult, RiskMetrics,
+  FundRecord, PortfolioSummary, Transaction, FundFee, IndustryAllocation,
+  HoldingRisk, PerformanceAttribution, IndustryInsight, ScreenedFund,
+} from '../types';
+
 const API_BASE = '/api';
 
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('token');
-  const headers: Record<string, string> = {
+  const defaultHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
+  const mergedHeaders = {
+    ...defaultHeaders,
+    ...(options?.headers || {}),
+  };
+  const { headers: _, ...restOptions } = options || {};
   const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers,
-    ...options,
+    headers: mergedHeaders,
+    ...restOptions,
   });
 
   if (!response.ok) {
@@ -20,7 +33,7 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     try {
       const errBody = await response.json();
       if (errBody.error) errorMsg = errBody.error;
-    } catch {}
+    } catch (e) { console.error('解析错误响应体失败:', e); }
     throw new Error(errorMsg);
   }
 
@@ -42,21 +55,124 @@ export const fundApi = {
         if (value) query.append(key, String(value));
       });
     }
-    return fetchApi<any[]>(`/funds?${query.toString()}`);
+    return fetchApi<Fund[]>(`/funds?${query.toString()}`);
   },
 
   getFundDetail: (code: string) =>
-    fetchApi<any>(`/funds/${encodeURIComponent(code)}`),
+    fetchApi<any>(`/funds/${encodeURIComponent(code)}`), // response shape differs from FundDetail in types — component defines local FundDetailType
 
   getQDIIFunds: () =>
-    fetchApi<any[]>('/funds/qdii'),
+    fetchApi<any[]>('/funds/qdii'), // response includes extra QDII fields not in Fund type — component defines local Fund interface
 
   getHS300Funds: () =>
-    fetchApi<any[]>('/funds/hs300'),
+    fetchApi<Fund[]>('/funds/hs300'),
 
   getMarketIndices: async () => {
     const data = await fetchApi<any>('/market/indices');
     return data.indices || data; // 兼容新旧格式
+  },
+
+  // 指数估值中心
+  getValuationCenter: async () => {
+    const data = await fetchApi<any>('/valuation/center');
+    return data.indices || data;
+  },
+
+  // 指数估值历史趋势（真实数据）
+  getIndexValuationTrend: async (code: string, days?: number) => {
+    const params = days ? `?days=${days}` : '';
+    return fetchApi<any>(`/valuation/trend/${code}${params}`);
+  },
+
+  // AI投资助手（非流式，兼容）
+  aiChat: async (message: string, sessionId?: string) => {
+    return fetchApi<any>('/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, sessionId }),
+    });
+  },
+
+  // AI投资助手（流式 SSE）
+  aiChatStream: async (message: string, sessionId: string | undefined, onText: (text: string) => void, onDone: (sessionId: string) => void, onError: (err: string) => void) => {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+    const response = await fetch(`${API_BASE}/ai/chat/stream`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ message, sessionId }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: '请求失败' }));
+      onError(err.error || `HTTP ${response.status}`);
+      return;
+    }
+    const reader = response.body?.getReader();
+    if (!reader) { onError('无法读取响应流'); return; }
+    const decoder = new TextDecoder();
+    let buffer = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === 'text') onText(event.content);
+            else if (event.type === 'done') onDone(event.sessionId || sessionId || '');
+            else if (event.type === 'error') onError(event.content);
+          } catch (e) { /* ignore parse errors */ console.error('SSE事件解析失败:', e); }
+        }
+      }
+    } catch (e: any) {
+      onError(e.message || '流读取失败');
+    }
+  },
+
+  // 获取AI聊天历史
+  getAIHistory: async (params?: { sessionId?: string; limit?: number; before?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.sessionId) query.set('sessionId', params.sessionId);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.before) query.set('before', String(params.before));
+    return fetchApi<any>(`/ai/history?${query.toString()}`);
+  },
+
+  // 获取AI会话列表
+  getAISessions: async () => {
+    return fetchApi<any>('/ai/sessions');
+  },
+
+  // 清空AI聊天记录
+  clearAIHistory: async (sessionId?: string) => {
+    const query = sessionId ? `?sessionId=${sessionId}` : '';
+    return fetchApi<any>(`/ai/history${query}`, { method: 'DELETE' });
+  },
+
+  // 基金诊断报告
+  getFundDiagnosis: async (code: string) => {
+    return fetchApi<any>(`/fund-diagnosis/${code}`);
+  },
+
+  // 持仓重叠分析
+  getPortfolioOverlap: async () => {
+    return fetchApi<any>('/portfolio/overlap');
+  },
+
+  // 目标投资规划
+  calculateGoal: async (params: { targetAmount: number; currentAmount?: number; monthlyContribution?: number; expectedReturn?: number; years: number }) => {
+    return fetchApi<any>('/goal-planning', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
   },
 
   getSectors: async () => {
@@ -68,19 +184,19 @@ export const fundApi = {
     fetchApi<{ northbound: any; mainFlow: any[]; lastUpdate: string }>('/market/capital-flow'),
 
   getIndustryRecommendations: () =>
-    fetchApi<any[]>('/recommendations/industry'),
+    fetchApi<IndustryRecommendation[]>('/recommendations/industry'),
 
   getBatchPlans: () =>
-    fetchApi<any[]>('/recommendations/batch-plans'),
+    fetchApi<BatchPlan[]>('/recommendations/batch-plans'),
 
-  getRiskProfile: (profile: any) =>
-    fetchApi<any>('/risk/profile', {
+  getRiskProfile: (profile: RiskProfile) =>
+    fetchApi<any>('/risk/profile', { // response includes score/type/riskLevel/expectedReturn/allocation not in RiskProfile
       method: 'POST',
       body: JSON.stringify(profile),
     }),
 
-  calculateDCA: (params: any) =>
-    fetchApi<any>('/tools/dca', {
+  calculateDCA: (params: DCAInput) =>
+    fetchApi<DCAOutput>('/tools/dca', {
       method: 'POST',
       body: JSON.stringify(params),
     }),
@@ -102,23 +218,23 @@ export const fundApi = {
   getStarManagers: () =>
     fetchApi<Array<{ name: string; company: string; title: string; experience: string; specialty: string; bio: string; tags: string[] }>>('/star-managers'),
 
-  // 获取数据更新状态
+  // 获取数据更新状态 (no specific type — response shape varies)
   getStatus: () =>
     fetchApi<any>('/status'),
 
-  // 手动触发数据更新
+  // 手动触发数据更新 (no specific type — response shape varies)
   triggerUpdate: () =>
     fetchApi<any>('/update', { method: 'POST' }),
 
   // 行业基金深度分析
   getIndustryAnalysis: (industry: string) =>
-    fetchApi<any>(`/industry-analysis/${encodeURIComponent(industry)}`),
+    fetchApi<IndustryAnalysis>(`/industry-analysis/${encodeURIComponent(industry)}`),
 
   // 沪深300深度分析
   getHS300Analysis: () =>
-    fetchApi<any>('/hs300/analysis'),
+    fetchApi<HS300Analysis>('/hs300/analysis'),
 
-  // 标普500深度分析
+  // 标普500深度分析 (no matching type defined)
   getSP500Analysis: () =>
     fetchApi<any>('/sp500/analysis'),
 
@@ -193,22 +309,22 @@ export const fundApi = {
 
 export const authApi = {
   login: (username: string, password: string) =>
-    fetchApi<{ token: string; user: any }>('/auth/login', {
+    fetchApi<{ token: string; user: User }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     }),
   register: (username: string, password: string, nickname: string) =>
-    fetchApi<{ token: string; user: any }>('/auth/register', {
+    fetchApi<{ token: string; user: User }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ username, password, nickname }),
     }),
-  getMe: () => fetchApi<{ user: any; oauthAccounts: any[] }>('/auth/me'),
+  getMe: () => fetchApi<{ user: User; oauthAccounts: any[] }>('/auth/me'),
   getAlipayQrcode: () =>
     fetchApi<{ url: string; state: string; mock: boolean }>('/auth/alipay/qrcode'),
   alipayCheck: (state: string) =>
-    fetchApi<{ status: string; token?: string; user?: any }>(`/auth/alipay/check?state=${state}`),
+    fetchApi<{ status: string; token?: string; user?: User }>(`/auth/alipay/check?state=${state}`),
   alipayMockLogin: () =>
-    fetchApi<{ token: string; user: any; mock: boolean }>('/auth/alipay/mock-login', {
+    fetchApi<{ token: string; user: User; mock: boolean }>('/auth/alipay/mock-login', {
       method: 'POST',
     }),
   changePassword: (oldPassword: string, newPassword: string) =>
@@ -216,16 +332,20 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ oldPassword, newPassword }),
     }),
+  guestLogin: () =>
+    fetchApi<{ token: string; user: User }>('/auth/guest', {
+      method: 'POST',
+    }),
 };
 
 export const profileApi = {
   updateProfile: (data: { nickname?: string; avatar_url?: string }) =>
-    fetchApi<{ success: boolean; message: string; user: any }>('/auth/profile', {
+    fetchApi<{ success: boolean; message: string; user: User }>('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
   getLoginHistory: () =>
-    fetchApi<{ logs: any[] }>('/auth/login-history'),
+    fetchApi<{ logs: any[] }>('/auth/login-history'), // no specific log type defined
 };
 
 export const portfolioApi = {
@@ -234,25 +354,27 @@ export const portfolioApi = {
       method: 'POST',
     }),
   getRecords: (fundCode?: string) =>
-    fetchApi<any[]>(`/portfolio/records${fundCode ? `?fund_code=${fundCode}` : ''}`),
-  addRecord: (record: any) =>
-    fetchApi<any>('/portfolio/records', {
+    fetchApi<FundRecord[]>(`/portfolio/records${fundCode ? `?fund_code=${fundCode}` : ''}`),
+  addRecord: (record: Partial<FundRecord>) =>
+    fetchApi<FundRecord>('/portfolio/records', {
       method: 'POST',
       body: JSON.stringify(record),
     }),
-  updateRecord: (id: number, record: any) =>
-    fetchApi<any>(`/portfolio/records/${id}`, {
+  updateRecord: (id: number, record: Partial<FundRecord>) =>
+    fetchApi<FundRecord>(`/portfolio/records/${id}`, {
       method: 'PUT',
       body: JSON.stringify(record),
     }),
   deleteRecord: (id: number) =>
-    fetchApi<any>(`/portfolio/records/${id}`, { method: 'DELETE' }),
-  getSummary: () => fetchApi<any>('/portfolio/summary'),
+    fetchApi<{ success: boolean }>(`/portfolio/records/${id}`, { method: 'DELETE' }),
+  getSummary: () => fetchApi<PortfolioSummary>('/portfolio/summary'),
+  // returns-map response shape is complex, no matching type defined
   getReturnsMap: (year?: number) =>
     fetchApi<any>(`/portfolio/returns-map${year ? `?year=${year}` : ''}`),
+  // insights response shape is complex, no matching type defined
   getInsights: () => fetchApi<any>('/portfolio/insights'),
-  getRiskProfile: () => fetchApi<any>('/portfolio/risk-profile'),
-  saveRiskProfile: (profile: any) =>
+  getRiskProfile: () => fetchApi<RiskProfile>('/portfolio/risk-profile'),
+  saveRiskProfile: (profile: any) => // accepts extra fields (score, riskType, etc.) beyond RiskProfile
     fetchApi<any>('/portfolio/risk-profile', {
       method: 'POST',
       body: JSON.stringify(profile),
@@ -287,7 +409,7 @@ export const portfolioApi = {
     }
     return res.json();
   },
-  // 定投计划
+  // 定投计划 (DCA plan shape differs from DCAOutput; kept as `any` — no dedicated plan input type)
   getDcaPlans: () => fetchApi<any[]>('/portfolio/dca-plans'),
   addDcaPlan: (plan: any) =>
     fetchApi<any>('/portfolio/dca-plans', {
@@ -300,7 +422,7 @@ export const portfolioApi = {
       body: JSON.stringify(plan),
     }),
   deleteDcaPlan: (id: number) =>
-    fetchApi<any>(`/portfolio/dca-plans/${id}`, { method: 'DELETE' }),
+    fetchApi<{ success: boolean }>(`/portfolio/dca-plans/${id}`, { method: 'DELETE' }),
   syncDcaPlans: () =>
     fetchApi<{ synced: number; details: any[]; message: string }>('/portfolio/dca-plans/sync', {
       method: 'POST',
@@ -309,18 +431,49 @@ export const portfolioApi = {
     fetchApi<{ updated: number; validated: number; warnings: string[]; message: string }>('/portfolio/refresh-nav', {
       method: 'POST',
     }),
+  // VIP insights response is very complex; kept as `any`
   getVIPInsights: () => fetchApi<any>('/portfolio/vip-insights'),
+  // 卖出/赎回
+  sellFund: (data: { fund_code: string; shares: number; sell_price: number; sell_date: string; sell_fee?: number; notes?: string }) =>
+    fetchApi<{ record: FundRecord; summary: { sellShares: number; avgCost: number; sellPrice: number; realizedPnl: number; returnRate: number; remainingShares: number } }>('/portfolio/sell', {
+      method: 'POST', body: JSON.stringify(data),
+    }),
+  sellRecord: (id: number, data: { shares: number; sell_price: number; sell_date: string; sell_fee?: number; notes?: string }) =>
+    fetchApi<{ success: boolean; summary: { sellShares: number; sellPrice: number; realizedPnl: number; returnRate: number; isFullSell: boolean } }>(`/portfolio/records/${id}/sell`, {
+      method: 'POST', body: JSON.stringify(data),
+    }),
+  // 交易流水
+  getTransactions: (params?: { fund_code?: string; type?: string; page?: number; pageSize?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.fund_code) query.append('fund_code', params.fund_code);
+    if (params?.type) query.append('type', params.type);
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.pageSize) query.append('pageSize', String(params.pageSize));
+    return fetchApi<{ transactions: Transaction[]; total: number; page: number; pageSize: number; stats: any }>(`/portfolio/transactions?${query.toString()}`);
+  },
+  // 费用分析
+  getFeeAnalysis: () =>
+    fetchApi<{ summary: { totalBuyFees: number; totalSellFees: number; totalFees: number; totalInvestment: number; feeRate: number }; fundFees: FundFee[] }>('/portfolio/fee-analysis'),
+  // 持仓风险指标
+  getHoldingsRisk: () =>
+    fetchApi<{ holdings: { fundCode: string; fundName: string; totalShares: number; totalCost: number; metrics: RiskMetrics | null; industry: string; valuation: string; scale: number }[] }>('/portfolio/holdings-risk'),
+  // 行业配置分析
+  getIndustryAllocation: () =>
+    fetchApi<{ allocations: IndustryAllocation[]; totalValue: number; industryCount: number; concentration: string; hhi: number; topIndustry: string; topWeight: number; suggestions: any[] }>('/portfolio/industry-allocation'),
+  // 收益归因分析
+  getPerformanceAttribution: () =>
+    fetchApi<{ attributions: PerformanceAttribution[]; totalPnl: number; totalValue: number; bestContributor: any; worstContributor: any }>('/portfolio/performance-attribution'),
 };
 
 export const watchlistApi = {
-  getList: () => fetchApi<any[]>('/watchlist'),
+  getList: () => fetchApi<Fund[]>('/watchlist'),
   add: (fund_code: string, fund_name?: string) =>
-    fetchApi<any>('/watchlist', {
+    fetchApi<{ success: boolean }>('/watchlist', {
       method: 'POST',
       body: JSON.stringify({ fund_code, fund_name }),
     }),
   remove: (fund_code: string) =>
-    fetchApi<any>(`/watchlist/${fund_code}`, { method: 'DELETE' }),
+    fetchApi<{ success: boolean }>(`/watchlist/${fund_code}`, { method: 'DELETE' }),
   check: (codes: string[]) =>
     fetchApi<Record<string, boolean>>('/watchlist/check', {
       method: 'POST',
@@ -332,6 +485,7 @@ export const alertsApi = {
   getAlerts: () => fetchApi<any[]>('/alerts'),
 };
 
+// Market events — no specific event type defined; `any` kept for event structures
 export const marketEventsApi = {
   getEvents: (params?: { month?: number; category?: string; impact?: string }) => {
     const query = new URLSearchParams();
@@ -350,6 +504,7 @@ export const marketEventsApi = {
   },
 };
 
+// News API — no specific news item type defined; `any` kept for news structures
 export const newsApi = {
   getNews: (params?: { category?: string; impact?: string; keyword?: string; page?: number; pageSize?: number }) => {
     const query = new URLSearchParams();
@@ -403,17 +558,18 @@ export const newsApi = {
               try {
                 const data = JSON.parse(line.slice(6));
                 onMessage(data);
-              } catch {}
+              } catch (e) { console.error('SSE消息解析失败:', e); }
             }
           }
         }
-      } catch {}
+      } catch (e) { console.error('SSE流读取失败:', e); }
     };
     connect();
     return controller;
   },
 };
 
+// Admin APIs — responses are complex/variable; `any` kept intentionally for admin-only endpoints
 export const adminApi = {
   // User management
   getUsers: (params?: { search?: string; role?: string; status?: string; page?: number; pageSize?: number; sort?: string; order?: string }) => {
@@ -527,25 +683,49 @@ export const adminApi = {
 };
 
 export const subscriptionApi = {
-  getPlans: () => fetchApi<{ plans: any[] }>('/subscription/plans'),
+  getPlans: () => fetchApi<{ plans: SubscriptionPlan[] }>('/subscription/plans'),
   createOrder: (planId?: number) =>
     fetchApi<{ orderId: number; outTradeNo: string; amount: number; planName: string; qrCodeUrl: string; qrCodeBase64: string }>(
       '/subscription/create-order', { method: 'POST', body: JSON.stringify({ planId }) }
     ),
   checkOrder: (outTradeNo: string) =>
     fetchApi<{ paid: boolean }>('/subscription/check-order', { method: 'POST', body: JSON.stringify({ outTradeNo }) }),
-  getStatus: () => fetchApi<{ isPremium: boolean; expiresAt: string; planName: string; daysRemaining: number }>('/subscription/status'),
-  getOrders: () => fetchApi<{ orders: any[] }>('/subscription/orders'),
+  getStatus: () => fetchApi<{ tier: 'free' | 'basic' | 'premium'; isPremium: boolean; expiresAt: string; planName: string; daysRemaining: number }>('/subscription/status'),
+  getOrders: () => fetchApi<{ orders: SubscriptionOrder[] }>('/subscription/orders'),
 };
 
 export const stockPickerApi = {
   rankFunds: (params: { industry?: string; type?: string; limit?: number; factors?: Record<string, { weight: number }> }) =>
-    fetchApi<{ ranked: any[]; total: number; factors: any; industryStats: any }>('/stock-picker/rank', { method: 'POST', body: JSON.stringify(params) }),
+    fetchApi<{ ranked: StockPickResult[]; total: number; factors: any; industryStats: any }>('/stock-picker/rank', { method: 'POST', body: JSON.stringify(params) }),
+  enhancedRank: (params: { industry?: string; type?: string; limit?: number; factors?: Record<string, { weight: number }> }) =>
+    fetchApi<{ ranked: StockPickResult[]; total: number; factors: any; industryStats: any }>('/stock-picker/enhanced-rank', { method: 'POST', body: JSON.stringify(params) }),
   getFactors: () => fetchApi<{ factors: any }>('/stock-picker/factors'),
   backtest: (codes: string[], days?: number) =>
     fetchApi<{ dates: string[]; portfolio: number[]; benchmark: number[]; summary: any }>('/stock-picker/backtest', { method: 'POST', body: JSON.stringify({ codes, days }) }),
   buildPortfolio: (params: { topN?: number; budget?: number; strategy?: string }) =>
     fetchApi<{ allocation: any[]; totalBudget: number; perFund: number; strategy: string }>('/stock-picker/portfolio', { method: 'POST', body: JSON.stringify(params) }),
+  getRiskMetrics: (code: string) =>
+    fetchApi<{ code: string; metrics: RiskMetrics }>(`/stock-picker/risk-metrics/${code}`),
+  getRiskMetricsBatch: (codes: string[]) =>
+    fetchApi<{ results: Record<string, RiskMetrics> }>('/stock-picker/risk-metrics-batch', { method: 'POST', body: JSON.stringify({ codes }) }),
+  getIndustryInsights: () =>
+    fetchApi<{ insights: IndustryInsight[]; currentMonth: number }>('/stock-picker/industry-insights'),
+  getBatchEntry: (params: { industry?: string; budget?: number; batches?: number }) =>
+    fetchApi<any>('/stock-picker/batch-entry', { method: 'POST', body: JSON.stringify(params) }),
+  screenFunds: (params: { mode?: string; minSharpe?: number; minSortino?: number; minCalmar?: number; maxDrawdown?: number; minReturn?: number; limit?: number }) =>
+    fetchApi<{ mode: string; config: any; total: number; funds: ScreenedFund[] }>('/stock-picker/screen', { method: 'POST', body: JSON.stringify(params) }),
+  multiStrategy: (params: { industry?: string; type?: string; limit?: number }) =>
+    fetchApi<{ strategies: Record<string, any>; consensusFunds: any[]; totalFunds: number }>('/stock-picker/multi-strategy', { method: 'POST', body: JSON.stringify(params) }),
+  getMarketContext: () =>
+    fetchApi<{ indices: MarketIndex[]; sectors: any[]; capitalFlow: any; marketSentiment: string; sentimentDetail: string; suggestedStrategy: string; hs300Valuation: any; timestamp: string }>('/stock-picker/market-context'),
+  getManagerPerformance: () =>
+    fetchApi<{ managers: any[]; total: number }>('/stock-picker/manager-performance'),
+  getMultiBenchmark: (fundCode: string, days?: number) =>
+    fetchApi<{ fundCode: string; fundReturn: number; days: number; benchmarks: any[] }>('/stock-picker/multi-benchmark', { method: 'POST', body: JSON.stringify({ fundCode, days }) }),
+  getFeeProjection: (fundCode: string, amount?: number, years?: number) =>
+    fetchApi<any>('/stock-picker/fee-projection', { method: 'POST', body: JSON.stringify({ fundCode, amount, years }) }),
+  getStyleDrift: () =>
+    fetchApi<{ drifts: any[]; total: number }>('/stock-picker/style-drift'),
 };
 
 export const fundCompareApi = {

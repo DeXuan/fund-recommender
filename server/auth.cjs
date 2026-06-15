@@ -192,6 +192,34 @@ router.post('/register', strictLimit, async (req, res) => {
   }
 });
 
+// POST /api/auth/guest — 游客快速体验
+router.post('/guest', strictLimit, async (req, res) => {
+  try {
+    const pool = getPool();
+    const guestId = crypto.randomBytes(6).toString('hex');
+    const username = `guest_${guestId}`;
+    const nickname = `游客${guestId.slice(0, 6)}`;
+    const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+
+    const result = await pool.query(
+      'INSERT INTO users (username, password_hash, nickname, role) VALUES ($1, $2, $3, $4) RETURNING id',
+      [username, passwordHash, nickname, 'guest']
+    );
+    const userId = result.rows[0].id;
+
+    const token = jwt.sign(
+      { id: userId, username, nickname, role: 'guest' },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({ token, user: { id: userId, username, nickname, role: 'guest', subscription_status: 'free' } });
+  } catch (error) {
+    console.error('游客登录失败:', error.message);
+    res.status(500).json({ error: '游客登录失败' });
+  }
+});
+
 // Parse user agent for browser/OS info
 function parseUserAgent(ua) {
   if (!ua) return { browser: '', os: '', device: '' };

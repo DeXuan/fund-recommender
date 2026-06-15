@@ -66,7 +66,7 @@ function HealthCheck() {
 
   const fetchData = useCallback(async () => {
     try { setData(await adminApi.getHealthCheck()); }
-    catch { message.error('健康检查失败'); }
+    catch (e) { console.error('健康检查失败:', e); message.error('健康检查失败'); }
     finally { setLoading(false); }
   }, []);
 
@@ -135,7 +135,7 @@ function ApiStats() {
 
   const fetchData = useCallback(async () => {
     try { setLoading(true); setData(await adminApi.getApiStats(hours)); }
-    catch { message.error('获取API统计失败'); }
+    catch (e) { console.error('获取API统计失败:', e); message.error('获取API统计失败'); }
     finally { setLoading(false); }
   }, [hours]);
 
@@ -219,13 +219,13 @@ function AlertManagement() {
 
   const fetchRules = useCallback(async () => {
     try { setLoading(true); const res = await adminApi.getAlertRules(); setRules(res.rules); }
-    catch { message.error('获取告警规则失败'); }
+    catch (e) { console.error('获取告警规则失败:', e); message.error('获取告警规则失败'); }
     finally { setLoading(false); }
   }, []);
 
   const fetchHistory = useCallback(async () => {
     try { setHistoryLoading(true); const res = await adminApi.getAlertHistory({ pageSize: 100 }); setHistory(res.history); setHistoryStats(res.stats); }
-    catch { message.error('获取告警历史失败'); }
+    catch (e) { console.error('获取告警历史失败:', e); message.error('获取告警历史失败'); }
     finally { setHistoryLoading(false); }
   }, []);
 
@@ -250,12 +250,12 @@ function AlertManagement() {
 
   const handleDelete = async (id: number) => {
     try { await adminApi.deleteAlertRule(id); message.success('规则已删除'); fetchRules(); }
-    catch { message.error('删除失败'); }
+    catch (e) { console.error('删除告警规则失败:', e); message.error('删除失败'); }
   };
 
   const handleResolve = async (id: number) => {
     try { await adminApi.resolveAlert(id); message.success('告警已解决'); fetchHistory(); }
-    catch { message.error('操作失败'); }
+    catch (e) { console.error('解决告警失败:', e); message.error('操作失败'); }
   };
 
   const metricLabels: Record<string, string> = {
@@ -379,7 +379,7 @@ function DBDetails() {
 
   const fetchData = async () => {
     try { setLoading(true); setData(await adminApi.getDbDetails()); }
-    catch { message.error('获取数据库详情失败'); }
+    catch (e) { console.error('获取数据库详情失败:', e); message.error('获取数据库详情失败'); }
     finally { setLoading(false); }
   };
 
@@ -552,7 +552,7 @@ function LogViewer() {
       setLoading(true);
       const res = await adminApi.getLogs({ level: lvl, keyword: kw, page: pg, pageSize: 50 });
       setLogs(res.logs); setTotal(res.total); setTotalPages(res.totalPages); setPage(pg);
-    } catch { message.error('获取日志失败'); }
+    } catch (e) { console.error('获取日志失败:', e); message.error('获取日志失败'); }
     finally { setLoading(false); }
   }, [level, keyword]);
 
@@ -642,7 +642,7 @@ function SystemSettings() {
       await adminApi.updateSettings({ [key]: value });
       setConfig(prev => ({ ...prev, [key]: { ...prev[key], value } }));
       message.success('配置已更新');
-    } catch { message.error('更新失败'); }
+    } catch (e) { console.error('更新配置失败:', e); message.error('更新失败'); }
     finally { setSaving(false); }
   };
 
@@ -690,7 +690,7 @@ function ServerResources() {
 
   const fetchData = async () => {
     try { setData(await adminApi.getServerResources()); }
-    catch { message.error('获取服务器资源失败'); }
+    catch (e) { console.error('获取服务器资源失败:', e); message.error('获取服务器资源失败'); }
     finally { setLoading(false); }
   };
 
@@ -846,7 +846,7 @@ export default function SystemMonitor() {
         const next = [...prev, { timestamp: res.timestamp, qps: res.qps, cacheHit: res.database.cacheHitRatio, connections: res.connections.active, slowQueries: res.database.activeSlowQueries }];
         return next.slice(-30);
       });
-    } catch { /* silent */ }
+    } catch (e) { /* silent */ console.error('获取监控指标失败:', e); }
     finally { setLoading(false); }
   }, []);
 

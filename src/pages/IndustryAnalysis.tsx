@@ -119,6 +119,7 @@ const INDUSTRIES = [
   // 其他行业
   { key: '医药', icon: '💊', label: '医药' },
   { key: '人工智能', icon: '🤖', label: '人工智能' },
+  { key: '算力', icon: '🖥️', label: '算力' },
   { key: '半导体/芯片', icon: '🔬', label: '半导体' },
   { key: '证券', icon: '📈', label: '证券' },
   { key: '新能源', icon: '⚡', label: '新能源' },

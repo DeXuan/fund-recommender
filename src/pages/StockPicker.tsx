@@ -57,14 +57,14 @@ export default function StockPicker() {
     try {
       const data = await fundApi.getIndustries();
       setIndustries(Array.isArray(data) ? data : []);
-    } catch {}
+    } catch (e) { console.error('加载行业列表失败:', e); }
   };
 
   const loadWatchlist = async () => {
     try {
       const data = await watchlistApi.getList();
       setWatchedCodes(new Set((data || []).map((w: any) => w.fund_code)));
-    } catch {}
+    } catch (e) { console.error('加载自选列表失败:', e); }
   };
 
   const toggleWatchlist = async (code: string, e: React.MouseEvent) => {
@@ -77,7 +77,7 @@ export default function StockPicker() {
         await watchlistApi.add(code);
         setWatchedCodes(prev => new Set(prev).add(code));
       }
-    } catch {}
+    } catch (e) { console.error('自选操作失败:', e); }
   };
 
   const handleRank = async (strategyOverride?: string) => {

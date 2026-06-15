@@ -64,7 +64,7 @@ export default function Subscription() {
               setUser({ ...user, subscription_status: 'premium' });
             }
           }
-        } catch {}
+        } catch (e) { console.error('支付状态轮询失败:', e); }
       }, 3000);
     } catch (e: any) {
       message.error(e.message || '创建订单失败');
