@@ -45,6 +45,7 @@ const navItems = [
   { key: '/qdii', label: 'QDII基金', icon: <GlobalOutlined /> },
   { key: '/cmb-products', label: '招行理财', icon: <BankOutlined /> },
   { key: '/events', label: '事件日历', icon: <CalendarOutlined /> },
+  { key: '/ai-assistant', label: 'AI助手', icon: <ThunderboltOutlined /> },
 ];
 
 const DISMISSED_KEY = 'dismissed_alerts';

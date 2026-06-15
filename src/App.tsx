@@ -7,6 +7,7 @@ import Footer from './components/Footer';
 import DataStatus from './components/DataStatus';
 import ErrorBoundary from './components/ErrorBoundary';
 import GsapEnhancer from './components/GsapEnhancer';
+import FloatingChat from './components/FloatingChat';
 
 const Home = lazy(() => import('./pages/Home'));
 const FundList = lazy(() => import('./pages/FundList'));
@@ -28,6 +29,7 @@ const Subscription = lazy(() => import('./pages/Subscription'));
 const StockPicker = lazy(() => import('./pages/StockPicker'));
 const Profile = lazy(() => import('./pages/Profile'));
 const FundCompare = lazy(() => import('./pages/FundCompare'));
+const AIAssistant = lazy(() => import('./pages/AIAssistant'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -66,6 +68,7 @@ function AppRoutes() {
         <Route path="/stock-picker" element={<ProtectedRoute><StockPicker /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/fund-compare" element={<FundCompare />} />
+        <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
         <Route path="/admin/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
         <Route path="/admin/monitor" element={<AdminRoute><SystemMonitor /></AdminRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -90,6 +93,7 @@ function App() {
             </ErrorBoundary>
           </Layout.Content>
           <Footer />
+          <FloatingChat />
         </Layout>
       </AuthProvider>
     </Router>
