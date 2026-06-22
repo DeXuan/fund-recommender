@@ -1,15 +1,7 @@
-export { PortfolioSummaryCards } from './PortfolioSummaryCards';
-export { HoldingsTable } from './HoldingsTable';
-export { HoldingsCharts } from './HoldingsCharts';
 export { HoldingsDiagnosis } from './HoldingsDiagnosis';
 export { TransactionBehaviorAnalysis } from './TransactionBehaviorAnalysis';
-export { DCAPlansPanel } from './DCAPlansPanel';
-export { RiskAssessmentTab } from './RiskAssessmentTab';
-export { DCACalculatorTab } from './DCACalculatorTab';
 export { TransactionHistoryTab } from './TransactionHistoryTab';
 export { DeepAnalysisTab } from './DeepAnalysisTab';
 export { GoalPlanningTab } from './GoalPlanningTab';
 export { SmartDCATab } from './SmartDCATab';
-export { AddEditRecordModal } from './AddEditRecordModal';
-export { DCAModal } from './DCAModal';
 export { SellModal } from './SellModal';

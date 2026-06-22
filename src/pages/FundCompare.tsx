@@ -138,8 +138,8 @@ export default function FundCompare() {
               columns={[
                 { title: '基金', dataIndex: 'name' },
                 { title: '年化波动率(%)', render: (_: any, r: any) => r.riskMetrics.volatility },
-                { title: '最大回撤(%)', render: (_: any, r: any) => <span style={{ color: '#ff4d4f' }}>{r.riskMetrics.maxDrawdown}%</span> },
-                { title: '夏普比率', render: (_: any, r: any) => <span style={{ color: r.riskMetrics.sharpeRatio > 0 ? '#52c41a' : '#ff4d4f' }}>{r.riskMetrics.sharpeRatio}</span> },
+                { title: '最大回撤(%)', render: (_: any, r: any) => <span style={{ color: 'var(--danger)' }}>{r.riskMetrics.maxDrawdown}%</span> },
+                { title: '夏普比率', render: (_: any, r: any) => <span style={{ color: r.riskMetrics.sharpeRatio > 0 ? 'var(--success)' : 'var(--danger)' }}>{r.riskMetrics.sharpeRatio}</span> },
                 { title: '卡玛比率', render: (_: any, r: any) => r.riskMetrics.calmarRatio },
                 { title: '3年持有成本(%)', render: (_: any, r: any) => `${r.feeComparison.cost3y}%` },
               ]}

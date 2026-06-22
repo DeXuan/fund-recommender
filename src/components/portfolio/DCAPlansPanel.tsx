@@ -22,8 +22,8 @@ export function DCAPlansPanel({ dcaPlans, loading, syncing, isDark, onSyncDca, o
     {
       title: '基金名称', dataIndex: 'fund_name', key: 'fund_name', width: 180,
       render: (name: string, record: any) => (
-        <Link to={`/funds/${record.fund_code}`} style={{ fontWeight: 500, color: '#1677ff' }}>
-          {name} <LinkOutlined style={{ fontSize: 11, color: '#1677ff' }} />
+        <Link to={`/funds/${record.fund_code}`} style={{ fontWeight: 500, color: 'var(--primary)' }}>
+          {name} <LinkOutlined style={{ fontSize: 11, color: 'var(--primary)' }} />
         </Link>
       ),
     },

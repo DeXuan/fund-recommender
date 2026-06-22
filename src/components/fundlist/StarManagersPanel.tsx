@@ -44,9 +44,9 @@ export function StarManagersPanel({ visible, isDark, starManagers, selectedManag
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
                 <div style={{
                   width: 40, height: 40, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #722ed1 0%, #9254de 100%)',
+                  background: 'var(--gradient-card-purple)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'white', fontWeight: 700, fontSize: 16, marginRight: 12,
+                  color: 'var(--color-text-on-dark)', fontWeight: 700, fontSize: 16, marginRight: 12,
                 }}>
                   {mgr.name.charAt(0)}
                 </div>
@@ -61,7 +61,7 @@ export function StarManagersPanel({ visible, isDark, starManagers, selectedManag
               <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginBottom: 4 }}>
                 <strong>经验：</strong>{mgr.experience} | <strong>擅长：</strong>{mgr.specialty}
               </div>
-              <div style={{ fontSize: 12, color: '#999', marginBottom: 8, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8, lineHeight: 1.5 }}>
                 {mgr.bio}
               </div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>

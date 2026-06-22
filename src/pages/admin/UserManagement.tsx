@@ -16,6 +16,8 @@ import {
 import ReactECharts from 'echarts-for-react';
 import { adminApi } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { getEchartsTheme } from '../../utils/echarts-theme';
 
 const { Search } = Input;
 const { Text, Title } = Typography;
@@ -52,32 +54,32 @@ function UserStats({ stats }: { stats: any }) {
       </Col>
       <Col xs={12} sm={8} md={4}>
         <Card size="small" hoverable>
-          <Statistic title="管理员" value={parseInt(stats.admin_count) || 0} prefix={<CrownOutlined />} valueStyle={{ color: '#722ed1' }} />
+          <Statistic title="管理员" value={parseInt(stats.admin_count) || 0} prefix={<CrownOutlined />} valueStyle={{ color: 'var(--color-purple)' }} />
         </Card>
       </Col>
       <Col xs={12} sm={8} md={4}>
         <Card size="small" hoverable>
-          <Statistic title="已禁用" value={parseInt(stats.disabled_count) || 0} prefix={<StopOutlined />} valueStyle={{ color: '#ff4d4f' }} />
+          <Statistic title="已禁用" value={parseInt(stats.disabled_count) || 0} prefix={<StopOutlined />} valueStyle={{ color: 'var(--danger)' }} />
         </Card>
       </Col>
       <Col xs={12} sm={8} md={4}>
         <Card size="small" hoverable>
-          <Statistic title="7日活跃" value={parseInt(stats.active_7d) || 0} prefix={<RiseOutlined />} valueStyle={{ color: '#52c41a' }} />
+          <Statistic title="7日活跃" value={parseInt(stats.active_7d) || 0} prefix={<RiseOutlined />} valueStyle={{ color: 'var(--success)' }} />
         </Card>
       </Col>
       <Col xs={12} sm={8} md={4}>
         <Card size="small" hoverable>
-          <Statistic title="30日活跃" value={parseInt(stats.active_30d) || 0} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#1677ff' }} />
+          <Statistic title="30日活跃" value={parseInt(stats.active_30d) || 0} prefix={<CheckCircleOutlined />} valueStyle={{ color: 'var(--primary)' }} />
         </Card>
       </Col>
       <Col xs={12} sm={8} md={4}>
         <Card size="small" hoverable>
-          <Statistic title="本月新增" value={parseInt(stats.new_30d) || 0} prefix={<RiseOutlined />} valueStyle={{ color: '#faad14' }} />
+          <Statistic title="本月新增" value={parseInt(stats.new_30d) || 0} prefix={<RiseOutlined />} valueStyle={{ color: 'var(--warning)' }} />
         </Card>
       </Col>
       <Col xs={12} sm={8} md={4}>
         <Card size="small" hoverable>
-          <Statistic title="VIP会员" value={parseInt(stats.vip_count) || 0} prefix={<GiftOutlined />} valueStyle={{ color: '#faad14' }} />
+          <Statistic title="VIP会员" value={parseInt(stats.vip_count) || 0} prefix={<GiftOutlined />} valueStyle={{ color: 'var(--warning)' }} />
         </Card>
       </Col>
     </Row>
@@ -86,6 +88,7 @@ function UserStats({ stats }: { stats: any }) {
 
 // Registration trend chart
 function TrendChart({ stats }: { stats: any }) {
+  const { isDark } = useTheme();
   if (!stats?.registrationTrend?.length && !stats?.loginTrend?.length) return null;
   const regDates = stats.registrationTrend?.map((d: any) => d.date) || [];
   const regCounts = stats.registrationTrend?.map((d: any) => parseInt(d.count)) || [];
@@ -109,7 +112,7 @@ function TrendChart({ stats }: { stats: any }) {
   };
   return (
     <Card size="small" title="近30日用户活跃趋势" style={{ marginBottom: 20 }}>
-      <ReactECharts option={option} style={{ height: 200 }} />
+      <ReactECharts option={option} style={{ height: 200 }} theme={getEchartsTheme(isDark)} />
     </Card>
   );
 }
@@ -164,7 +167,7 @@ function UserNotes({ userId }: { userId: number }) {
       setLoading(true);
       const res = await adminApi.getUserNotes(userId);
       setNotes(res.notes);
-    } catch (e) { console.error('获取用户备注失败:', e); message.error('获取备注失败'); }
+    } catch { message.error('获取备注失败'); }
     finally { setLoading(false); }
   }, [userId]);
 
@@ -177,13 +180,13 @@ function UserNotes({ userId }: { userId: number }) {
       await adminApi.addUserNote(userId, newNote.trim());
       setNewNote('');
       fetchNotes();
-    } catch (e) { console.error('添加用户备注失败:', e); message.error('添加备注失败'); }
+    } catch { message.error('添加备注失败'); }
     finally { setSubmitting(false); }
   };
 
   const handleDelete = async (id: number) => {
     try { await adminApi.deleteNote(id); fetchNotes(); }
-    catch (e) { console.error('删除用户备注失败:', e); message.error('删除备注失败'); }
+    catch { message.error('删除备注失败'); }
   };
 
   return (
@@ -237,7 +240,7 @@ function UserDetailDrawer({ userId, open, onClose }: { userId: number | null; op
        !data ? <Empty /> : (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-            <Avatar size={64} icon={<UserOutlined />} src={data.user.avatar_url} style={{ background: data.user.role === 'admin' ? '#722ed1' : '#1677ff' }} />
+            <Avatar size={64} icon={<UserOutlined />} src={data.user.avatar_url} style={{ background: data.user.role === 'admin' ? 'var(--color-purple)' : 'var(--primary)' }} />
             <div>
               <div style={{ fontSize: 18, fontWeight: 600 }}>{data.user.nickname || data.user.username}</div>
               <Space size={8}>
@@ -281,7 +284,7 @@ function UserDetailDrawer({ userId, open, onClose }: { userId: number | null; op
               <Row gutter={16}>
                 <Col span={8}><Statistic title="总市值" value={parseFloat(data.portfolio.total_value) || 0} prefix="¥" precision={2} valueStyle={{ fontSize: 16 }} /></Col>
                 <Col span={8}><Statistic title="总盈亏" value={parseFloat(data.portfolio.total_pnl) || 0} prefix="¥" precision={2}
-                  valueStyle={{ fontSize: 16, color: parseFloat(data.portfolio.total_pnl) >= 0 ? '#cf1322' : '#3f8600' }} /></Col>
+                  valueStyle={{ fontSize: 16, color: parseFloat(data.portfolio.total_pnl) >= 0 ? 'var(--danger)' : 'var(--success)' }} /></Col>
                 <Col span={8}><Statistic title="定投计划" value={parseInt(data.dcaPlans?.total) || 0} suffix={`/ ${parseInt(data.dcaPlans?.active) || 0} 活跃`} valueStyle={{ fontSize: 16 }} /></Col>
               </Row>
             </Card>
@@ -324,7 +327,7 @@ function LoginLogsTab() {
       setTotal(res.total);
       setStats(res.stats);
       setPage(pg);
-    } catch (e) { console.error('获取登录日志失败:', e); message.error('获取登录日志失败'); }
+    } catch { message.error('获取登录日志失败'); }
     finally { setLoading(false); }
   }, [statusFilter]);
 
@@ -341,8 +344,8 @@ function LoginLogsTab() {
       {stats && (
         <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
           <Col xs={12} sm={6}><Card size="small"><Statistic title="总记录" value={parseInt(stats.total) || 0} /></Card></Col>
-          <Col xs={12} sm={6}><Card size="small"><Statistic title="成功" value={parseInt(stats.success_count) || 0} valueStyle={{ color: '#52c41a' }} /></Card></Col>
-          <Col xs={12} sm={6}><Card size="small"><Statistic title="失败" value={parseInt(stats.failed_count) || 0} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+          <Col xs={12} sm={6}><Card size="small"><Statistic title="成功" value={parseInt(stats.success_count) || 0} valueStyle={{ color: 'var(--success)' }} /></Card></Col>
+          <Col xs={12} sm={6}><Card size="small"><Statistic title="失败" value={parseInt(stats.failed_count) || 0} valueStyle={{ color: 'var(--danger)' }} /></Card></Col>
           <Col xs={12} sm={6}><Card size="small"><Statistic title="24h登录" value={parseInt(stats.last_24h) || 0} prefix={<LoginOutlined />} /></Card></Col>
         </Row>
       )}
@@ -393,7 +396,7 @@ function OnlineUsersTab() {
     try {
       setLoading(true);
       setData(await adminApi.getOnlineUsers());
-    } catch (e) { console.error('获取在线用户失败:', e); message.error('获取在线用户失败'); }
+    } catch { message.error('获取在线用户失败'); }
     finally { setLoading(false); }
   }, []);
 
@@ -405,7 +408,7 @@ function OnlineUsersTab() {
     <div>
       {data?.sessionStats && (
         <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-          <Col xs={12} sm={6}><Card size="small"><Statistic title="当前在线" value={data.total || 0} prefix={<GlobalOutlined />} valueStyle={{ color: '#52c41a' }} /></Card></Col>
+          <Col xs={12} sm={6}><Card size="small"><Statistic title="当前在线" value={data.total || 0} prefix={<GlobalOutlined />} valueStyle={{ color: 'var(--success)' }} /></Card></Col>
           <Col xs={12} sm={6}><Card size="small"><Statistic title="5分钟内" value={parseInt(data.sessionStats.last_5min) || 0} /></Card></Col>
           <Col xs={12} sm={6}><Card size="small"><Statistic title="1小时内" value={parseInt(data.sessionStats.last_1hour) || 0} /></Card></Col>
           <Col xs={12} sm={6}><Card size="small"><Statistic title="24小时内" value={parseInt(data.sessionStats.last_24hour) || 0} /></Card></Col>
@@ -422,7 +425,7 @@ function OnlineUsersTab() {
         columns={[
           { title: '用户', key: 'user', render: (_: any, r: any) => (
             <Space>
-              <Avatar size="small" icon={<UserOutlined />} src={r.avatar_url} style={{ background: r.role === 'admin' ? '#722ed1' : '#1677ff' }} />
+              <Avatar size="small" icon={<UserOutlined />} src={r.avatar_url} style={{ background: r.role === 'admin' ? 'var(--color-purple)' : 'var(--primary)' }} />
               <div>
                 <div style={{ fontWeight: 500 }}>{r.nickname || r.username}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>@{r.username}</div>
@@ -459,7 +462,7 @@ function AuditLogTab() {
       setLogs(res.logs);
       setTotal(res.total);
       setPage(pg);
-    } catch (e) { console.error('获取审计日志失败:', e); message.error('获取审计日志失败'); }
+    } catch { message.error('获取审计日志失败'); }
     finally { setLoading(false); }
   }, [actionFilter]);
 
@@ -546,12 +549,12 @@ export default function UserManagement() {
       const data = await adminApi.getUsers(params);
       setUsers(data.users);
       setTotal(data.total);
-    } catch (e) { console.error('获取用户列表失败:', e); message.error('获取用户列表失败'); }
+    } catch { message.error('获取用户列表失败'); }
     finally { setLoading(false); }
   }, [page, pageSize, search, roleFilter, statusFilter, vipFilter, sortField, sortOrder]);
 
   const fetchStats = async () => {
-    try { setStats(await adminApi.getUserStats()); } catch (e) { /* silent */ console.error('获取用户统计失败:', e); }
+    try { setStats(await adminApi.getUserStats()); } catch { /* silent */ }
   };
 
   useEffect(() => { fetchUsers(1); fetchStats(); }, []);
@@ -651,7 +654,7 @@ export default function UserManagement() {
       sorter: true,
       render: (_: any, record: UserRecord) => (
         <Space style={{ cursor: 'pointer' }} onClick={() => { setDetailUserId(record.id); setDetailOpen(true); }}>
-          <Avatar size="small" icon={<UserOutlined />} src={record.avatar_url} style={{ background: record.role === 'admin' ? '#722ed1' : '#1677ff' }} />
+          <Avatar size="small" icon={<UserOutlined />} src={record.avatar_url} style={{ background: record.role === 'admin' ? 'var(--color-purple)' : 'var(--primary)' }} />
           <div>
             <div style={{ fontWeight: 500 }}>{record.nickname || record.username}</div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>@{record.username}</div>
@@ -716,7 +719,7 @@ export default function UserManagement() {
       dataIndex: 'oauth_count',
       key: 'oauth_count',
       width: 60,
-      render: (count: number) => count > 0 ? <Tooltip title={`${count} 个第三方账户`}><LinkOutlined style={{ color: '#52c41a' }} /></Tooltip> : '-',
+      render: (count: number) => count > 0 ? <Tooltip title={`${count} 个第三方账户`}><LinkOutlined style={{ color: 'var(--success)' }} /></Tooltip> : '-',
     },
     {
       title: '最后登录',

@@ -121,20 +121,20 @@ export function HoldingsCharts({ holdings, summary, benchmarkData, isDark }: Pro
           />
           <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginTop: 12 }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ color: isDark ? '#6b6b6b' : '#8c8c8c', fontSize: 12 }}>我的持仓收益</div>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>我的持仓收益</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: (summary?.totalReturn || 0) >= 0 ? (isDark ? '#ff4d4f' : '#cf1322') : (isDark ? '#52c41a' : '#3f8600') }}>
                 {(summary?.totalReturn || 0) >= 0 ? '+' : ''}{(summary?.totalReturn || 0).toFixed(2)}%
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ color: isDark ? '#6b6b6b' : '#8c8c8c', fontSize: 12 }}>沪深300同期</div>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>沪深300同期</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: parseFloat(benchmarkData[benchmarkData.length - 1]?.return_pct || 0) >= 0 ? (isDark ? '#ff4d4f' : '#cf1322') : (isDark ? '#52c41a' : '#3f8600') }}>
                 {benchmarkData.length > 0 ? `${parseFloat(benchmarkData[benchmarkData.length - 1].return_pct) >= 0 ? '+' : ''}${benchmarkData[benchmarkData.length - 1].return_pct}%` : '-'}
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ color: isDark ? '#6b6b6b' : '#8c8c8c', fontSize: 12 }}>超额收益</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#722ed1' }}>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>超额收益</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-purple)' }}>
                 {benchmarkData.length > 0
                   ? `${((summary?.totalReturn || 0) - parseFloat(benchmarkData[benchmarkData.length - 1].return_pct)) >= 0 ? '+' : ''}${((summary?.totalReturn || 0) - parseFloat(benchmarkData[benchmarkData.length - 1].return_pct)).toFixed(2)}%`
                   : '-'}

@@ -84,26 +84,26 @@ export function DeepAnalysisTab({
           <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
             <Col xs={12} sm={6}>
               <Card size="small" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#1677ff' }}>{overlapData.summary.totalFunds}</div>
-                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>持仓基金数</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--primary)' }}>{overlapData.summary.totalFunds}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>持仓基金数</div>
               </Card>
             </Col>
             <Col xs={12} sm={6}>
               <Card size="small" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#722ed1' }}>{overlapData.summary.industryCount}</div>
-                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>覆盖行业数</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-purple)' }}>{overlapData.summary.industryCount}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>覆盖行业数</div>
               </Card>
             </Col>
             <Col xs={12} sm={6}>
               <Card size="small" style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 24, fontWeight: 700, color: overlapData.summary.concentrationLevel.includes('高度') ? '#ff4d4f' : overlapData.summary.concentrationLevel.includes('中度') ? '#faad14' : '#52c41a' }}>{overlapData.summary.concentrationLevel}</div>
-                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>集中度评估</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>集中度评估</div>
               </Card>
             </Col>
             <Col xs={12} sm={6}>
               <Card size="small" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#faad14' }}>{overlapData.summary.hhi}</div>
-                <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>HHI指数</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--warning)' }}>{overlapData.summary.hhi}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>HHI指数</div>
               </Card>
             </Col>
           </Row>
@@ -142,10 +142,10 @@ export function DeepAnalysisTab({
             <Col xs={24} lg={12}>
               {overlapData.overlapPairs.length > 0 ? (
                 <Card
-                  title={<span><WarningOutlined style={{ color: '#faad14', marginRight: 8 }} />重叠行业（{overlapData.overlapPairs.length}个）</span>}
+                  title={<span><WarningOutlined style={{ color: 'var(--warning)', marginRight: 8 }} />重叠行业（{overlapData.overlapPairs.length}个）</span>}
                   size="small"
                 >
-                  <p style={{ marginBottom: 12, fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>
+                  <p style={{ marginBottom: 12, fontSize: 12, color: 'var(--text-secondary)' }}>
                     以下行业有多只基金重叠，可能导致风险集中
                   </p>
                   {overlapData.overlapPairs.map((pair: any) => {
@@ -177,8 +177,8 @@ export function DeepAnalysisTab({
                   })}
                 </Card>
               ) : (
-                <Card title={<Space><CheckCircleOutlined style={{ color: '#52c41a' }} /> 无重叠风险</Space>} size="small">
-                  <div style={{ textAlign: 'center', padding: 40, color: '#52c41a' }}>
+                <Card title={<Space><CheckCircleOutlined style={{ color: 'var(--success)' }} /> 无重叠风险</Space>} size="small">
+                  <div style={{ textAlign: 'center', padding: 40, color: 'var(--success)' }}>
                     <CheckCircleOutlined style={{ fontSize: 48, marginBottom: 12 }} />
                     <p>持仓行业分布合理，无明显重叠风险</p>
                   </div>
@@ -223,18 +223,18 @@ export function DeepAnalysisTab({
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col xs={12} sm={6}><Card size="small"><Statistic title="总买入费用" value={feeData.summary.totalBuyFees} prefix="¥" precision={2} /></Card></Col>
             <Col xs={12} sm={6}><Card size="small"><Statistic title="总卖出费用" value={feeData.summary.totalSellFees} prefix="¥" precision={2} /></Card></Col>
-            <Col xs={12} sm={6}><Card size="small"><Statistic title="总费用" value={feeData.summary.totalFees} prefix="¥" precision={2} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+            <Col xs={12} sm={6}><Card size="small"><Statistic title="总费用" value={feeData.summary.totalFees} prefix="¥" precision={2} valueStyle={{ color: 'var(--danger)' }} /></Card></Col>
             <Col xs={12} sm={6}><Card size="small"><Statistic title="综合费率" value={feeData.summary.feeRate} suffix="%" precision={2} /></Card></Col>
           </Row>
           <Table dataSource={feeData.fundFees} rowKey="code" size="small" pagination={false}
             columns={[
               { title: '基金', dataIndex: 'name', ellipsis: true },
               { title: '代码', dataIndex: 'code', width: 80 },
-              { title: '买入费', dataIndex: 'buyFees', width: 80, render: (v: number) => `¥${v.toFixed(2)}` },
-              { title: '卖出费', dataIndex: 'sellFees', width: 80, render: (v: number) => `¥${v.toFixed(2)}` },
-              { title: '总费用', dataIndex: 'totalFees', width: 90, render: (v: number) => <span style={{ color: '#ff4d4f' }}>¥{v.toFixed(2)}</span> },
-              { title: '费率', dataIndex: 'feeRate', width: 80, render: (v: number) => `${v}%` },
-              { title: '投入金额', dataIndex: 'investment', width: 110, render: (v: number) => `¥${v.toLocaleString()}` },
+              { title: '买入费', dataIndex: 'buyFees', width: 80, render: (v: number) => `¥${Number(v || 0).toFixed(2)}` },
+              { title: '卖出费', dataIndex: 'sellFees', width: 80, render: (v: number) => `¥${Number(v || 0).toFixed(2)}` },
+              { title: '总费用', dataIndex: 'totalFees', width: 90, render: (v: number) => <span style={{ color: 'var(--danger)' }}>¥{Number(v || 0).toFixed(2)}</span> },
+              { title: '费率', dataIndex: 'feeRate', width: 80, render: (v: number) => `${Number(v || 0).toFixed(2)}%` },
+              { title: '投入金额', dataIndex: 'investment', width: 110, render: (v: number) => `¥${Number(v || 0).toLocaleString()}` },
             ]}
           />
         </Card>

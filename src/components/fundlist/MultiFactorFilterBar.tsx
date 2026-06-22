@@ -69,7 +69,7 @@ export function MultiFactorFilterBar({
         />
       </div>
       <span style={{ fontSize: 12, color: isDark ? '#6b6b6b' : '#8c8c8c' }}>
-        筛选结果 <strong style={{ color: '#1677ff' }}>{filteredCount}</strong> 只
+        筛选结果 <strong style={{ color: 'var(--primary)' }}>{filteredCount}</strong> 只
       </span>
     </div>
   );

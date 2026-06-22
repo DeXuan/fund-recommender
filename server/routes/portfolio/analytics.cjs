@@ -15,7 +15,7 @@ router.get('/returns-map', async (req, res) => {
 
     // Get user's holdings grouped by fund
     const recordsResult = await pool.query(
-      'SELECT fund_code, fund_name, shares, buy_date FROM fund_records WHERE user_id = $1 ORDER BY buy_date',
+      "SELECT fund_code, fund_name, shares, buy_date FROM fund_records WHERE user_id = $1 AND (record_type IS NULL OR record_type = 'buy') AND shares > 0 ORDER BY buy_date",
       [req.user.id]
     );
     if (recordsResult.rows.length === 0) {
@@ -150,12 +150,12 @@ router.get('/returns-map', async (req, res) => {
 router.get('/summary', async (req, res) => {
   try {
     const pool = getPool();
-    // 从数据库读取已预计算的盈亏数据
+    // 从数据库读取已预计算的盈亏数据（排除卖出记录）
     const result = await pool.query(
       `SELECT id, user_id, fund_code, fund_name, shares, cost_price, buy_date, buy_fee, notes,
               current_nav, market_value, pnl, pnl_percent, nav_updated_at,
               created_at, updated_at
-       FROM fund_records WHERE user_id = $1 ORDER BY buy_date DESC`,
+       FROM fund_records WHERE user_id = $1 AND (record_type IS NULL OR record_type = 'buy') AND shares > 0 ORDER BY buy_date DESC`,
       [req.user.id]
     );
     if (result.rows.length === 0) {
@@ -269,7 +269,7 @@ router.post('/refresh-nav', async (req, res) => {
                ON CONFLICT (fund_code, nav_date) DO UPDATE SET nav = EXCLUDED.nav`,
               [code, val.nav, val.totalNav || val.nav, val.navDate || new Date().toISOString().split('T')[0]]
             );
-          } catch (e) { /* 忽略写入失败 */ }
+          } catch (e) { console.warn(`[NAV持久化] 写入失败 ${code}: ${e.message}`); }
         }
       }
     } catch (e) {

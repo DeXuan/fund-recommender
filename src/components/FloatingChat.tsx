@@ -1,18 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { Drawer, Badge } from 'antd';
-import { RobotOutlined, CloseOutlined, CustomerServiceOutlined } from '@ant-design/icons';
-import { useLocation } from 'react-router-dom';
+import { Drawer, Badge, Button } from 'antd';
+import { RobotOutlined, CloseOutlined, CustomerServiceOutlined, ExpandOutlined } from '@ant-design/icons';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AIAssistant from '../pages/AIAssistant';
 import { useTheme } from '../contexts/ThemeContext';
 
 export default function FloatingChat() {
   const { isDark } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const prevOverflow = useRef('');
 
-  // 切换页面时自动关闭聊天面板
+  // Close chat panel on route change
   useEffect(() => {
     setOpen(false);
   }, [location.pathname]);
@@ -24,6 +25,9 @@ export default function FloatingChat() {
     }
     return () => { document.body.style.overflow = prevOverflow.current; };
   }, [open]);
+
+  // Don't show floating chat on the AI assistant page itself
+  if (location.pathname === '/ai-assistant') return null;
 
   return (
     <>
@@ -44,25 +48,33 @@ export default function FloatingChat() {
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
         }
+        @keyframes gradientBorder {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .floating-chat-bubble {
+          position: fixed;
+          bottom: 25vh;
+          right: 24px;
+          z-index: 1000;
+          cursor: pointer;
+          transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .floating-chat-bubble:hover {
+          transform: scale(1.12);
+        }
       `}</style>
 
-      {/* 悬浮气泡 */}
+      {/* Floating bubble */}
       {!open && (
         <div
+          className="floating-chat-bubble"
           onClick={() => setOpen(true)}
           onMouseEnter={() => setHover(true)}
           onMouseLeave={() => setHover(false)}
-          style={{
-            position: 'fixed',
-            bottom: '25vh',
-            right: 24,
-            zIndex: 1000,
-            cursor: 'pointer',
-            transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            transform: hover ? 'scale(1.12)' : 'scale(1)',
-          }}
         >
-          {/* 脉冲光环 */}
+          {/* Pulse ring */}
           <div style={{
             position: 'absolute', inset: -6,
             borderRadius: '50%',
@@ -70,7 +82,7 @@ export default function FloatingChat() {
             animation: 'chatRing 2s ease-out infinite',
           }} />
 
-          {/* 气泡主体 */}
+          {/* Bubble body */}
           <div style={{
             width: 58, height: 58, borderRadius: '50%',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -83,16 +95,17 @@ export default function FloatingChat() {
           }}>
             <CustomerServiceOutlined style={{ color: '#fff', fontSize: 28 }} />
 
-            {/* 在线状态点 */}
+            {/* Online indicator */}
             <div style={{
               position: 'absolute', top: 2, right: 2,
               width: 12, height: 12, borderRadius: '50%',
               background: '#52c41a',
               border: `2px solid ${isDark ? '#1a1a2e' : '#fff'}`,
+              animation: 'chatRing 3s ease-in-out infinite',
             }} />
           </div>
 
-          {/* 提示标签 */}
+          {/* Tooltip */}
           <div style={{
             position: 'absolute', right: 68, top: '50%', transform: 'translateY(-50%)',
             background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.75)',
@@ -104,17 +117,21 @@ export default function FloatingChat() {
             pointerEvents: 'none',
             backdropFilter: 'blur(8px)',
           }}>
-            AI 投资助手
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#52c41a', display: 'inline-block' }} />
+              AI 投资助手
+            </div>
+            <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>Claude AI 驱动 · 点击开启</div>
           </div>
         </div>
       )}
 
-      {/* 聊天面板 */}
+      {/* Chat panel */}
       <Drawer
         placement="right"
         open={open}
         onClose={() => setOpen(false)}
-        width={440}
+        width={480}
         closable={false}
         mask={false}
         push={false}
@@ -133,7 +150,7 @@ export default function FloatingChat() {
           height: 'calc(100vh - 32px)',
         }}
       >
-        {/* 自定义头部 */}
+        {/* Custom header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '14px 18px',
@@ -152,26 +169,42 @@ export default function FloatingChat() {
               <RobotOutlined style={{ color: '#fff', fontSize: 18 }} />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: '#fff', lineHeight: 1.2 }}>AI 投资助手</div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#fff', lineHeight: 1.2 }}>FinPilot AI 投资助手</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#52c41a', display: 'inline-block' }} />
-                在线 · Claude AI 驱动
+                在线 · Claude AI 驱动 · 七层能力体系
               </div>
             </div>
           </div>
-          <div
-            onClick={() => setOpen(false)}
-            style={{
-              width: 32, height: 32, borderRadius: 8,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', background: 'rgba(255,255,255,0.2)',
-              transition: 'all 0.2s',
-              border: '1px solid rgba(255,255,255,0.15)',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,87,87,0.6)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)'; }}
-          >
-            <CloseOutlined style={{ fontSize: 14, color: '#fff' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div
+              onClick={() => { setOpen(false); navigate('/ai-assistant'); }}
+              style={{
+                width: 32, height: 32, borderRadius: 8,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', background: 'rgba(255,255,255,0.15)',
+                transition: 'all 0.2s',
+                border: '1px solid rgba(255,255,255,0.15)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.3)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}
+            >
+              <ExpandOutlined style={{ fontSize: 14, color: '#fff' }} />
+            </div>
+            <div
+              onClick={() => setOpen(false)}
+              style={{
+                width: 32, height: 32, borderRadius: 8,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', background: 'rgba(255,255,255,0.15)',
+                transition: 'all 0.2s',
+                border: '1px solid rgba(255,255,255,0.15)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,87,87,0.6)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}
+            >
+              <CloseOutlined style={{ fontSize: 14, color: '#fff' }} />
+            </div>
           </div>
         </div>
 

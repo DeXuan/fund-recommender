@@ -58,10 +58,18 @@ async function activateSubscription(userId, orderId) {
     await client.query('BEGIN');
     const order = await client.query('SELECT * FROM subscription_orders WHERE id = $1 AND user_id = $2', [orderId, userId]);
     if (order.rows.length === 0) throw new Error('订单不存在');
+    if (order.rows[0].status === 'paid') {
+      await client.query('COMMIT');
+      return { success: true, alreadyPaid: true };
+    }
     const plan = await client.query('SELECT duration_days FROM subscription_plans WHERE id = $1', [order.rows[0].plan_id]);
     const days = plan.rows[0]?.duration_days || 30;
     const now = new Date();
-    const end = new Date(now.getTime() + days * 86400000);
+    // 若当前会员未过期，从到期日续费；否则从当前开始
+    const currentUser = await client.query('SELECT subscription_end FROM users WHERE id = $1', [userId]);
+    const currentEnd = currentUser.rows[0]?.subscription_end;
+    const baseDate = currentEnd && new Date(currentEnd) > now ? new Date(currentEnd) : now;
+    const end = new Date(baseDate.getTime() + days * 86400000);
     await client.query(
       `UPDATE users SET subscription_status = 'premium', subscription_plan_id = $1, subscription_start = $2, subscription_end = $3 WHERE id = $4`,
       [order.rows[0].plan_id, now, end, userId]
@@ -94,7 +102,11 @@ async function activateByTradeNo(outTradeNo, tradeNo) {
     const plan = await client.query('SELECT duration_days FROM subscription_plans WHERE id = $1', [order.rows[0].plan_id]);
     const days = plan.rows[0]?.duration_days || 30;
     const now = new Date();
-    const end = new Date(now.getTime() + days * 86400000);
+    // 若当前会员未过期，从到期日续费；否则从当前开始
+    const currentUser = await client.query('SELECT subscription_end FROM users WHERE id = $1', [order.rows[0].user_id]);
+    const currentEnd = currentUser.rows[0]?.subscription_end;
+    const baseDate = currentEnd && new Date(currentEnd) > now ? new Date(currentEnd) : now;
+    const end = new Date(baseDate.getTime() + days * 86400000);
     await client.query(
       `UPDATE users SET subscription_status = 'premium', subscription_plan_id = $1, subscription_start = $2, subscription_end = $3 WHERE id = $4`,
       [order.rows[0].plan_id, now, end, order.rows[0].user_id]

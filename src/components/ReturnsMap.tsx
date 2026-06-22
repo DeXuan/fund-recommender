@@ -8,6 +8,7 @@ import {
 import ReactECharts from 'echarts-for-react';
 import { portfolioApi } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { getEchartsTheme } from '../utils/echarts-theme';
 
 interface CategoryData {
   name: string;
@@ -202,7 +203,7 @@ export default function ReturnsMap() {
               <Col span={6}><Statistic title="最大单日亏损" value={mapData.summary.maxLoss} precision={2} prefix="¥" valueStyle={{ fontSize: 16, color: '#3f8600' }} /></Col>
               <Col span={6}><Statistic title="交易天数" value={mapData.summary.totalDays} suffix="天" valueStyle={{ fontSize: 16 }} /></Col>
             </Row>
-            <ReactECharts option={getCalendarOption()} style={{ height: 180, width: '100%' }} opts={{ renderer: 'svg' }} />
+            <ReactECharts option={getCalendarOption()} theme={getEchartsTheme(isDark)} style={{ height: 180, width: '100%' }} opts={{ renderer: 'svg' }} />
           </>
         ) : (
           <Empty description={`${year}年暂无收益数据`} />
@@ -216,7 +217,7 @@ export default function ReturnsMap() {
           <Card title="资产配置分布" bodyStyle={{ padding: '12px 16px' }} style={{ height: '100%' }}>
             {categories.length > 0 ? (
               <>
-                <ReactECharts option={getCategoryPieOption()} style={{ height: 260 }} />
+                <ReactECharts option={getCategoryPieOption()} theme={getEchartsTheme(isDark)} style={{ height: 260 }} />
                 <Row gutter={8} style={{ textAlign: 'center', borderTop: `1px solid ${isDark ? '#262626' : '#f0f0f0'}`, paddingTop: 8 }}>
                   <Col span={12}>
                     <div style={{ fontSize: 12, color: '#888' }}>进阶理财</div>
@@ -262,7 +263,7 @@ export default function ReturnsMap() {
             {/* 收益率柱状图 */}
             {categories.length > 1 && (
               <div style={{ borderTop: `1px solid ${isDark ? '#262626' : '#f0f0f0'}`, paddingTop: 8, marginTop: 4 }}>
-                <ReactECharts option={getCategoryBarOption()} style={{ height: Math.max(categories.length * 36, 100) }} />
+                <ReactECharts option={getCategoryBarOption()} theme={getEchartsTheme(isDark)} style={{ height: Math.max(categories.length * 36, 100) }} />
               </div>
             )}
           </Card>

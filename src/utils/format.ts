@@ -38,3 +38,8 @@ export function getValuationColor(valuation: string | null | undefined): string 
   if (valuation === 'high' || valuation === 'very_high' || valuation.includes('高')) return '#ff4d4f';
   return '#1677ff';
 }
+
+// 通用收益率着色样式（用于行内 span）
+export function getReturnStyle(value: number): { color: string } {
+  return { color: getReturnColor(value) };
+}

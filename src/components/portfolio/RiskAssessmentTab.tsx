@@ -144,12 +144,12 @@ export function RiskAssessmentTab({ isDark }: Props) {
             <Row gutter={16} style={{ marginBottom: 24 }}>
               <Col xs={12} sm={6}>
                 <Card size="small" style={{ textAlign: 'center' }}>
-                  <Statistic title="预期年化收益" value={riskRecommendation.expectedReturn} valueStyle={{ color: '#1677ff' }} />
+                  <Statistic title="预期年化收益" value={riskRecommendation.expectedReturn} valueStyle={{ color: 'var(--primary)' }} />
                 </Card>
               </Col>
               <Col xs={12} sm={6}>
                 <Card size="small" style={{ textAlign: 'center' }}>
-                  <Statistic title="风险等级" value={riskRecommendation.riskLevel} valueStyle={{ color: '#ff4d4f' }} />
+                  <Statistic title="风险等级" value={riskRecommendation.riskLevel} valueStyle={{ color: 'var(--danger)' }} />
                 </Card>
               </Col>
             </Row>
@@ -159,7 +159,7 @@ export function RiskAssessmentTab({ isDark }: Props) {
                 <div key={index} style={{ marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <strong>{item.industry}</strong>
-                    <span style={{ color: '#1677ff', fontWeight: 600 }}>{item.percentage}%</span>
+                    <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{item.percentage}%</span>
                   </div>
                   <Progress percent={item.percentage} showInfo={false} />
                   <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>推荐基金：{item.funds.join('、')}</div>

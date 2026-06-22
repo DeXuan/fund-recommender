@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Card, Progress, Tag } from 'antd';
+import { Card, Progress, Tag, Pagination } from 'antd';
 import { fundApi } from '../services/api';
 import ReactECharts from 'echarts-for-react';
 import { useTheme } from '../contexts/ThemeContext';
@@ -119,7 +119,6 @@ const INDUSTRIES = [
   // 其他行业
   { key: '医药', icon: '💊', label: '医药' },
   { key: '人工智能', icon: '🤖', label: '人工智能' },
-  { key: '算力', icon: '🖥️', label: '算力' },
   { key: '半导体/芯片', icon: '🔬', label: '半导体' },
   { key: '证券', icon: '📈', label: '证券' },
   { key: '新能源', icon: '⚡', label: '新能源' },
@@ -155,6 +154,8 @@ export default function IndustryAnalysis() {
   const [sortKey, setSortKey] = useState<string>('return1y');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [goldOnly, setGoldOnly] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // 市场分析数据
   const [indices, setIndices] = useState<MarketIndex[]>([]);
@@ -207,6 +208,7 @@ export default function IndustryAnalysis() {
       setSortKey(key);
       setSortOrder('desc');
     }
+    setCurrentPage(1);
   };
 
   const getSortedFunds = () => {
@@ -223,6 +225,13 @@ export default function IndustryAnalysis() {
         : String(bVal).localeCompare(String(aVal));
     });
   };
+
+  const allSortedFunds = useMemo(() => getSortedFunds(), [data, goldOnly, sortKey, sortOrder]);
+
+  const paginatedFunds = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return allSortedFunds.slice(start, start + pageSize);
+  }, [allSortedFunds, currentPage, pageSize]);
 
   const getValuationColor = (valuation: string) => {
     if (valuation.includes('极低') || valuation.includes('低估')) return '#52c41a';
@@ -274,7 +283,7 @@ export default function IndustryAnalysis() {
                   <div style={{ width: '100%', height: 0, borderTop: `1px dashed ${isDark ? '#333' : '#e8e8e8'}`, margin: '4px 0' }} />
                 )}
                 <button
-                  onClick={() => { setSelectedIndustry(ind.key); setActiveTab('compare'); }}
+                  onClick={() => { setSelectedIndustry(ind.key); setActiveTab('compare'); setCurrentPage(1); }}
                   className={`btn ${selectedIndustry === ind.key ? 'btn-primary' : 'btn-outline'}`}
                   style={{ fontSize: 14, padding: '8px 20px', position: 'relative' }}
                 >
@@ -282,7 +291,7 @@ export default function IndustryAnalysis() {
                   {ind.tag && (
                     <span style={{
                       position: 'absolute', top: -6, right: -6,
-                      background: '#ff4d4f', color: 'white',
+                      background: 'var(--danger)', color: 'var(--color-text-on-dark)',
                       fontSize: 9, padding: '1px 4px', borderRadius: 6,
                       fontWeight: 700,
                     }}>
@@ -301,7 +310,7 @@ export default function IndustryAnalysis() {
           {/* 行业概况 */}
           <div className="card" style={{
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
+            color: 'var(--color-text-on-dark)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
               <div>
@@ -316,7 +325,7 @@ export default function IndustryAnalysis() {
                   <div style={{ fontSize: 12, opacity: 0.8 }}>基金数量</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: '#faad14' }}>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--warning)' }}>
                     {data.funds.filter(f => f.isGoldSelected).length}
                   </div>
                   <div style={{ fontSize: 12, opacity: 0.8 }}>金选基金</div>
@@ -360,14 +369,14 @@ export default function IndustryAnalysis() {
               ].map((tab) => (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => { setActiveTab(tab.key); setCurrentPage(1); }}
                   style={{
                     padding: '12px 24px',
                     border: 'none',
                     background: 'none',
                     cursor: 'pointer',
-                    borderBottom: activeTab === tab.key ? '2px solid #1677ff' : '2px solid transparent',
-                    color: activeTab === tab.key ? '#1677ff' : isDark ? '#a0a0a0' : '#666',
+                    borderBottom: activeTab === tab.key ? '2px solid var(--primary)' : '2px solid transparent',
+                    color: activeTab === tab.key ? 'var(--primary)' : isDark ? '#a0a0a0' : '#666',
                     fontWeight: activeTab === tab.key ? 600 : 400,
                     fontSize: 14,
                   }}
@@ -377,11 +386,11 @@ export default function IndustryAnalysis() {
               ))}
               <div style={{ marginLeft: 'auto', paddingRight: 16 }}>
                 <button
-                  onClick={() => setGoldOnly(!goldOnly)}
+                  onClick={() => { setGoldOnly(!goldOnly); setCurrentPage(1); }}
                   style={{
                     padding: '6px 16px',
-                    border: goldOnly ? '1px solid #faad14' : `1px solid ${isDark ? '#444' : '#d9d9d9'}`,
-                    background: goldOnly ? '#faad14' : isDark ? '#1a1a1a' : 'white',
+                    border: goldOnly ? '1px solid var(--warning)' : `1px solid ${isDark ? '#444' : '#d9d9d9'}`,
+                    background: goldOnly ? 'var(--warning)' : isDark ? '#1a1a1a' : 'white',
                     color: goldOnly ? 'white' : isDark ? '#a0a0a0' : '#666',
                     borderRadius: 4,
                     cursor: 'pointer',
@@ -403,8 +412,8 @@ export default function IndustryAnalysis() {
                 <span className="text-muted" style={{ fontSize: 12, fontWeight: 400, marginLeft: 12 }}>
                   点击表头排序 | 申购费率按支付宝1折计算
                   {goldOnly && (
-                    <span style={{ color: '#faad14', marginLeft: 8 }}>
-                      | ★ 仅显示 {getSortedFunds().length} 只金选基金
+                    <span style={{ color: 'var(--warning)', marginLeft: 8 }}>
+                      | ★ 仅显示 {allSortedFunds.length} 只金选基金
                     </span>
                   )}
                 </span>
@@ -449,15 +458,15 @@ export default function IndustryAnalysis() {
                     </tr>
                   </thead>
                   <tbody>
-                    {getSortedFunds().map((fund) => (
+                    {paginatedFunds.map((fund) => (
                       <tr key={fund.code}>
                         <td style={{ fontFamily: 'monospace' }}>{fund.code}</td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {fund.isGoldSelected && (
-                              <span style={{ fontSize: 10, background: '#faad14', color: 'white', padding: '1px 4px', borderRadius: 2 }}>金选</span>
+                              <span style={{ fontSize: 10, background: 'var(--warning)', color: 'var(--color-text-on-dark)', padding: '1px 4px', borderRadius: 2 }}>金选</span>
                             )}
-                            <Link to={`/funds/${fund.code}`} style={{ color: '#1677ff', textDecoration: 'none' }}>
+                            <Link to={`/funds/${fund.code}`} style={{ color: 'var(--primary)', textDecoration: 'none' }}>
                               {fund.name}
                             </Link>
                           </div>
@@ -476,7 +485,7 @@ export default function IndustryAnalysis() {
                         <td>{formatReturn(fund.return1w)}</td>
                         <td>{fund.managementFee}%</td>
                         <td>
-                          <span style={{ color: fund.totalFee > 0.8 ? '#ff4d4f' : isDark ? '#e8e8e8' : '#333', fontWeight: fund.totalFee > 0.8 ? 600 : 400 }}>
+                          <span style={{ color: fund.totalFee > 0.8 ? 'var(--danger)' : isDark ? '#e8e8e8' : '#333', fontWeight: fund.totalFee > 0.8 ? 600 : 400 }}>
                             {fund.totalFee}%
                           </span>
                         </td>
@@ -490,6 +499,20 @@ export default function IndustryAnalysis() {
                   </tbody>
                 </table>
               </div>
+              {allSortedFunds.length > pageSize && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+                  <Pagination
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={allSortedFunds.length}
+                    showSizeChanger
+                    showQuickJumper
+                    showTotal={(total) => `共 ${total} 只基金`}
+                    onChange={(page, size) => { setCurrentPage(page); setPageSize(size); }}
+                    pageSizeOptions={['10', '20', '50', '100']}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -513,9 +536,9 @@ export default function IndustryAnalysis() {
                     </tr>
                   </thead>
                   <tbody>
-                    {getSortedFunds().sort((a, b) => a.totalFee - b.totalFee).map((fund) => (
+                    {paginatedFunds.map((fund) => (
                       <tr key={fund.code}>
-                        <td><Link to={`/funds/${fund.code}`} style={{ color: '#1677ff', textDecoration: 'none' }}>{fund.name}</Link></td>
+                        <td><Link to={`/funds/${fund.code}`} style={{ color: 'var(--primary)', textDecoration: 'none' }}>{fund.name}</Link></td>
                         <td style={{ fontFamily: 'monospace' }}>{fund.code}</td>
                         <td>
                           <span className={`badge ${getAClassLabel(fund.name) === 'C' ? 'badge-warning' : 'badge-success'}`}>
@@ -527,7 +550,7 @@ export default function IndustryAnalysis() {
                         <td>{fund.serviceFee}%</td>
                         <td>
                           <span style={{
-                            color: fund.totalFee > 0.8 ? '#ff4d4f' : fund.totalFee <= 0.6 ? '#52c41a' : isDark ? '#e8e8e8' : '#333',
+                            color: fund.totalFee > 0.8 ? 'var(--danger)' : fund.totalFee <= 0.6 ? 'var(--success)' : isDark ? '#e8e8e8' : '#333',
                             fontWeight: 600,
                           }}>
                             {fund.totalFee}%
@@ -540,6 +563,20 @@ export default function IndustryAnalysis() {
                   </tbody>
                 </table>
               </div>
+              {allSortedFunds.length > pageSize && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+                  <Pagination
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={allSortedFunds.length}
+                    showSizeChanger
+                    showQuickJumper
+                    showTotal={(total) => `共 ${total} 只基金`}
+                    onChange={(page, size) => { setCurrentPage(page); setPageSize(size); }}
+                    pageSizeOptions={['10', '20', '50', '100']}
+                  />
+                </div>
+              )}
 
               <div style={{ marginTop: 24, padding: 16, background: isDark ? '#1f1f1f' : '#f5f5f5', borderRadius: 8 }}>
                 <h4 style={{ marginBottom: 8 }}>费率说明</h4>
@@ -578,7 +615,7 @@ export default function IndustryAnalysis() {
                     </tr>
                   </thead>
                   <tbody>
-                    {getSortedFunds().map((fund, index) => (
+                    {paginatedFunds.map((fund, idx) => (
                       <tr key={fund.code}>
                         <td>
                           <span style={{
@@ -590,13 +627,13 @@ export default function IndustryAnalysis() {
                             lineHeight: '24px',
                             fontSize: 12,
                             fontWeight: 600,
-                            background: index < 3 ? '#faad14' : isDark ? '#262626' : '#f0f0f0',
-                            color: index < 3 ? 'white' : isDark ? '#a0a0a0' : '#666',
+                            background: (currentPage - 1) * pageSize + idx < 3 ? 'var(--warning)' : isDark ? '#262626' : '#f0f0f0',
+                            color: (currentPage - 1) * pageSize + idx < 3 ? 'white' : isDark ? '#a0a0a0' : '#666',
                           }}>
-                            {index + 1}
+                            {(currentPage - 1) * pageSize + idx + 1}
                           </span>
                         </td>
-                        <td><Link to={`/funds/${fund.code}`} style={{ color: '#1677ff', textDecoration: 'none' }}>{fund.name}</Link></td>
+                        <td><Link to={`/funds/${fund.code}`} style={{ color: 'var(--primary)', textDecoration: 'none' }}>{fund.name}</Link></td>
                         <td style={{ fontFamily: 'monospace' }}>{fund.code}</td>
                         <td>
                           <span className={`badge ${getAClassLabel(fund.name) === 'C' ? 'badge-warning' : 'badge-success'}`}>
@@ -614,7 +651,7 @@ export default function IndustryAnalysis() {
                             borderRadius: 4,
                             fontSize: 12,
                             background: fund.trend.includes('上涨') ? isDark ? '#162312' : '#f6ffed' : fund.trend.includes('反弹') ? isDark ? '#111a2c' : '#e6f4ff' : isDark ? '#2c1618' : '#fff2f0',
-                            color: fund.trend.includes('上涨') ? '#52c41a' : fund.trend.includes('反弹') ? '#1677ff' : '#ff4d4f',
+                            color: fund.trend.includes('上涨') ? 'var(--success)' : fund.trend.includes('反弹') ? 'var(--primary)' : 'var(--danger)',
                           }}>
                             {fund.trend}
                           </span>
@@ -624,6 +661,20 @@ export default function IndustryAnalysis() {
                   </tbody>
                 </table>
               </div>
+              {allSortedFunds.length > pageSize && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+                  <Pagination
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={allSortedFunds.length}
+                    showSizeChanger
+                    showQuickJumper
+                    showTotal={(total) => `共 ${total} 只基金`}
+                    onChange={(page, size) => { setCurrentPage(page); setPageSize(size); }}
+                    pageSizeOptions={['10', '20', '50', '100']}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -655,7 +706,7 @@ export default function IndustryAnalysis() {
                         .map((fund) => (
                           <tr key={fund.code}>
                             <td>{getRatingStars(fund.rating)}</td>
-                            <td style={{ fontWeight: 600 }}><Link to={`/funds/${fund.code}`} style={{ color: '#1677ff', textDecoration: 'none' }}>{fund.name}</Link></td>
+                            <td style={{ fontWeight: 600 }}><Link to={`/funds/${fund.code}`} style={{ color: 'var(--primary)', textDecoration: 'none' }}>{fund.name}</Link></td>
                             <td style={{ fontFamily: 'monospace' }}>{fund.code}</td>
                             <td style={{ fontSize: 13, maxWidth: 300 }}>{fund.logic}</td>
                             <td>
@@ -723,7 +774,7 @@ export default function IndustryAnalysis() {
                         width: 12,
                         height: 12,
                         borderRadius: '50%',
-                        background: '#1677ff',
+                        background: 'var(--primary)',
                         border: '2px solid white',
                         boxShadow: '0 0 0 2px #1677ff',
                       }}></div>
@@ -767,8 +818,8 @@ export default function IndustryAnalysis() {
               </div>
 
               {/* 风险提示 */}
-              <div className="card" style={{ border: '1px solid #ffccc7', background: isDark ? '#2c1618' : '#fff2f0' }}>
-                <h3 style={{ color: '#ff4d4f', marginBottom: 12 }}>风险提示</h3>
+              <div className="card" style={{ border: '1px solid var(--danger-border)', background: isDark ? '#2c1618' : '#fff2f0' }}>
+                <h3 style={{ color: 'var(--danger)', marginBottom: 12 }}>风险提示</h3>
                 <div style={{ fontSize: 13, lineHeight: 1.8, color: isDark ? '#a0a0a0' : '#666', whiteSpace: 'pre-line' }}>
                   {data.riskWarning}
                 </div>
@@ -781,7 +832,7 @@ export default function IndustryAnalysis() {
             <div>
               <div className="card" style={{
                 background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                color: 'white',
+                color: 'var(--color-text-on-dark)',
               }}>
                 <h2 style={{ fontSize: 20, marginBottom: 8 }}>
                   {data.industry}交易量分析
@@ -810,13 +861,13 @@ export default function IndustryAnalysis() {
                           borderRadius: 4,
                           fontSize: 11,
                           fontWeight: 600,
-                          background: reason.impact === 'high' ? '#52c41a' : reason.impact === 'medium' ? '#1677ff' : '#999',
-                          color: 'white',
+                          background: reason.impact === 'high' ? 'var(--success)' : reason.impact === 'medium' ? 'var(--primary)' : 'var(--color-text-muted)',
+                          color: 'var(--color-text-on-dark)',
                         }}>
                           {reason.impact === 'high' ? '高影响' : reason.impact === 'medium' ? '中影响' : '低影响'}
                         </span>
                       </div>
-                      <p style={{ margin: 0, fontSize: 13, color: '#555', lineHeight: 1.6 }}>
+                      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                         {reason.detail}
                       </p>
                     </div>
@@ -825,7 +876,7 @@ export default function IndustryAnalysis() {
               </div>
 
               <div className="card" style={{ border: '1px solid #b7eb8f', background: isDark ? '#162312' : '#f6ffed' }}>
-                <h3 style={{ color: '#52c41a', marginBottom: 12 }}>交易量分析结论</h3>
+                <h3 style={{ color: 'var(--success)', marginBottom: 12 }}>交易量分析结论</h3>
                 <div style={{ fontSize: 14, lineHeight: 1.8, color: isDark ? '#e8e8e8' : '#333' }}>
                   <p>当前{data.industry}板块交易量放大是<strong>多重因素共振</strong>的结果：</p>
                   <ul style={{ paddingLeft: 20, marginTop: 8 }}>
@@ -846,7 +897,7 @@ export default function IndustryAnalysis() {
             <div>
               <div className="card" style={{
                 background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                color: 'white',
+                color: 'var(--color-text-on-dark)',
               }}>
                 <h2 style={{ fontSize: 20, marginBottom: 8 }}>
                   {data.industry}投资建议
@@ -860,15 +911,15 @@ export default function IndustryAnalysis() {
                 <h3 className="card-title">分周期投资策略</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div style={{ padding: 16, borderRadius: 8, border: '1px solid #ffd666', background: isDark ? '#2b2111' : '#fffbe6' }}>
-                    <h4 style={{ margin: '0 0 8px', color: '#faad14' }}>短期策略（1-3个月）</h4>
+                    <h4 style={{ margin: '0 0 8px', color: 'var(--warning)' }}>短期策略（1-3个月）</h4>
                     <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8 }}>{data.investmentAdvice.shortTerm}</p>
                   </div>
                   <div style={{ padding: 16, borderRadius: 8, border: '1px solid #91d5ff', background: '#e6f7ff' }}>
-                    <h4 style={{ margin: '0 0 8px', color: '#1677ff' }}>中期策略（3-12个月）</h4>
+                    <h4 style={{ margin: '0 0 8px', color: 'var(--primary)' }}>中期策略（3-12个月）</h4>
                     <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8 }}>{data.investmentAdvice.mediumTerm}</p>
                   </div>
                   <div style={{ padding: 16, borderRadius: 8, border: '1px solid #b7eb8f', background: isDark ? '#162312' : '#f6ffed' }}>
-                    <h4 style={{ margin: '0 0 8px', color: '#52c41a' }}>长期策略（1年以上）</h4>
+                    <h4 style={{ margin: '0 0 8px', color: 'var(--success)' }}>长期策略（1年以上）</h4>
                     <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8 }}>{data.investmentAdvice.longTerm}</p>
                   </div>
                 </div>
@@ -878,15 +929,15 @@ export default function IndustryAnalysis() {
                 <h3 className="card-title">关键指标</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
                   <div style={{ padding: 16, borderRadius: 8, background: isDark ? '#111a2c' : '#f0f5ff', textAlign: 'center' }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: '#1677ff' }}>{data.investmentAdvice.targetAllocation}</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--primary)' }}>{data.investmentAdvice.targetAllocation}</div>
                     <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>建议仓位占比</div>
                   </div>
                   <div style={{ padding: 16, borderRadius: 8, background: isDark ? '#162312' : '#f6ffed', textAlign: 'center' }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: '#52c41a' }}>{data.investmentAdvice.stopProfit}</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--success)' }}>{data.investmentAdvice.stopProfit}</div>
                     <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>止盈线</div>
                   </div>
                   <div style={{ padding: 16, borderRadius: 8, background: isDark ? '#2c1618' : '#fff2f0', textAlign: 'center' }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: '#ff4d4f' }}>{data.investmentAdvice.stopLoss}</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--danger)' }}>{data.investmentAdvice.stopLoss}</div>
                     <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>止损线</div>
                   </div>
                 </div>
@@ -907,29 +958,29 @@ export default function IndustryAnalysis() {
                     </thead>
                     <tbody>
                       <tr>
-                        <td><span style={{ background: '#faad14', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>首选</span></td>
-                        <td><Link to={`/funds/516750`} style={{ color: '#1677ff', textDecoration: 'none' }}>建材ETF富国</Link></td>
+                        <td><span style={{ background: 'var(--warning)', color: 'var(--color-text-on-dark)', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>首选</span></td>
+                        <td><Link to={`/funds/516750`} style={{ color: 'var(--primary)', textDecoration: 'none' }}>建材ETF富国</Link></td>
                         <td style={{ fontFamily: 'monospace' }}>516750</td>
                         <td>ETF</td>
                         <td style={{ fontSize: 13 }}>规模最大(12.3亿)，流动性最好，场内交易灵活</td>
                       </tr>
                       <tr>
-                        <td><span style={{ background: '#1677ff', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>次选</span></td>
-                        <td><Link to={`/funds/013019`} style={{ color: '#1677ff', textDecoration: 'none' }}>国泰建材ETF联接A</Link></td>
+                        <td><span style={{ background: 'var(--primary)', color: 'var(--color-text-on-dark)', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>次选</span></td>
+                        <td><Link to={`/funds/013019`} style={{ color: 'var(--primary)', textDecoration: 'none' }}>国泰建材ETF联接A</Link></td>
                         <td style={{ fontFamily: 'monospace' }}>013019</td>
                         <td>ETF联接</td>
                         <td style={{ fontSize: 13 }}>费率低(0.60%)，适合长期持有(&gt;=1年免赎回费)</td>
                       </tr>
                       <tr>
-                        <td><span style={{ background: '#52c41a', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>短期</span></td>
-                        <td><Link to={`/funds/013020`} style={{ color: '#1677ff', textDecoration: 'none' }}>国泰建材ETF联接C</Link></td>
+                        <td><span style={{ background: 'var(--success)', color: 'var(--color-text-on-dark)', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>短期</span></td>
+                        <td><Link to={`/funds/013020`} style={{ color: 'var(--primary)', textDecoration: 'none' }}>国泰建材ETF联接C</Link></td>
                         <td style={{ fontFamily: 'monospace' }}>013020</td>
                         <td>ETF联接</td>
                         <td style={{ fontSize: 13 }}>免申购费，短期灵活进出，适合试水建仓</td>
                       </tr>
                       <tr>
-                        <td><span style={{ background: '#722ed1', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>分散</span></td>
-                        <td><Link to={`/funds/004856`} style={{ color: '#1677ff', textDecoration: 'none' }}>广发建材指数A</Link></td>
+                        <td><span style={{ background: 'var(--color-purple)', color: 'var(--color-text-on-dark)', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>分散</span></td>
+                        <td><Link to={`/funds/004856`} style={{ color: 'var(--primary)', textDecoration: 'none' }}>广发建材指数A</Link></td>
                         <td style={{ fontFamily: 'monospace' }}>004856</td>
                         <td>指数增强</td>
                         <td style={{ fontSize: 13 }}>不同基金公司，分散单一基金公司风险</td>
@@ -1019,7 +1070,7 @@ export default function IndustryAnalysis() {
                     </table>
                   </div>
                   <div style={{ marginTop: 16, padding: 12, background: isDark ? '#111a2c' : '#e6f4ff', border: '1px solid #91caff', borderRadius: 6, fontSize: 13, lineHeight: 2 }}>
-                    <strong style={{ color: '#1677ff' }}>估值分位说明：</strong>
+                    <strong style={{ color: 'var(--primary)' }}>估值分位说明：</strong>
                     20%以下=极度低估（重仓买入）| 20-40%=偏低估（定投加仓）| 40-60%=合理（正常定投）| 60-80%=偏高估（小额定投）| 80%以上=极度高估（观望减仓）
                   </div>
                 </div>
@@ -1054,7 +1105,7 @@ export default function IndustryAnalysis() {
                               <span style={{
                                 display: 'inline-block', width: 24, height: 24, borderRadius: '50%',
                                 textAlign: 'center', lineHeight: '24px', fontSize: 12, fontWeight: 600,
-                                background: rec.rank <= 3 ? '#faad14' : isDark ? '#262626' : '#f0f0f0',
+                                background: rec.rank <= 3 ? 'var(--warning)' : isDark ? '#262626' : '#f0f0f0',
                                 color: rec.rank <= 3 ? 'white' : isDark ? '#a0a0a0' : '#666',
                               }}>
                                 {rec.rank}
@@ -1154,7 +1205,7 @@ export default function IndustryAnalysis() {
                     </Card>
                   ))}
                   <div style={{ marginTop: 16, padding: 12, background: isDark ? '#111a2c' : '#e6f4ff', border: '1px solid #91caff', borderRadius: 6, fontSize: 13, lineHeight: 2 }}>
-                    <strong style={{ color: '#1677ff' }}>估值趋势说明：</strong>
+                    <strong style={{ color: 'var(--primary)' }}>估值趋势说明：</strong>
                     PE分位越低，估值越便宜，投资价值越高。绿色区域(20%以下)=极度低估，红色区域(80%以上)=极度高估。
                   </div>
                 </div>

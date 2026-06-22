@@ -46,7 +46,7 @@ export default function RiskAssessment() {
             expectedReturn: data.expectedReturn,
             allocation: data.allocation,
           });
-        } catch (e) { /* 非登录用户忽略 */ }
+        } catch { /* 非登录用户忽略 */ }
       }
     } catch (error) {
       console.error('风险评估失败:', error);
@@ -140,7 +140,7 @@ export default function RiskAssessment() {
                     <Card
                       hoverable
                       style={{
-                        border: profile.riskTolerance === option.value ? '2px solid #1677ff' : isDark ? '1px solid #333' : '1px solid #e8e8e8',
+                        border: profile.riskTolerance === option.value ? '2px solid var(--primary)' : isDark ? '1px solid #333' : '1px solid #e8e8e8',
                         cursor: 'pointer',
                       }}
                       onClick={() => setProfile({ ...profile, riskTolerance: option.value as any })}
@@ -179,12 +179,12 @@ export default function RiskAssessment() {
             <Row gutter={16} style={{ marginBottom: 24 }}>
               <Col xs={12} sm={6}>
                 <Card size="small" style={{ textAlign: 'center' }}>
-                  <Statistic title="预期年化收益" value={recommendation.expectedReturn} valueStyle={{ color: '#1677ff' }} />
+                  <Statistic title="预期年化收益" value={recommendation.expectedReturn} valueStyle={{ color: 'var(--primary)' }} />
                 </Card>
               </Col>
               <Col xs={12} sm={6}>
                 <Card size="small" style={{ textAlign: 'center' }}>
-                  <Statistic title="风险等级" value={recommendation.riskLevel} valueStyle={{ color: '#ff4d4f' }} />
+                  <Statistic title="风险等级" value={recommendation.riskLevel} valueStyle={{ color: 'var(--danger)' }} />
                 </Card>
               </Col>
             </Row>

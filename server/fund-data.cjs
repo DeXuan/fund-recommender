@@ -237,34 +237,6 @@ const allFunds = [
   { code: '024766', name: '华宝国证通用航空产业ETF联接A', type: 'ETF联接', industry: '酒店旅游', index: '国证通用航空', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 0.20, rating: 3, buySuggestion: '逢低布局', dailyLimit: 0 },
   { code: '024767', name: '华宝国证通用航空产业ETF联接C', type: 'ETF联接', industry: '酒店旅游', index: '国证通用航空', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 1.00, rating: 3, buySuggestion: '逢低布局', dailyLimit: 0 },
   { code: '980059', name: '航空出行指数', type: '指数', industry: '酒店旅游', index: '航空出行', managementFee: 0.00, custodyFee: 0.00, serviceFee: 0.00, totalFee: 0.00, scale: 0, rating: 3, buySuggestion: '关注', dailyLimit: 0 },
-
-  // ========== 算力概念基金（中证算力基础设施指数 931688） ==========
-  // 算力基础设施ETF（场内）
-  { code: '159551', name: '国泰中证算力基础设施ETF', type: 'ETF', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 12.50, rating: 5, buySuggestion: '首选配置', dailyLimit: 0 },
-  { code: '562550', name: '华夏中证算力基础设施ETF', type: 'ETF', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 8.30, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
-  { code: '562660', name: '广发中证算力基础设施ETF', type: 'ETF', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 5.60, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
-  { code: '159578', name: '南方中证算力基础设施ETF', type: 'ETF', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 6.80, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
-  // 算力基础设施ETF联接（支付宝可买）
-  { code: '019575', name: '华夏中证算力基础设施ETF联接A', type: 'ETF联接', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 5.20, rating: 5, buySuggestion: '优先配置', dailyLimit: 0 },
-  { code: '019576', name: '华夏中证算力基础设施ETF联接C', type: 'ETF联接', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 3.80, rating: 5, buySuggestion: '短期灵活', dailyLimit: 0 },
-  { code: '020046', name: '国泰中证算力基础设施ETF联接A', type: 'ETF联接', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 4.50, rating: 5, buySuggestion: '优先配置', dailyLimit: 0 },
-  { code: '020047', name: '国泰中证算力基础设施ETF联接C', type: 'ETF联接', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 3.20, rating: 5, buySuggestion: '短期灵活', dailyLimit: 0 },
-  { code: '020049', name: '富国中证算力基础设施ETF联接A', type: 'ETF联接', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 3.60, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
-  { code: '020050', name: '富国中证算力基础设施ETF联接C', type: 'ETF联接', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 2.80, rating: 4, buySuggestion: '短期灵活', dailyLimit: 0 },
-  { code: '020164', name: '嘉实中证算力基础设施ETF联接A', type: 'ETF联接', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 3.10, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
-  { code: '020165', name: '嘉实中证算力基础设施ETF联接C', type: 'ETF联接', industry: '算力', index: '中证算力基础设施', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 2.50, rating: 4, buySuggestion: '短期灵活', dailyLimit: 0 },
-  // 云计算与大数据ETF联接（算力上游应用层）
-  { code: '017958', name: '鹏华中证云计算与大数据ETF联接A', type: 'ETF联接', industry: '算力', index: '中证云计算与大数据', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 3.50, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
-  { code: '017959', name: '鹏华中证云计算与大数据ETF联接C', type: 'ETF联接', industry: '算力', index: '中证云计算与大数据', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 2.20, rating: 4, buySuggestion: '短期灵活', dailyLimit: 0 },
-  // 半导体增强（算力芯片核心）
-  { code: '017146', name: '嘉实中证半导体增强A', type: '指数增强', industry: '算力', index: '中证半导体', managementFee: 1.00, custodyFee: 0.20, serviceFee: 0.00, totalFee: 1.20, scale: 2.80, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
-  { code: '017147', name: '嘉实中证半导体增强C', type: '指数增强', industry: '算力', index: '中证半导体', managementFee: 1.00, custodyFee: 0.20, serviceFee: 0.30, totalFee: 1.50, scale: 1.50, rating: 3, buySuggestion: '费率偏高', dailyLimit: 0 },
-  // 芯片ETF联接（算力硬件基础）
-  { code: '013614', name: '国泰中证芯片ETF联接A', type: 'ETF联接', industry: '算力', index: '中证芯片', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 4.20, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
-  { code: '013615', name: '国泰中证芯片ETF联接C', type: 'ETF联接', industry: '算力', index: '中证芯片', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 2.60, rating: 4, buySuggestion: '短期灵活', dailyLimit: 0 },
-  // 大数据产业ETF联接（算力数据层）
-  { code: '014804', name: '华夏中证大数据产业ETF联接A', type: 'ETF联接', industry: '算力', index: '中证大数据产业', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 2.50, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
-  { code: '014805', name: '华夏中证大数据产业ETF联接C', type: 'ETF联接', industry: '算力', index: '中证大数据产业', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 1.80, rating: 4, buySuggestion: '短期灵活', dailyLimit: 0 },
 ];
 
 // 基金经理映射（基金代码 → 基金经理）
@@ -518,27 +490,6 @@ const fundManagerMap = {
   '009342': '张坤',
   '161131': '陈皓',
   '110005': '陈皓',
-  // 算力概念基金经理
-  '159551': '梁杏',
-  '562550': '赵宗庭',
-  '562660': '霍华明',
-  '159578': '罗文杰',
-  '019575': '赵宗庭',
-  '019576': '赵宗庭',
-  '020046': '梁杏',
-  '020047': '梁杏',
-  '020049': '王乐乐',
-  '020050': '王乐乐',
-  '020164': '田光远',
-  '020165': '田光远',
-  '017958': '闫冬',
-  '017959': '闫冬',
-  '017146': '田光远',
-  '017147': '田光远',
-  '013614': '梁杏',
-  '013615': '梁杏',
-  '014804': '赵宗庭',
-  '014805': '赵宗庭',
 };
 
 // 明星基金经理详细信息

@@ -4,6 +4,7 @@ import { BarChartOutlined, RiseOutlined, FallOutlined, InfoCircleOutlined, Reloa
 import ReactECharts from 'echarts-for-react';
 import { fundApi } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { getEchartsTheme } from '../utils/echarts-theme';
 import { Link } from 'react-router-dom';
 
 interface IndexValuation {
@@ -133,12 +134,12 @@ export default function ValuationCenter() {
           return html;
         },
       },
-      legend: { data: ['PE', 'PB'], top: 0, textStyle: { color: isDark ? '#a0a0a0' : '#666' } },
+      legend: { data: ['PE', 'PB'], top: 0, textStyle: { color: 'var(--text-secondary)' } },
       grid: { top: 40, left: 50, right: 50, bottom: 30 },
-      xAxis: { type: 'category', data: dates, axisLabel: { color: isDark ? '#6b6b6b' : '#999', fontSize: 11 } },
+      xAxis: { type: 'category', data: dates, axisLabel: { color: 'var(--color-text-muted)', fontSize: 11 } },
       yAxis: [
-        { type: 'value', name: 'PE', position: 'left', axisLabel: { color: isDark ? '#6b6b6b' : '#999' } },
-        { type: 'value', name: 'PB', position: 'right', axisLabel: { color: isDark ? '#6b6b6b' : '#999' } },
+        { type: 'value', name: 'PE', position: 'left', axisLabel: { color: 'var(--color-text-muted)' } },
+        { type: 'value', name: 'PB', position: 'right', axisLabel: { color: 'var(--color-text-muted)' } },
       ],
       series: [
         {
@@ -165,7 +166,7 @@ export default function ValuationCenter() {
       tooltip: { trigger: 'axis' },
       grid: { top: 20, left: 80, right: 30, bottom: 30 },
       xAxis: { type: 'value', max: 100, show: false },
-      yAxis: { type: 'category', data: ['PB分位', 'PE分位'], axisLabel: { color: isDark ? '#a0a0a0' : '#666' } },
+      yAxis: { type: 'category', data: ['PB分位', 'PE分位'], axisLabel: { color: 'var(--text-secondary)' } },
       series: [
         {
           type: 'bar',
@@ -189,10 +190,10 @@ export default function ValuationCenter() {
   return (
     <div className="fade-in">
       <h1 style={{ marginBottom: 8, fontSize: 24, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <BarChartOutlined style={{ color: '#1677ff' }} />
+        <BarChartOutlined style={{ color: 'var(--primary)' }} />
         指数估值中心
       </h1>
-      <p style={{ marginBottom: 24, fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>
+      <p style={{ marginBottom: 24, fontSize: 13, color: 'var(--text-secondary)' }}>
         基于历史PE/PB数据计算真实百分位数，辅助判断指数高估/低估状态
       </p>
 
@@ -222,7 +223,7 @@ export default function ValuationCenter() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 15 }}>{idx.name}</div>
-                    <div style={{ fontSize: 12, color: isDark ? '#6b6b6b' : '#999', marginTop: 2 }}>{idx.code}</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{idx.code}</div>
                   </div>
                   <Tag color={color} style={{ margin: 0 }}>{getValuationLabel(p)}</Tag>
                 </div>
@@ -230,7 +231,7 @@ export default function ValuationCenter() {
                 {/* PE分位条 */}
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                    <span style={{ color: isDark ? '#a0a0a0' : '#666' }}>PE分位</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>PE分位</span>
                     <span style={{ fontWeight: 600, color }}>{p}%</span>
                   </div>
                   <div style={{ height: 8, background: isDark ? '#262626' : '#f0f0f0', borderRadius: 4, overflow: 'hidden' }}>
@@ -240,8 +241,8 @@ export default function ValuationCenter() {
 
                 {/* 关键指标 */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                  <span style={{ color: isDark ? '#a0a0a0' : '#666' }}>PE {idx.pe?.toFixed(1) || '-'}</span>
-                  <span style={{ color: isDark ? '#a0a0a0' : '#666' }}>PB {idx.pb?.toFixed(2) || '-'}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>PE {idx.pe?.toFixed(1) || '-'}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>PB {idx.pb?.toFixed(2) || '-'}</span>
                   {idx.changePercent !== null && (
                     <span style={{ color: idx.changePercent >= 0 ? '#ff4d4f' : '#52c41a', fontWeight: 500 }}>
                       {idx.changePercent >= 0 ? '+' : ''}{idx.changePercent?.toFixed(2)}%
@@ -277,9 +278,9 @@ export default function ValuationCenter() {
                   { label: '股息率', value: selected.dividendYield?.toFixed(2), suffix: '%' },
                 ].map(item => (
                   <div key={item.label} style={{ textAlign: 'center', padding: 12, background: isDark ? '#1f1f1f' : '#fafafa', borderRadius: 8 }}>
-                    <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginBottom: 4 }}>{item.label}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{item.label}</div>
                     <div style={{ fontSize: 20, fontWeight: 700, color: isDark ? '#e8e8e8' : '#1f1f1f' }}>
-                      {item.value || '-'}<span style={{ fontSize: 12, fontWeight: 400, color: isDark ? '#6b6b6b' : '#999' }}>{item.suffix}</span>
+                      {item.value || '-'}<span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-text-muted)' }}>{item.suffix}</span>
                     </div>
                   </div>
                 ))}
@@ -288,21 +289,21 @@ export default function ValuationCenter() {
               {/* 历史区间 */}
               {selected.history.dataPoints > 0 && (
                 <div style={{ marginTop: 16, padding: 12, background: isDark ? '#111a2c' : '#e6f4ff', borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: '#1677ff' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--primary)' }}>
                     历史统计（{selected.history.dataPoints}个数据点）
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 12 }}>
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ color: isDark ? '#a0a0a0' : '#666' }}>PE最低</div>
-                      <div style={{ fontWeight: 600, color: '#52c41a' }}>{selected.history.peMin?.toFixed(1)}</div>
+                      <div style={{ color: 'var(--text-secondary)' }}>PE最低</div>
+                      <div style={{ fontWeight: 600, color: 'var(--success)' }}>{selected.history.peMin?.toFixed(1)}</div>
                     </div>
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ color: isDark ? '#a0a0a0' : '#666' }}>PE均值</div>
+                      <div style={{ color: 'var(--text-secondary)' }}>PE均值</div>
                       <div style={{ fontWeight: 600 }}>{selected.history.peAvg?.toFixed(1)}</div>
                     </div>
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ color: isDark ? '#a0a0a0' : '#666' }}>PE最高</div>
-                      <div style={{ fontWeight: 600, color: '#ff4d4f' }}>{selected.history.peMax?.toFixed(1)}</div>
+                      <div style={{ color: 'var(--text-secondary)' }}>PE最高</div>
+                      <div style={{ fontWeight: 600, color: 'var(--danger)' }}>{selected.history.peMax?.toFixed(1)}</div>
                     </div>
                   </div>
                 </div>
@@ -311,12 +312,12 @@ export default function ValuationCenter() {
 
             {/* 分位数对比 */}
             <Card title={<span style={{ fontWeight: 600 }}>分位数对比</span>}>
-              <ReactECharts option={getPercentileBarOption()} style={{ height: 120 }} />
-              <div style={{ marginTop: 12, fontSize: 12, color: isDark ? '#a0a0a0' : '#666', lineHeight: 1.8 }}>
-                <p style={{ margin: 0 }}><span style={{ color: '#52c41a' }}>低于20%</span>：极度低估，适合加大投入</p>
-                <p style={{ margin: 0 }}><span style={{ color: '#1677ff' }}>20%-60%</span>：合理偏低，适合定投</p>
-                <p style={{ margin: 0 }}><span style={{ color: '#faad14' }}>60%-80%</span>：偏高估，谨慎加仓</p>
-                <p style={{ margin: 0 }}><span style={{ color: '#ff4d4f' }}>高于80%</span>：极度高估，建议减仓</p>
+              <ReactECharts option={getPercentileBarOption()} theme={getEchartsTheme(isDark)} style={{ height: 120 }} />
+              <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+                <p style={{ margin: 0 }}><span style={{ color: 'var(--success)' }}>低于20%</span>：极度低估，适合加大投入</p>
+                <p style={{ margin: 0 }}><span style={{ color: 'var(--primary)' }}>20%-60%</span>：合理偏低，适合定投</p>
+                <p style={{ margin: 0 }}><span style={{ color: 'var(--warning)' }}>60%-80%</span>：偏高估，谨慎加仓</p>
+                <p style={{ margin: 0 }}><span style={{ color: 'var(--danger)' }}>高于80%</span>：极度高估，建议减仓</p>
               </div>
             </Card>
           </Col>
@@ -341,7 +342,7 @@ export default function ValuationCenter() {
               {trendLoading ? (
                 <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
               ) : trendData.length > 0 ? (
-                <ReactECharts option={getTrendOption()} style={{ height: 350 }} />
+                <ReactECharts option={getTrendOption()} theme={getEchartsTheme(isDark)} style={{ height: 350 }} />
               ) : (
                 <Empty description="暂无历史数据，系统每日自动采集" />
               )}
@@ -358,7 +359,7 @@ export default function ValuationCenter() {
                     <div style={{ fontSize: 32, fontWeight: 700, color: getValuationColor(selected.pePercentile) }}>
                       {selected.pePercentile ?? '-'}%
                     </div>
-                    <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>当前PE分位</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>当前PE分位</div>
                     <Tag color={getValuationColor(selected.pePercentile)} style={{ marginTop: 8 }}>
                       {getValuationLabel(selected.pePercentile)}
                     </Tag>
@@ -374,7 +375,7 @@ export default function ValuationCenter() {
                     {selected.pePercentile !== null && selected.pePercentile > 80 && (
                       <p style={{ margin: 0, color: '#ff4d4f' }}>当前估值处于历史高位，注意控制仓位</p>
                     )}
-                    <p style={{ margin: 0, fontSize: 12, color: isDark ? '#6b6b6b' : '#999' }}>
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--color-text-muted)' }}>
                       数据来源：腾讯行情+东方财富，每日自动更新
                     </p>
                   </div>

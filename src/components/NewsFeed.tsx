@@ -34,10 +34,10 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 const actionConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  buy: { label: '关注加仓', color: '#52c41a', icon: <RiseOutlined /> },
-  sell: { label: '评估减仓', color: '#f5222d', icon: <FallOutlined /> },
-  watch: { label: '密切关注', color: '#1677ff', icon: <EyeOutlined /> },
-  hold: { label: '持有观望', color: '#8c8c8c', icon: <EyeOutlined /> },
+  buy: { label: '关注加仓', color: 'var(--success)', icon: <RiseOutlined /> },
+  sell: { label: '评估减仓', color: 'var(--danger)', icon: <FallOutlined /> },
+  watch: { label: '密切关注', color: 'var(--primary)', icon: <EyeOutlined /> },
+  hold: { label: '持有观望', color: 'var(--text-tertiary)', icon: <EyeOutlined /> },
 };
 
 interface NewsFeedProps {
@@ -84,40 +84,59 @@ export default function NewsFeed({ compact = false, maxItems = 50, showHeader = 
     }
   };
 
-  // SSE 实时连接
+  // SSE 实时连接（自动重连）
   useEffect(() => {
-    const es = newsApi.connectSSE((data) => {
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectDelay = 1000;
+    const maxDelay = 30000;
+    let unmounted = false;
+
+    const handleMessage = (data: any) => {
       if (data.type === 'init') {
-        // 初始数据，合并到列表
         setNews(prev => {
           const existing = new Set(prev.map(n => n.id));
           const newItems = data.items.filter((n: any) => !existing.has(n.id));
           return [...newItems, ...prev].slice(0, maxItems);
         });
       } else if (data.type === 'news') {
-        // 新的突发新闻
         setBreakingNews(prev => [...data.items, ...prev].slice(0, 10));
         setNews(prev => {
           const existing = new Set(prev.map(n => n.id));
           const newItems = data.items.filter((n: any) => !existing.has(n.id));
           return [...newItems, ...prev].slice(0, maxItems);
         });
-        // 显示通知
         data.items.forEach((item: any) => {
           if (item.impact === 'high') {
-            message.warning({
-              content: `突发: ${item.title.substring(0, 40)}...`,
-              duration: 5,
-            });
+            message.warning({ content: `突发: ${item.title.substring(0, 40)}...`, duration: 5 });
           }
         });
       }
-    });
-    esRef.current = es;
-    setSseConnected(true);
+    };
+
+    const connect = () => {
+      if (unmounted) return;
+      const es = newsApi.connectSSE(handleMessage);
+      esRef.current = es;
+      setSseConnected(true);
+
+      // 监听连接关闭以触发重连
+      const origSignal = es.signal;
+      origSignal.addEventListener('abort', () => {
+        if (unmounted) return;
+        setSseConnected(false);
+        reconnectTimer = setTimeout(() => {
+          reconnectDelay = Math.min(reconnectDelay * 2, maxDelay);
+          connect();
+        }, reconnectDelay);
+      });
+    };
+
+    connect();
 
     return () => {
-      es.abort();
+      unmounted = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      esRef.current?.abort();
       setSseConnected(false);
     };
   }, [maxItems]);
@@ -184,12 +203,12 @@ export default function NewsFeed({ compact = false, maxItems = 50, showHeader = 
       {breakingNews.length > 0 && !compact && (
         <Card
           size="small"
-          style={{ marginBottom: 12, borderColor: '#f5222d', background: 'rgba(245, 34, 45, 0.04)' }}
+          style={{ marginBottom: 12, borderColor: 'var(--danger)', background: 'rgba(245, 34, 45, 0.04)' }}
           styles={{ body: { padding: '8px 12px' } }}
         >
           <Space size={6}>
-            <ThunderboltOutlined style={{ color: '#f5222d' }} />
-            <Text strong style={{ color: '#f5222d', fontSize: 13 }}>突发快讯</Text>
+            <ThunderboltOutlined style={{ color: 'var(--danger)' }} />
+            <Text strong style={{ color: 'var(--danger)', fontSize: 13 }}>突发快讯</Text>
           </Space>
           {breakingNews.slice(0, 3).map(item => (
             <div key={item.id} style={{ marginTop: 4 }}>
@@ -211,9 +230,9 @@ export default function NewsFeed({ compact = false, maxItems = 50, showHeader = 
           renderItem={(item: any) => {
             const catCfg = categories[item.category] || { label: '其他', color: isDark ? '#6b6b6b' : '#8c8c8c' };
             const impactTag = item.impact === 'high'
-              ? { color: 'red', text: '高影响' }
+              ? { color: 'var(--danger)', text: '高影响' }
               : item.impact === 'medium'
-              ? { color: 'orange', text: '中影响' }
+              ? { color: 'var(--warning)', text: '中影响' }
               : { color: 'default', text: '低影响' };
 
             return (

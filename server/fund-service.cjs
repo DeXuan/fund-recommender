@@ -1,5 +1,24 @@
 const { getPool } = require('./db.cjs');
-const { API_URLS, REQUEST_DEFAULTS } = require('./config/index.cjs');
+
+// ========== 内存缓存 ==========
+const _cache = new Map();
+const CACHE_TTL = 30 * 1000; // 30秒
+
+function _cacheGet(key) {
+  const entry = _cache.get(key);
+  if (entry && Date.now() - entry.ts < CACHE_TTL) return entry.data;
+  _cache.delete(key);
+  return null;
+}
+
+function _cacheSet(key, data) {
+  _cache.set(key, { data, ts: Date.now() });
+  // 防止内存泄漏：最多缓存 20 个 key
+  if (_cache.size > 20) {
+    const oldest = _cache.keys().next().value;
+    _cache.delete(oldest);
+  }
+}
 
 // ========== 基金基本信息 ==========
 
@@ -60,7 +79,7 @@ async function getIndustries() {
     SELECT DISTINCT industry FROM (
       SELECT industry FROM funds
       UNION
-      SELECT '易方达' as industry FROM yifangda_funds LIMIT 1
+      (SELECT '易方达' as industry FROM yifangda_funds LIMIT 1)
     ) combined ORDER BY industry
   `);
   return result.rows.map(r => r.industry);
@@ -182,9 +201,9 @@ const RETURNS_CACHE_TTL = 30 * 60 * 1000; // 30分钟
 async function fetchReturnsFromAPI(code) {
   try {
     const axios = require('axios');
-    const resp = await axios.get(`${API_URLS.EASTMONEY_FUND_DETAIL}${code}.js`, {
+    const resp = await axios.get(`https://fund.eastmoney.com/pingzhongdata/${code}.js`, {
       timeout: 8000,
-      headers: { 'User-Agent': REQUEST_DEFAULTS.USER_AGENT, Referer: REQUEST_DEFAULTS.REFERER_EASTMONEY, Range: 'bytes=0-3000' },
+      headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://fund.eastmoney.com/', Range: 'bytes=0-3000' },
     });
     const text = resp.data || '';
     const extract = (key) => {
@@ -223,6 +242,17 @@ async function batchFetchReturns(codes) {
 }
 
 async function getAllFundsWithNav(filters = {}) {
+  // 构建缓存 key（只缓存无筛选的场景）
+  const cacheKey = (!filters.industry && !filters.type && !filters.search && !filters.manager && !filters.sort)
+    ? '_all_'
+    : null;
+
+  // 尝试命中缓存
+  if (cacheKey) {
+    const cached = _cacheGet(cacheKey);
+    if (cached) return cached;
+  }
+
   const pool = getPool();
 
   // 合并 funds + yifangda_funds，以基金代码去重
@@ -234,6 +264,7 @@ async function getAllFundsWithNav(filters = {}) {
              f.scale, f.rating, f.buy_suggestion, f.valuation, f.trend,
              f.logic, f.is_gold_selected, f.daily_limit,
              COALESCE(f.manager, '') as manager,
+             f.institution_hold, f.individual_hold,
              n.nav, n.total_nav, n.nav_date,
              n.return_1w, n.return_1m, n.return_3m, n.return_6m, n.return_1y
       FROM funds f
@@ -254,6 +285,7 @@ async function getAllFundsWithNav(filters = {}) {
              '' as buy_suggestion, '' as valuation, '' as trend,
              '' as logic, false as is_gold_selected, 0 as daily_limit,
              COALESCE(y.fund_manager, '') as manager,
+             NULL as institution_hold, NULL as individual_hold,
              y.unit_nav as nav, NULL as total_nav, y.nav_date,
              y.return_1w, y.return_1m, y.return_3m, y.return_6m, y.return_1y
       FROM yifangda_funds y
@@ -298,22 +330,22 @@ async function getAllFundsWithNav(filters = {}) {
 
   // 分页
   const page = parseInt(filters.page) || 1;
-  const pageSize = Math.min(parseInt(filters.pageSize) || 100, 2000);
+  const pageSize = Math.min(parseInt(filters.pageSize) || 100, 15000);
   const offset = (page - 1) * pageSize;
 
-  // 总数（去掉外层SELECT * 和 ORDER BY/LIMIT）
+  // 始终执行 COUNT 查询以保证 total 准确
   const lastOrderBy = query.lastIndexOf('ORDER BY');
   const innerQuery = query.substring(query.indexOf('FROM ('), lastOrderBy > 0 ? lastOrderBy : undefined);
   const countQuery = `SELECT COUNT(*) ${innerQuery}`;
   const countResult = await pool.query(countQuery, params);
-  const total = parseInt(countResult.rows[0].count);
+  let total = parseInt(countResult.rows[0].count);
 
   query += ` LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
   params.push(pageSize, offset);
 
   const result = await pool.query(query, params);
 
-  return {
+  const response = {
     data: result.rows.map(row => ({
       code: row.code,
       name: row.name,
@@ -333,6 +365,8 @@ async function getAllFundsWithNav(filters = {}) {
       isGoldSelected: row.is_gold_selected,
       dailyLimit: row.daily_limit,
       manager: row.manager || null,
+      institutionHold: row.institution_hold != null ? parseFloat(row.institution_hold) : null,
+      individualHold: row.individual_hold != null ? parseFloat(row.individual_hold) : null,
       nav: row.nav ? parseFloat(row.nav) : null,
       navDate: row.nav_date || null,
       return1w: row.return_1w ? parseFloat(row.return_1w) : null,
@@ -346,6 +380,35 @@ async function getAllFundsWithNav(filters = {}) {
     pageSize,
     totalPages: Math.ceil(total / pageSize),
   };
+
+  // 写入缓存
+  if (cacheKey) _cacheSet(cacheKey, response);
+  return response;
+}
+
+// ========== 评分查询（共享SQL） ==========
+
+// 查询基金+最新净值（用于评分/排名/策略对比等场景）
+// 返回原始数据库行，调用方自行评分行映射
+async function queryFundsForScoring(filters = {}) {
+  const pool = getPool();
+  let query = `
+    SELECT f.code, f.name, f.type, f.industry, f.total_fee, f.scale, f.valuation, f.rating,
+           f.management_fee, f.custody_fee, f.service_fee, f.manager,
+           n.nav, n.return_1w, n.return_1m, n.return_3m, n.return_6m, n.return_1y
+    FROM funds f
+    LEFT JOIN LATERAL (
+      SELECT nav, return_1w, return_1m, return_3m, return_6m, return_1y
+      FROM fund_nav WHERE fund_code = f.code ORDER BY nav_date DESC LIMIT 1
+    ) n ON true
+    WHERE n.nav IS NOT NULL
+  `;
+  const params = [];
+  if (filters.industry) { params.push(filters.industry); query += ` AND f.industry = $${params.length}`; }
+  if (filters.type) { params.push(filters.type); query += ` AND f.type = $${params.length}`; }
+  if (filters.requireReturn1y) { query += ' AND n.return_1y IS NOT NULL'; }
+  const result = await pool.query(query, params);
+  return result.rows;
 }
 
 // ========== 市场指数 ==========
@@ -665,6 +728,7 @@ module.exports = {
   getFundsByIndustry,
   getIndustries,
   getAllFundsWithNav,
+  queryFundsForScoring,
   batchFetchReturns,
   updateFundNav,
   updateFundReturns,

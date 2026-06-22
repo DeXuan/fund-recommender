@@ -85,7 +85,7 @@ export default function GsapEnhancer() {
 
     function setupTilt(card: Element) {
       const el = card as HTMLElement;
-      if (el.dataset.tiltBound) return;
+      if (el.dataset.tiltBound || el.dataset.glassCard) return;
       el.dataset.tiltBound = '1';
       el.style.transformStyle = 'preserve-3d';
       el.style.willChange = 'transform';

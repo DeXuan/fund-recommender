@@ -199,6 +199,18 @@ async function initDatabase(retries = 3) {
         UNIQUE(user_id, fund_code)
       )`,
       `CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id)`,
+      // AI 聊天历史表
+      `CREATE TABLE IF NOT EXISTS chat_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        session_id VARCHAR(100) NOT NULL,
+        role VARCHAR(20) NOT NULL,
+        content TEXT NOT NULL,
+        data JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_history_session ON chat_history(session_id, id)`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_history_user ON chat_history(user_id, created_at DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_fund_records_user ON fund_records(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_dca_plans_user ON dca_plans(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_oauth_accounts_provider ON oauth_accounts(provider, provider_user_id)`,
@@ -229,6 +241,16 @@ async function initDatabase(retries = 3) {
         ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS dca_last_executed DATE;
       EXCEPTION WHEN duplicate_column THEN NULL;
       END $$`,
+      // 卖出相关字段
+      `DO $$ BEGIN
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS record_type VARCHAR(10) DEFAULT 'buy';
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS sell_price NUMERIC(12,6);
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS sell_date DATE;
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS sell_fee NUMERIC(10,4) DEFAULT 0;
+        ALTER TABLE fund_records ADD COLUMN IF NOT EXISTS realized_pnl NUMERIC(15,2) DEFAULT 0;
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$`,
+      `CREATE INDEX IF NOT EXISTS idx_fund_records_record_type ON fund_records(record_type)`,
       // 基金经理字段
       `DO $$ BEGIN
         ALTER TABLE funds ADD COLUMN IF NOT EXISTS manager VARCHAR(50);
@@ -453,6 +475,37 @@ async function initDatabase(retries = 3) {
       )`,
       `CREATE INDEX IF NOT EXISTS idx_system_events_time ON system_events(created_at DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_system_events_type ON system_events(event_type)`,
+      // 多账户资产台账表
+      `CREATE TABLE IF NOT EXISTS asset_accounts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        account_type VARCHAR(20) NOT NULL DEFAULT 'fund',
+        account_name VARCHAR(100) NOT NULL,
+        balance NUMERIC(15,2) DEFAULT 0,
+        cost_basis NUMERIC(15,2) DEFAULT 0,
+        currency VARCHAR(10) DEFAULT 'CNY',
+        icon VARCHAR(10) DEFAULT '💰',
+        color VARCHAR(20) DEFAULT '#1677ff',
+        notes TEXT DEFAULT '',
+        is_active BOOLEAN DEFAULT true,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_asset_accounts_user ON asset_accounts(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_asset_accounts_type ON asset_accounts(user_id, account_type)`,
+      // 预算管控表
+      `CREATE TABLE IF NOT EXISTS budget_rules (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        category VARCHAR(50) NOT NULL,
+        monthly_limit NUMERIC(12,2) NOT NULL,
+        alert_threshold NUMERIC(5,2) DEFAULT 80,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_budget_rules_user ON budget_rules(user_id)`,
       // 种子数据：默认系统配置
       `INSERT INTO system_config (key, value, description) VALUES
         ('registration_enabled', 'true', '是否开放注册'),

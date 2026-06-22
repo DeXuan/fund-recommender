@@ -28,16 +28,18 @@ export default class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <Result
-          status="error"
-          title="页面出错了"
-          subTitle={this.state.error?.message || '发生未知错误'}
-          extra={
-            <Button type="primary" onClick={this.handleRetry}>
-              重试
-            </Button>
-          }
-        />
+        <div role="alert" aria-live="assertive">
+          <Result
+            status="error"
+            title="页面出错了"
+            subTitle={this.state.error?.message || '发生未知错误'}
+            extra={
+              <Button type="primary" onClick={this.handleRetry}>
+                重试
+              </Button>
+            }
+          />
+        </div>
       );
     }
     return this.props.children;

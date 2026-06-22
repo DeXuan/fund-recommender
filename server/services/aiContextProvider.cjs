@@ -16,7 +16,7 @@ function extractFundCodes(message) {
   return [...new Set(codes)];
 }
 
-async function buildContext(message, userId) {
+async function buildContext(message, userId, command = null, args = null) {
   const pool = getPool();
   const fundCodes = extractFundCodes(message);
   let context = '';
@@ -175,6 +175,87 @@ async function buildContext(message, userId) {
       if (fund.isGoldSelected) context += `- ⭐ **金选基金**\n`;
       if (fund.manager) context += `- 基金经理：${fund.manager}\n`;
     }
+  }
+
+  // === 命令专属上下文增强 ===
+  if (command === '/diagnose' && args) {
+    const codeMatch = args.match(/\b(\d{6})\b/);
+    if (codeMatch) {
+      const code = codeMatch[1];
+      try {
+        const navHistory = await pool.query(
+          `SELECT nav, nav_date, return_1w, return_1m, return_3m, return_6m, return_1y
+           FROM fund_nav WHERE fund_code = $1 ORDER BY nav_date DESC LIMIT 60`, [code]
+        );
+        if (navHistory.rows.length > 0) {
+          context += `\n## 📊 基金净值历史（最近60日）\n\n`;
+          context += `| 日期 | 净值 | 1周 | 1月 | 3月 | 6月 | 1年 |\n`;
+          context += `|:----:|-----:|----:|----:|----:|----:|----:|\n`;
+          for (const row of navHistory.rows.slice(0, 30)) {
+            context += `| ${row.nav_date} | ${row.nav} | ${row.return_1w || '-'} | ${row.return_1m || '-'} | ${row.return_3m || '-'} | ${row.return_6m || '-'} | ${row.return_1y || '-'} |\n`;
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  if (command === '/portfolio' && userId) {
+    try {
+      const allocation = await pool.query(`
+        SELECT f.industry, COUNT(*) as count, SUM(r.market_value) as total_value
+        FROM fund_records r JOIN funds f ON r.fund_code = f.code
+        WHERE r.user_id = $1 AND r.record_type != 'sell'
+        GROUP BY f.industry ORDER BY total_value DESC
+      `, [userId]);
+      if (allocation.rows.length > 0) {
+        const totalAlloc = allocation.rows.reduce((s, r) => s + parseFloat(r.total_value || 0), 0);
+        context += `\n## 🏷️ 行业配置分布\n\n`;
+        context += `| 行业 | 基金数 | 市值 | 占比 |\n`;
+        context += `|:----:|------:|-----:|-----:|\n`;
+        for (const a of allocation.rows) {
+          const pct = totalAlloc > 0 ? (parseFloat(a.total_value) / totalAlloc * 100).toFixed(1) : '0';
+          context += `| ${a.industry || '未知'} | ${a.count} | ¥${parseFloat(a.total_value).toFixed(2)} | ${pct}% |\n`;
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  if (command === '/risk' && userId) {
+    try {
+      const riskData = await pool.query(`
+        SELECT fund_code, fund_name, pnl_percent, market_value
+        FROM fund_records WHERE user_id = $1 AND record_type != 'sell'
+        ORDER BY market_value DESC
+      `, [userId]);
+      if (riskData.rows.length > 0) {
+        const totalMV = riskData.rows.reduce((s, r) => s + parseFloat(r.market_value || 0), 0);
+        const maxSingle = Math.max(...riskData.rows.map(r => parseFloat(r.market_value || 0)));
+        const concentration = totalMV > 0 ? (maxSingle / totalMV * 100).toFixed(1) : '0';
+        context += `\n## ⚠️ 风险指标\n\n`;
+        context += `- 持仓基金数量：${riskData.rows.length}只\n`;
+        context += `- 最大单只占比：${concentration}%\n`;
+        context += `- 总市值：¥${totalMV.toFixed(2)}\n`;
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  if (command === '/dca' && args) {
+    try {
+      const targetMatch = args.match(/[一-龥a-zA-Z0-9]+/g);
+      if (targetMatch) {
+        context += `\n## 📅 定投参考数据\n\n`;
+        for (const target of targetMatch.slice(0, 3)) {
+          const result = await fundService.getAllFundsWithNav({ search: target }).catch(() => ({ data: [] }));
+          const funds = (result.data || result || []).slice(0, 5);
+          if (funds.length > 0) {
+            context += `### ${target}相关基金\n`;
+            for (const f of funds) {
+              context += `- ${f.name}(${f.code})：近1年${f.return1y >= 0 ? '+' : ''}${f.return1y?.toFixed(2) || '-'}%，费率${f.totalFee?.toFixed(2) || '-'}%\n`;
+            }
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 
   return context;

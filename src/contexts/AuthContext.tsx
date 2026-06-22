@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { User } from '../types';
+import { authApi } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -20,11 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (token) {
-      fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
-        .then(res => {
-          if (!res.ok) throw new Error();
-          return res.json();
-        })
+      authApi.getMe()
         .then(data => setUser(data.user))
         .catch(() => {
           localStorage.removeItem('token');
@@ -37,32 +34,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (username: string, password: string) => {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || '登录失败');
-    }
-    const data = await res.json();
+    const data = await authApi.login(username, password);
     localStorage.setItem('token', data.token);
     setToken(data.token);
     setUser(data.user);
   };
 
   const register = async (username: string, password: string, nickname: string) => {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, nickname }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || '注册失败');
-    }
-    const data = await res.json();
+    const data = await authApi.register(username, password, nickname);
     localStorage.setItem('token', data.token);
     setToken(data.token);
     setUser(data.user);

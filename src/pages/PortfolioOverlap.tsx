@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Card, Row, Col, Table, Tag, Spin, Alert, Empty, Progress } from 'antd';
 import { WarningOutlined, CheckCircleOutlined, PieChartOutlined, FundOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
-import { fundApi } from '../services/api';
+import { portfolioApi } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { getEchartsTheme } from '../utils/echarts-theme';
 import { Link } from 'react-router-dom';
 
 interface OverlapPair {
@@ -56,7 +57,7 @@ export default function PortfolioOverlap() {
     setLoading(true);
     setError('');
     try {
-      const result = await fundApi.getPortfolioOverlap();
+      const result = await portfolioApi.getOverlap();
       if (result.error) {
         setError(result.error);
       } else {
@@ -136,7 +137,7 @@ export default function PortfolioOverlap() {
   return (
     <div className="fade-in">
       <h1 style={{ marginBottom: 8, fontSize: 24, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <PieChartOutlined style={{ color: '#1677ff' }} />
+        <PieChartOutlined style={{ color: 'var(--primary)' }} />
         持仓重叠分析
       </h1>
       <p style={{ marginBottom: 24, fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>
@@ -147,13 +148,13 @@ export default function PortfolioOverlap() {
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col xs={12} sm={6}>
           <Card style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#1677ff' }}>{data.summary.totalFunds}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--primary)' }}>{data.summary.totalFunds}</div>
             <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>持仓基金数</div>
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#722ed1' }}>{data.summary.industryCount}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--color-purple)' }}>{data.summary.industryCount}</div>
             <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>覆盖行业数</div>
           </Card>
         </Col>
@@ -165,7 +166,7 @@ export default function PortfolioOverlap() {
         </Col>
         <Col xs={12} sm={6}>
           <Card style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#faad14' }}>{data.summary.hhi}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--warning)' }}>{data.summary.hhi}</div>
             <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>HHI指数</div>
           </Card>
         </Col>
@@ -185,7 +186,7 @@ export default function PortfolioOverlap() {
         <Col xs={24} lg={12}>
           <Card title={<span style={{ fontWeight: 600 }}>行业分布</span>} style={{ marginBottom: 16 }}>
             {data.industryAllocation.length > 0 ? (
-              <ReactECharts option={getPieOption()} style={{ height: 300 }} />
+              <ReactECharts option={getPieOption()} theme={getEchartsTheme(isDark)} style={{ height: 300 }} />
             ) : (
               <Empty description="暂无数据" />
             )}
@@ -196,7 +197,7 @@ export default function PortfolioOverlap() {
         <Col xs={24} lg={12}>
           <Card title={<span style={{ fontWeight: 600 }}>基金类型分布</span>} style={{ marginBottom: 16 }}>
             {data.typeDistribution.length > 0 ? (
-              <ReactECharts option={getTypePieOption()} style={{ height: 300 }} />
+              <ReactECharts option={getTypePieOption()} theme={getEchartsTheme(isDark)} style={{ height: 300 }} />
             ) : (
               <Empty description="暂无数据" />
             )}
@@ -209,7 +210,7 @@ export default function PortfolioOverlap() {
         <Card
           title={
             <span style={{ fontWeight: 600 }}>
-              <WarningOutlined style={{ color: '#faad14', marginRight: 8 }} />
+              <WarningOutlined style={{ color: 'var(--warning)', marginRight: 8 }} />
               重叠行业（{data.overlapPairs.length}个）
             </span>
           }

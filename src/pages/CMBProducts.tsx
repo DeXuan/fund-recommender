@@ -110,7 +110,7 @@ const personalColumns: ColumnsType<CMBProduct> = [
     sorter: (a, b) => (a.unit_nav || 0) - (b.unit_nav || 0),
     render: (nav: number | null, record) => nav ? (
       <Tooltip title={`净值日期: ${record.nav_date || '-'}`}>
-        <Text strong style={{ color: '#1677ff' }}>{nav.toFixed(4)}</Text>
+        <Text strong style={{ color: 'var(--primary)' }}>{nav.toFixed(4)}</Text>
       </Tooltip>
     ) : <Text type="secondary">-</Text>,
   },
@@ -252,7 +252,7 @@ export default function CMBProducts() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <Space align="center">
-          <BankOutlined style={{ fontSize: 24, color: '#1677ff' }} />
+          <BankOutlined style={{ fontSize: 24, color: 'var(--primary)' }} />
           <Title level={3} style={{ margin: 0 }}>招商银行持仓理财</Title>
         </Space>
         <Space>
@@ -273,7 +273,7 @@ export default function CMBProducts() {
 
       {/* 统计卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
-        <StatCard label="产品数量" value={String(personalStats.count)} color="#1677ff" />
+        <StatCard label="产品数量" value={String(personalStats.count)} color="var(--primary)" />
         {renderReturnCard('平均近1月', personalStats.avg1m)}
         {renderReturnCard('平均近3月', personalStats.avg3m)}
         {renderReturnCard('平均近6月', personalStats.avg6m)}

@@ -5,7 +5,6 @@
  */
 
 const axios = require('axios');
-const { API_URLS } = require('./config/index.cjs');
 
 // 内存缓存
 let newsCache = [];
@@ -128,7 +127,7 @@ async function fetchCLSNews() {
 // 从东方财富抓取快讯
 async function fetchEastmoneyNews() {
   try {
-    const response = await axios.get(API_URLS.EASTMONEY_NEWS, {
+    const response = await axios.get('https://np-listapi.eastmoney.com/comm/web/getNewsByColumns', {
       params: {
         client: 'web',
         biz: 'web_home_channel',
@@ -178,7 +177,7 @@ async function fetchEastmoneyNews() {
 // 东方财富实时快讯备用API
 async function fetchEastmoneyLiveData() {
   try {
-    const response = await axios.get(API_URLS.EASTMONEY_ANNOUNCEMENT, {
+    const response = await axios.get('https://np-anotice-stock.eastmoney.com/api/security/ann', {
       params: {
         sr: '-1',
         page_size: '30',
@@ -502,9 +501,9 @@ const NEWS_INDUSTRY_MAP = {
   '风电': '新能源', '碳中和': '新能源',
   // 消费/白酒
   '茅台': '消费', '五粮液': '消费', '白酒': '消费', '汾酒': '消费',
-  '消费': '消费', '白酒': '消费', '泸州老窖': '消费',
+  '消费': '消费', '泸州老窖': '消费',
   // 金融/银行/证券
-  '银行': '金融', '央行': '金融', '降息': '金融', '降准': '金融', 'LPR': '金融',
+  '银行': '金融', '央行': '金融', '降息': '金融', '降准': '金融', 'LPR': '金融', '加息': '金融',
   '券商': '证券', '中信证券': '证券', '东方财富': '证券', '华泰证券': '证券',
   // 军工
   '军工': '军工', '国防': '军工', '航天': '军工', '歼': '军工', '导弹': '军工',
@@ -523,10 +522,10 @@ const NEWS_INDUSTRY_MAP = {
   // 纳斯达克/QDII
   '纳斯达克': '纳斯达克100', '美股': '纳斯达克100', '特斯拉': '纳斯达克100',
   '苹果': '纳斯达克100', '微软': '纳斯达克100', 'Meta': '纳斯达克100', '谷歌': '纳斯达克100',
-  '英伟达': '纳斯达克100', 'NVDA': '纳斯达克100', '亚马逊': '纳斯达克100',
-  'AMD': '纳斯达克100', '博通': '纳斯达克100', '奈飞': '纳斯达克100', '台积电': '纳斯达克100',
+  'NVDA': '纳斯达克100', '亚马逊': '纳斯达克100',
+  'AMD': '纳斯达克100', '博通': '纳斯达克100', '奈飞': '纳斯达克100',
   'AAPL': '纳斯达克100', 'MSFT': '纳斯达克100', 'AMZN': '纳斯达克100', 'TSLA': '纳斯达克100',
-  '美联储': '纳斯达克100', '降息': '纳斯达克100', '加息': '纳斯达克100', 'QDII': '纳斯达克100',
+  '美联储': '纳斯达克100', 'QDII': '纳斯达克100',
   '汇率': '纳斯达克100', '人民币': '纳斯达克100', '美元': '纳斯达克100', '外汇': '纳斯达克100',
   // 标普500
   '标普': '标普500', '标普500': '标普500', 'S&P500': '标普500', 'S&P': '标普500',

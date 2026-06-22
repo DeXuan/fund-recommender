@@ -134,6 +134,18 @@ export default function QDIIFunds() {
     }
   };
 
+  // 按行业动态分组
+  const industryGroups = useMemo(() => {
+    const groups: Record<string, Fund[]> = {};
+    for (const f of funds) {
+      const key = f.industry || '其他';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(f);
+    }
+    // 按数量降序排列
+    return Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+  }, [funds]);
+
   const nasdaqFunds = useMemo(() => funds.filter(f => f.industry === '纳斯达克100'), [funds]);
   const sp500Funds = useMemo(() => funds.filter(f => f.industry === '标普500'), [funds]);
 
@@ -169,7 +181,7 @@ export default function QDIIFunds() {
   );
 
   const sp500RenderReturn = (value: number) => {
-    if (value === undefined || value === null) return <span style={{ color: '#999' }}>-</span>;
+    if (value === undefined || value === null) return <span style={{ color: 'var(--color-text-muted)' }}>-</span>;
     return <span style={{ color: getReturnColor(value), fontWeight: 600 }}>{formatReturn(value)}</span>;
   };
 
@@ -179,14 +191,14 @@ export default function QDIIFunds() {
       dataIndex: 'code',
       key: 'code',
       width: 90,
-      render: (code: string) => <Link to={`/funds/${code}`} style={{ color: '#1677ff' }}>{code}</Link>,
+      render: (code: string) => <Link to={`/funds/${code}`} style={{ color: 'var(--primary)' }}>{code}</Link>,
     },
     {
       title: '基金名称',
       dataIndex: 'name',
       key: 'name',
       render: (name: string, record: Fund) => (
-        <Link to={`/funds/${record.code}`} style={{ color: '#1677ff', fontWeight: 500 }}>{name}</Link>
+        <Link to={`/funds/${record.code}`} style={{ color: 'var(--primary)', fontWeight: 500 }}>{name}</Link>
       ),
     },
     {
@@ -214,7 +226,7 @@ export default function QDIIFunds() {
       sorter: (a: Fund, b: Fund) => (a.dailyLimit ?? 0) - (b.dailyLimit ?? 0),
       render: (v: number) => {
         const label = v === 0 ? '暂停' : v >= 10000 ? `${(v / 10000).toFixed(0)}万` : `${v}元`;
-        const color = v === 0 ? '#999' : v <= 10 ? '#ff4d4f' : v >= 10000 ? '#52c41a' : '#faad14';
+        const color = v === 0 ? 'var(--color-text-muted)' : v <= 10 ? 'var(--danger)' : v >= 10000 ? 'var(--success)' : 'var(--warning)';
         return <span style={{ fontWeight: 600, color }}>{label}</span>;
       },
     },
@@ -237,13 +249,13 @@ export default function QDIIFunds() {
   const sp500Columns = [
     {
       title: '基金代码', dataIndex: 'code', key: 'code', width: 90,
-      render: (code: string) => <Link to={`/funds/${code}`} style={{ color: '#1677ff' }}>{code}</Link>,
+      render: (code: string) => <Link to={`/funds/${code}`} style={{ color: 'var(--primary)' }}>{code}</Link>,
     },
     {
       title: '基金名称', dataIndex: 'name', key: 'name', width: 220,
       render: (name: string, record: SP500Fund) => (
         <div>
-          <Link to={`/funds/${record.code}`} style={{ color: '#1677ff', fontWeight: 500, fontSize: 13 }}>{name}</Link>
+          <Link to={`/funds/${record.code}`} style={{ color: 'var(--primary)', fontWeight: 500, fontSize: 13 }}>{name}</Link>
           {record.isGoldSelected && <Tag color="gold" style={{ marginLeft: 4, fontSize: 10 }}>金选</Tag>}
         </div>
       ),
@@ -288,7 +300,7 @@ export default function QDIIFunds() {
       onHeaderCell: () => ({ onClick: () => handleSort('dailyLimit') }),
       render: (v: number) => {
         const label = v === 0 ? '暂停' : v >= 10000 ? `${(v / 10000).toFixed(0)}万` : `${v}元`;
-        const color = v === 0 ? '#999' : v <= 10 ? '#ff4d4f' : v >= 10000 ? '#52c41a' : '#faad14';
+        const color = v === 0 ? 'var(--color-text-muted)' : v <= 10 ? 'var(--danger)' : v >= 10000 ? 'var(--success)' : 'var(--warning)';
         return <span style={{ fontWeight: 600, color }}>{label}</span>;
       },
     },
@@ -300,7 +312,7 @@ export default function QDIIFunds() {
     },
     {
       title: '评级', dataIndex: 'rating', key: 'rating', width: 80,
-      render: (r: number) => <span style={{ color: '#faad14' }}>{'★'.repeat(r)}</span>,
+      render: (r: number) => <span style={{ color: 'var(--warning)' }}>{'★'.repeat(r)}</span>,
     },
     {
       title: '操作', key: 'action', width: 70,
@@ -347,6 +359,14 @@ export default function QDIIFunds() {
         </div>
       ),
     },
+    // 动态生成其他行业Tab（排除纳斯达克100和标普500，它们有专属Tab）
+    ...industryGroups
+      .filter(([industry]) => industry !== '纳斯达克100' && industry !== '标普500')
+      .map(([industry, industryFunds]) => ({
+        key: `industry-${industry}`,
+        label: `${industry} (${industryFunds.length})`,
+        children: <Table columns={nasdaqColumns} dataSource={industryFunds} rowKey="code" pagination={false} size="small" scroll={{ x: 1000 }} />,
+      })),
     {
       key: 'sp500',
       label: `标普500 (${sp500Funds.length})`,
@@ -354,10 +374,10 @@ export default function QDIIFunds() {
         <div>
           {/* 估值概览卡片 */}
           {sp500Data && (
-            <Card style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)', border: 'none', marginBottom: 20, color: 'white' }}>
+            <Card style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)', border: 'none', marginBottom: 20, color: 'var(--color-text-on-dark)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 20 }}>
                 <div>
-                  <h3 style={{ color: 'white', marginBottom: 8 }}>标普500指数估值</h3>
+                  <h3 style={{ color: 'var(--color-text-on-dark)', marginBottom: 8 }}>标普500指数估值</h3>
                   <p style={{ opacity: 0.85, fontSize: 14 }}>{sp500Data.recommendation.summary}</p>
                 </div>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -398,8 +418,8 @@ export default function QDIIFunds() {
                     border: 'none',
                     background: 'none',
                     cursor: 'pointer',
-                    borderBottom: sp500Tab === tab.key ? '2px solid #1677ff' : '2px solid transparent',
-                    color: sp500Tab === tab.key ? '#1677ff' : (isDark ? '#a0a0a0' : '#666'),
+                    borderBottom: sp500Tab === tab.key ? '2px solid var(--primary)' : '2px solid transparent',
+                    color: sp500Tab === tab.key ? 'var(--primary)' : (isDark ? '#a0a0a0' : '#666'),
                     fontWeight: sp500Tab === tab.key ? 600 : 400,
                     whiteSpace: 'nowrap',
                   }}
@@ -413,7 +433,7 @@ export default function QDIIFunds() {
           {sp500Loading ? (
             <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" tip="加载标普500分析数据中..." /></div>
           ) : !sp500Data ? (
-            <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>暂无标普500分析数据</div>
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-muted)' }}>暂无标普500分析数据</div>
           ) : (
             <>
               {/* 基金对比 */}
@@ -427,7 +447,7 @@ export default function QDIIFunds() {
                         {sp500Data.recommendation.bestPicks.map(pick => (
                           <Col xs={24} sm={12} key={pick.code}>
                             <div style={{ marginBottom: 8 }}>
-                              <Link to={`/funds/${pick.code}`} style={{ fontWeight: 600, color: '#1677ff' }}>
+                              <Link to={`/funds/${pick.code}`} style={{ fontWeight: 600, color: 'var(--primary)' }}>
                                 {pick.name} ({pick.code})
                               </Link>
                               <p style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', margin: '2px 0 0' }}>{pick.reason}</p>
@@ -481,11 +501,11 @@ export default function QDIIFunds() {
                           {sp500Data.topHoldings.map(h => (
                             <tr key={h.code}>
                               <td style={{ fontWeight: 600 }}>{h.name}</td>
-                              <td style={{ fontSize: 12, color: '#999' }}>{h.code}</td>
+                              <td style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{h.code}</td>
                               <td><span className="tag tag-active">{h.industry}</span></td>
                               <td style={{ fontWeight: 600 }}>{h.weight}%</td>
                               <td>{h.pe}x</td>
-                              <td style={{ fontWeight: 600, color: h.roe > 20 ? '#52c41a' : h.roe > 10 ? '#1677ff' : '#faad14' }}>
+                              <td style={{ fontWeight: 600, color: h.roe > 20 ? 'var(--success)' : h.roe > 10 ? 'var(--primary)' : 'var(--warning)' }}>
                                 {h.roe}%
                               </td>
                               <td className={h.revenueGrowth > 0 ? 'rise' : 'fall'}>
@@ -524,19 +544,19 @@ export default function QDIIFunds() {
                     <Row gutter={16}>
                       <Col xs={24} sm={8}>
                         <div style={{ padding: 16, background: isDark ? '#162312' : '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f', height: '100%' }}>
-                          <h4 style={{ color: '#52c41a', marginBottom: 8 }}>短期（3个月）</h4>
+                          <h4 style={{ color: 'var(--success)', marginBottom: 8 }}>短期（3个月）</h4>
                           <p style={{ fontSize: 13 }}>{sp500Data.recommendation.strategy.shortTerm}</p>
                         </div>
                       </Col>
                       <Col xs={24} sm={8}>
                         <div style={{ padding: 16, background: isDark ? '#111a2c' : '#e6f4ff', borderRadius: 8, border: '1px solid #91caff', height: '100%' }}>
-                          <h4 style={{ color: '#1677ff', marginBottom: 8 }}>中期（6个月）</h4>
+                          <h4 style={{ color: 'var(--primary)', marginBottom: 8 }}>中期（6个月）</h4>
                           <p style={{ fontSize: 13 }}>{sp500Data.recommendation.strategy.mediumTerm}</p>
                         </div>
                       </Col>
                       <Col xs={24} sm={8}>
                         <div style={{ padding: 16, background: isDark ? '#2b2111' : '#fff7e6', borderRadius: 8, border: '1px solid #ffd591', height: '100%' }}>
-                          <h4 style={{ color: '#fa8c16', marginBottom: 8 }}>长期（1年）</h4>
+                          <h4 style={{ color: 'var(--warning)', marginBottom: 8 }}>长期（1年）</h4>
                           <p style={{ fontSize: 13 }}>{sp500Data.recommendation.strategy.longTerm}</p>
                         </div>
                       </Col>
@@ -546,7 +566,7 @@ export default function QDIIFunds() {
                   <Card title="看多因素" style={{ marginBottom: 16 }}>
                     <ul style={{ paddingLeft: 20, fontSize: 14, lineHeight: 2 }}>
                       {sp500Data.recommendation.bullFactors.map((f, i) => (
-                        <li key={i} style={{ color: '#52c41a' }}>{f}</li>
+                        <li key={i} style={{ color: 'var(--success)' }}>{f}</li>
                       ))}
                     </ul>
                   </Card>
@@ -554,7 +574,7 @@ export default function QDIIFunds() {
                   <Card title="风险因素" style={{ marginBottom: 16 }}>
                     <ul style={{ paddingLeft: 20, fontSize: 14, lineHeight: 2 }}>
                       {sp500Data.recommendation.bearFactors.map((f, i) => (
-                        <li key={i} style={{ color: '#ff4d4f' }}>{f}</li>
+                        <li key={i} style={{ color: 'var(--danger)' }}>{f}</li>
                       ))}
                     </ul>
                   </Card>
@@ -566,7 +586,7 @@ export default function QDIIFunds() {
                         <div key={idx} style={{ marginBottom: 24, position: 'relative' }}>
                           <div style={{
                             position: 'absolute', left: -22, top: 4, width: 12, height: 12,
-                            borderRadius: '50%', background: '#1677ff', border: '2px solid white',
+                            borderRadius: '50%', background: '#1677ff', border: '2px solid var(--color-text-on-dark)',
                             boxShadow: '0 0 0 2px #1677ff',
                           }}></div>
                           <div style={{ background: isDark ? '#1a1a1a' : 'white', padding: 16, borderRadius: 8, border: isDark ? '1px solid #333' : '1px solid #e8e8e8' }}>
@@ -592,7 +612,18 @@ export default function QDIIFunds() {
     {
       key: 'all',
       label: `全部QDII (${funds.length})`,
-      children: <Table columns={nasdaqColumns} dataSource={funds} rowKey="code" pagination={{ pageSize: 20 }} size="small" scroll={{ x: 1000 }} />,
+      children: (
+        <div>
+          <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {industryGroups.map(([industry, group]) => (
+              <Tag key={industry} color="blue" style={{ fontSize: 13, padding: '4px 12px' }}>
+                {industry}: {group.length}只
+              </Tag>
+            ))}
+          </div>
+          <Table columns={nasdaqColumns} dataSource={funds} rowKey="code" pagination={{ pageSize: 20 }} size="small" scroll={{ x: 1000 }} />
+        </div>
+      ),
     },
   ];
 
@@ -603,7 +634,7 @@ export default function QDIIFunds() {
       </h1>
 
       <Card style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none', marginBottom: 16 }}>
-        <h3 style={{ color: 'white', marginBottom: 12 }}>什么是QDII基金？</h3>
+        <h3 style={{ color: 'var(--color-text-on-dark)', marginBottom: 12 }}>什么是QDII基金？</h3>
         <p style={{ color: 'rgba(255,255,255,0.9)', lineHeight: 1.8 }}>
           QDII基金是指经批准从事境外证券市场投资的基金。简单来说，就是用人民币买海外市场的基金。
         </p>
@@ -615,7 +646,7 @@ export default function QDIIFunds() {
           ].map((item) => (
             <Col xs={24} sm={8} key={item.title}>
               <Card size="small" style={{ background: 'rgba(255,255,255,0.1)', border: 'none' }}>
-                <strong style={{ color: 'white' }}>{item.title}</strong>
+                <strong style={{ color: 'var(--color-text-on-dark)' }}>{item.title}</strong>
                 <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', margin: '4px 0 0' }}>{item.desc}</p>
               </Card>
             </Col>
@@ -631,19 +662,19 @@ export default function QDIIFunds() {
         <Row gutter={16}>
           <Col xs={24} sm={8}>
             <Card size="small" style={{ background: isDark ? '#2c1618' : '#fff2f0', border: '1px solid #ffccc7' }}>
-              <h4 style={{ color: '#ff4d4f', marginBottom: 8 }}>暂停申购</h4>
+              <h4 style={{ color: 'var(--danger)', marginBottom: 8 }}>暂停申购</h4>
               <p style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', margin: 0 }}>QDII额度紧张，基金公司暂停申购，无法买入</p>
             </Card>
           </Col>
           <Col xs={24} sm={8}>
             <Card size="small" style={{ background: isDark ? '#2b2111' : '#fffbe6', border: '1px solid #ffe58f' }}>
-              <h4 style={{ color: '#faad14', marginBottom: 8 }}>限大额</h4>
+              <h4 style={{ color: 'var(--warning)', marginBottom: 8 }}>限大额</h4>
               <p style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', margin: 0 }}>每日限购10-10000元不等，国泰标普500限额最宽松(1万元/日)</p>
             </Card>
           </Col>
           <Col xs={24} sm={8}>
             <Card size="small" style={{ background: isDark ? '#162312' : '#f6ffed', border: '1px solid #b7eb8f' }}>
-              <h4 style={{ color: '#52c41a', marginBottom: 8 }}>开放申购</h4>
+              <h4 style={{ color: 'var(--success)', marginBottom: 8 }}>开放申购</h4>
               <p style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', margin: 0 }}>正常申购，无限额限制</p>
             </Card>
           </Col>

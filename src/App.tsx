@@ -8,13 +8,14 @@ import DataStatus from './components/DataStatus';
 import ErrorBoundary from './components/ErrorBoundary';
 import GsapEnhancer from './components/GsapEnhancer';
 import FloatingChat from './components/FloatingChat';
+import ParticleCanvas from './components/ParticleCanvas';
+import CommandPalette from './components/CommandPalette';
 
 const Home = lazy(() => import('./pages/Home'));
 const FundList = lazy(() => import('./pages/FundList'));
 const FundDetail = lazy(() => import('./pages/FundDetail'));
 const QDIIFunds = lazy(() => import('./pages/QDIIFunds'));
 const IndustryAnalysis = lazy(() => import('./pages/IndustryAnalysis'));
-const HS300Analysis = lazy(() => import('./pages/HS300Analysis'));
 
 const CMBProducts = lazy(() => import('./pages/CMBProducts'));
 const CMBProductDetail = lazy(() => import('./pages/CMBProductDetail'));
@@ -30,6 +31,10 @@ const StockPicker = lazy(() => import('./pages/StockPicker'));
 const Profile = lazy(() => import('./pages/Profile'));
 const FundCompare = lazy(() => import('./pages/FundCompare'));
 const AIAssistant = lazy(() => import('./pages/AIAssistant'));
+const FundDiagnosis = lazy(() => import('./pages/FundDiagnosis'));
+const ValuationCenter = lazy(() => import('./pages/ValuationCenter'));
+const PortfolioOverlap = lazy(() => import('./pages/PortfolioOverlap'));
+const About = lazy(() => import('./pages/About'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -59,7 +64,7 @@ function AppRoutes() {
         <Route path="/market" element={<Navigate to="/industry" replace />} />
         <Route path="/industry" element={<IndustryAnalysis />} />
         <Route path="/events" element={<MarketEvents />} />
-        <Route path="/hs300" element={<HS300Analysis />} />
+        <Route path="/hs300" element={<Navigate to="/funds" replace />} />
         <Route path="/cmb-products" element={<CMBProducts />} />
         <Route path="/cmb-products/:code" element={<CMBProductDetail />} />
         <Route path="/login" element={<Login />} />
@@ -68,9 +73,14 @@ function AppRoutes() {
         <Route path="/stock-picker" element={<ProtectedRoute><StockPicker /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/fund-compare" element={<FundCompare />} />
-        <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+        <Route path="/ai-assistant" element={<AIAssistant />} />
+        <Route path="/fund-diagnosis" element={<ProtectedRoute><FundDiagnosis /></ProtectedRoute>} />
+        <Route path="/fund-diagnosis/:code" element={<ProtectedRoute><FundDiagnosis /></ProtectedRoute>} />
+        <Route path="/valuation-center" element={<ProtectedRoute><ValuationCenter /></ProtectedRoute>} />
+        <Route path="/portfolio-overlap" element={<ProtectedRoute><PortfolioOverlap /></ProtectedRoute>} />
         <Route path="/admin/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
         <Route path="/admin/monitor" element={<AdminRoute><SystemMonitor /></AdminRoute>} />
+        <Route path="/about" element={<About />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
@@ -79,21 +89,23 @@ function AppRoutes() {
 
 function App() {
   return (
-    <Router basename="/web">
+    <Router basename={import.meta.env.VITE_CAPACITOR === 'true' ? '' : '/web'}>
       <AuthProvider>
         <Layout style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
+          <ParticleCanvas />
           <GsapEnhancer />
           <Navbar />
-          <div style={{ position: 'sticky', top: 64, zIndex: 99, padding: '8px 24px', background: 'var(--bg-primary)', backdropFilter: 'blur(8px)', borderBottom: '1px solid var(--border-color-light)' }}>
+          <div role="status" aria-live="polite" aria-label="数据状态" style={{ position: 'sticky', top: 64, zIndex: 99, padding: '8px 24px', background: 'var(--bg-primary)', backdropFilter: 'blur(8px)', borderBottom: '1px solid var(--border-color-light)' }}>
             <DataStatus />
           </div>
-          <Layout.Content style={{ maxWidth: 1800, margin: '0 auto', padding: '20px 24px', width: '100%' }}>
+          <Layout.Content role="main" aria-label="主要内容" style={{ maxWidth: 1800, margin: '0 auto', padding: '20px 24px', width: '100%' }}>
             <ErrorBoundary>
               <AppRoutes />
             </ErrorBoundary>
           </Layout.Content>
           <Footer />
           <FloatingChat />
+          <CommandPalette />
         </Layout>
       </AuthProvider>
     </Router>

@@ -94,8 +94,12 @@ router.post('/api/fund-compare/premium', authMiddleware, subscriptionMiddleware,
         }
         maxDrawdown = maxDrawdown * 100;
 
+        // 年化收益率（基于历史数据，与波动率使用同一数据源）
+        const totalReturn = (navs[navs.length - 1] - navs[0]) / navs[0];
+        const years = navs.length / 252;
+        const annualReturn = years > 0 ? (Math.pow(1 + totalReturn, 1 / years) - 1) * 100 : 0;
+
         // 夏普比率（无风险利率2%）
-        const annualReturn = (parseFloat(fund.return_1y) || 0);
         sharpeRatio = volatility > 0 ? (annualReturn - 2) / volatility : 0;
 
         // 卡玛比率

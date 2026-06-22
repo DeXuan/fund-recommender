@@ -276,7 +276,7 @@ export default function Profile() {
                   <Card size="small" style={{ ...cardStyle, marginBottom: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <LockOutlined style={{ fontSize: 20, color: '#1677ff' }} />
+                        <LockOutlined style={{ fontSize: 20, color: 'var(--primary)' }} />
                         <div>
                           <div style={{ fontWeight: 500 }}>登录密码</div>
                           <Text type="secondary" style={{ fontSize: 13 }}>已设置，建议定期更换密码</Text>
@@ -288,7 +288,7 @@ export default function Profile() {
                   <Card size="small" style={{ ...cardStyle, marginBottom: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <MobileOutlined style={{ fontSize: 20, color: '#52c41a' }} />
+                        <MobileOutlined style={{ fontSize: 20, color: 'var(--success)' }} />
                         <div>
                           <div style={{ fontWeight: 500 }}>支付宝绑定</div>
                           <Text type="secondary" style={{ fontSize: 13 }}>可通过支付宝扫码快速登录</Text>

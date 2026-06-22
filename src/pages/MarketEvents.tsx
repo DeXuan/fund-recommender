@@ -76,7 +76,7 @@ export default function MarketEvents() {
     <div>
       {/* 页面标题 */}
       <h1 style={{ marginBottom: 8, fontSize: 24, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <CalendarOutlined style={{ color: '#1677ff' }} />
+        <CalendarOutlined style={{ color: 'var(--primary)' }} />
         市场事件与实时快讯
       </h1>
       <p style={{ marginBottom: 24, fontSize: 13, color: c.text2 }}>
@@ -116,8 +116,8 @@ export default function MarketEvents() {
               onClick={() => setActiveTab(tab.key)}
               style={{
                 padding: '12px 24px', border: 'none', background: 'none', cursor: 'pointer',
-                borderBottom: activeTab === tab.key ? '2px solid #1677ff' : '2px solid transparent',
-                color: activeTab === tab.key ? '#1677ff' : c.text2,
+                borderBottom: activeTab === tab.key ? '2px solid var(--primary)' : '2px solid transparent',
+                color: activeTab === tab.key ? 'var(--primary)' : c.text2,
                 fontWeight: activeTab === tab.key ? 600 : 400,
                 fontSize: 14, display: 'flex', alignItems: 'center', gap: 6,
                 transition: 'all 0.2s',
@@ -183,7 +183,7 @@ export default function MarketEvents() {
               value={filterImpact || undefined}
               onChange={v => setFilterImpact(v || '')}
               options={Object.entries(impactConfig).map(([k, v]: [string, any]) => ({
-                value: k, label: statusTag(k === 'high' ? c.dangerBg : k === 'medium' ? c.warningBg : c.bg3, k === 'high' ? '#ff4d4f' : k === 'medium' ? '#faad14' : c.text3, v.label),
+                value: k, label: statusTag(k === 'high' ? c.dangerBg : k === 'medium' ? c.warningBg : c.bg3, k === 'high' ? 'var(--danger)' : k === 'medium' ? 'var(--warning)' : c.text3, v.label),
               }))}
             />
             <div style={{ flex: 1 }} />
@@ -191,7 +191,7 @@ export default function MarketEvents() {
               {['timeline', 'month', 'table'].map(mode => (
                 <button key={mode} onClick={() => setViewMode(mode)} style={{
                   padding: '6px 14px', border: 'none', cursor: 'pointer', fontSize: 13,
-                  background: viewMode === mode ? '#1677ff' : c.btnBg,
+                  background: viewMode === mode ? 'var(--primary)' : c.btnBg,
                   color: viewMode === mode ? '#fff' : c.text2,
                   fontWeight: viewMode === mode ? 500 : 400,
                   borderRight: mode !== 'table' ? `1px solid ${c.border}` : 'none',
@@ -234,12 +234,12 @@ export default function MarketEvents() {
             <div key={month} style={{ marginBottom: 32 }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16,
-                paddingBottom: 8, borderBottom: '2px solid #1677ff',
+                paddingBottom: 8, borderBottom: '2px solid var(--primary)',
               }}>
-                <CalendarOutlined style={{ color: '#1677ff', fontSize: 18 }} />
+                <CalendarOutlined style={{ color: 'var(--primary)', fontSize: 18 }} />
                 <span style={{ fontSize: 17, fontWeight: 600, color: c.text }}>{monthNames[month]}</span>
-                {statusTag(c.primaryBg, '#1677ff', `${eventsByMonth[month].length} 个事件`)}
-                {month === defaultMonth && statusTag(c.dangerBg, '#ff4d4f', '当前月')}
+                {statusTag(c.primaryBg, 'var(--primary)', `${eventsByMonth[month].length} 个事件`)}
+                {month === defaultMonth && statusTag(c.dangerBg, 'var(--danger)', '当前月')}
               </div>
               <div style={{ paddingLeft: 30, position: 'relative' }}>
                 <div style={{ position: 'absolute', left: 15, top: 0, bottom: 0, width: 2, background: c.border }} />
@@ -248,7 +248,7 @@ export default function MarketEvents() {
                     {/* 圆点 */}
                     <div style={{
                       position: 'absolute', left: -21, top: 18, width: 12, height: 12, borderRadius: '50%',
-                      background: impactConfig[event.impact]?.color || '#8c8c8c',
+                      background: impactConfig[event.impact]?.color || 'var(--text-tertiary)',
                       border: `2px solid ${c.bg}`, boxShadow: `0 0 0 2px ${impactConfig[event.impact]?.color || c.text3}`,
                     }} />
                     <div style={{
@@ -267,7 +267,7 @@ export default function MarketEvents() {
                             )}
                             {statusTag(
                               event.impact === 'high' ? c.dangerBg : event.impact === 'medium' ? c.warningBg : c.bg3,
-                              event.impact === 'high' ? '#ff4d4f' : event.impact === 'medium' ? '#faad14' : c.text3,
+                              event.impact === 'high' ? 'var(--danger)' : event.impact === 'medium' ? 'var(--warning)' : c.text3,
                               impactConfig[event.impact]?.label || ''
                             )}
                           </div>
@@ -281,7 +281,7 @@ export default function MarketEvents() {
                               marginTop: 10, padding: '8px 12px', borderRadius: 6,
                               background: c.warningBg, border: `1px solid ${c.warningBorder}`, fontSize: 13, lineHeight: 1.8,
                             }}>
-                              <strong style={{ color: '#fa8c16' }}>投资提示：</strong>
+                              <strong style={{ color: 'var(--warning)' }}>投资提示：</strong>
                               <span style={{ color: c.text2 }}>{event.investmentHint}</span>
                             </div>
                           )}
@@ -308,10 +308,10 @@ export default function MarketEvents() {
               key: String(month),
               label: (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CalendarOutlined style={{ color: '#1677ff' }} />
+                  <CalendarOutlined style={{ color: 'var(--primary)' }} />
                   <strong>{monthNames[month]}</strong>
-                  <Badge count={eventsByMonth[month].length} style={{ backgroundColor: '#1677ff' }} />
-                  {month === defaultMonth && statusTag(c.dangerBg, '#ff4d4f', '当前月')}
+                  <Badge count={eventsByMonth[month].length} style={{ backgroundColor: 'var(--primary)' }} />
+                  {month === defaultMonth && statusTag(c.dangerBg, 'var(--danger)', '当前月')}
                 </span>
               ),
               children: (
@@ -325,7 +325,7 @@ export default function MarketEvents() {
                       }}>
                         <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
                           {statusTag(categoryConfig[event.category]?.color + '18', categoryConfig[event.category]?.color, categoryConfig[event.category]?.label)}
-                          {statusTag(event.impact === 'high' ? c.dangerBg : c.warningBg, event.impact === 'high' ? '#ff4d4f' : '#faad14', impactConfig[event.impact]?.label)}
+                          {statusTag(event.impact === 'high' ? c.dangerBg : c.warningBg, event.impact === 'high' ? 'var(--danger)' : 'var(--warning)', impactConfig[event.impact]?.label)}
                           <span style={{ fontSize: 12, color: c.text3 }}>{event.dateRange}</span>
                         </div>
                         <div style={{ fontWeight: 600, fontSize: 14, color: c.text, marginBottom: 6 }}>{event.title}</div>
@@ -370,7 +370,7 @@ export default function MarketEvents() {
                       {statusTag(categoryConfig[event.category]?.color + '18', categoryConfig[event.category]?.color, categoryConfig[event.category]?.label)}
                     </td>
                     <td style={{ padding: '12px 16px', borderBottom: `1px solid ${c.borderLight}`, textAlign: 'center' }}>
-                      {statusTag(event.impact === 'high' ? c.dangerBg : c.warningBg, event.impact === 'high' ? '#ff4d4f' : '#faad14', impactConfig[event.impact]?.label)}
+                      {statusTag(event.impact === 'high' ? c.dangerBg : c.warningBg, event.impact === 'high' ? 'var(--danger)' : 'var(--warning)', impactConfig[event.impact]?.label)}
                     </td>
                     <td style={{ padding: '12px 16px', borderBottom: `1px solid ${c.borderLight}`, maxWidth: 280 }}>
                       <Tooltip title={event.investmentHint}>
@@ -389,13 +389,13 @@ export default function MarketEvents() {
           marginTop: 24, padding: '12px 16px', background: c.primaryBg,
           border: `1px solid ${c.primaryBorder}`, borderRadius: 6, fontSize: 13, lineHeight: 2,
         }}>
-          <strong style={{ color: '#1677ff' }}>免责声明：</strong>
+          <strong style={{ color: 'var(--primary)' }}>免责声明：</strong>
           <span style={{ color: c.text2 }}>
             以上事件时间基于历年惯例和已公布信息整理，具体日期以官方公告为准。投资提示仅供参考，不构成投资建议。
             建议关注
-            <a href="https://www.gov.cn" target="_blank" rel="noopener" style={{ margin: '0 4px', color: '#1677ff' }}>中国政府网</a>、
-            <a href="https://www.mofcom.gov.cn" target="_blank" rel="noopener" style={{ margin: '0 4px', color: '#1677ff' }}>商务部</a>、
-            <a href="https://www.sse.com.cn" target="_blank" rel="noopener" style={{ margin: '0 4px', color: '#1677ff' }}>上交所</a>获取最新信息。
+            <a href="https://www.gov.cn" target="_blank" rel="noopener" style={{ margin: '0 4px', color: 'var(--primary)' }}>中国政府网</a>、
+            <a href="https://www.mofcom.gov.cn" target="_blank" rel="noopener" style={{ margin: '0 4px', color: 'var(--primary)' }}>商务部</a>、
+            <a href="https://www.sse.com.cn" target="_blank" rel="noopener" style={{ margin: '0 4px', color: 'var(--primary)' }}>上交所</a>获取最新信息。
           </span>
         </div>
       </div>
@@ -428,9 +428,9 @@ function NewsStatsPanel() {
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
         {[
-          { value: stats.total, label: '总快讯', bg: c.primaryBg, color: '#1677ff' },
-          { value: stats.byImpact?.high || 0, label: '高影响', bg: c.dangerBg, color: '#ff4d4f' },
-          { value: stats.byImpact?.medium || 0, label: '中影响', bg: c.warningBg, color: '#faad14' },
+          { value: stats.total, label: '总快讯', bg: c.primaryBg, color: 'var(--primary)' },
+          { value: stats.byImpact?.high || 0, label: '高影响', bg: c.dangerBg, color: 'var(--danger)' },
+          { value: stats.byImpact?.medium || 0, label: '中影响', bg: c.warningBg, color: 'var(--warning)' },
         ].map((s, i) => (
           <div key={i} style={{ padding: '12px 16px', borderRadius: 8, textAlign: 'center', background: s.bg }}>
             <div style={{ fontSize: 24, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -455,10 +455,10 @@ function NewsStatsPanel() {
 
 // ==================== 与我相关面板 ====================
 const actionConfig: Record<string, { label: string; color: string; bg: string; darkBg: string; icon: React.ReactNode }> = {
-  buy: { label: '关注加仓', color: '#52c41a', bg: '#f6ffed', darkBg: '#162312', icon: <RiseOutlined /> },
-  sell: { label: '评估减仓', color: '#ff4d4f', bg: '#fff2f0', darkBg: '#2c1618', icon: <FallOutlined /> },
-  watch: { label: '密切关注', color: '#1677ff', bg: '#e6f4ff', darkBg: '#111a2c', icon: <EyeOutlined /> },
-  hold: { label: '持有观望', color: '#8c8c8c', bg: '#f5f5f5', darkBg: '#262626', icon: <CheckCircleOutlined /> },
+  buy: { label: '关注加仓', color: 'var(--success)', bg: '#f6ffed', darkBg: '#162312', icon: <RiseOutlined /> },
+  sell: { label: '评估减仓', color: 'var(--danger)', bg: '#fff2f0', darkBg: '#2c1618', icon: <FallOutlined /> },
+  watch: { label: '密切关注', color: 'var(--primary)', bg: '#e6f4ff', darkBg: '#111a2c', icon: <EyeOutlined /> },
+  hold: { label: '持有观望', color: 'var(--text-tertiary)', bg: '#f5f5f5', darkBg: '#262626', icon: <CheckCircleOutlined /> },
 };
 
 function PersonalNewsPanel() {
@@ -480,7 +480,9 @@ function PersonalNewsPanel() {
       setHoldings(data.holdings || []);
       setWatchlist(data.watchlist || []);
       setMatchedIndustries(data.matchedIndustries || []);
-    } catch (e) { console.error('加载个性化资讯失败:', e); } finally { setLoading(false); }
+    } catch (e) {
+      console.error('加载个性化资讯失败:', e);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => {
@@ -511,7 +513,7 @@ function PersonalNewsPanel() {
   if (holdings.length === 0 && watchlist.length === 0) {
     return (
       <div className="card">
-        <Empty description={<span>暂无持仓或自选基金，请先<a href="/portfolio" style={{ margin: '0 4px', color: '#1677ff' }}>记录持仓</a>或<a href="/watchlist" style={{ margin: '0 4px', color: '#1677ff' }}>添加自选</a></span>} />
+        <Empty description={<span>暂无持仓或自选基金，请先<a href="/portfolio" style={{ margin: '0 4px', color: 'var(--primary)' }}>记录持仓</a>或<a href="/watchlist" style={{ margin: '0 4px', color: 'var(--primary)' }}>添加自选</a></span>} />
       </div>
     );
   }
@@ -521,10 +523,10 @@ function PersonalNewsPanel() {
       <Col xs={24} lg={16}>
         {/* 筛选栏 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-          <StarOutlined style={{ color: '#faad14' }} />
+          <StarOutlined style={{ color: 'var(--warning)' }} />
           <span style={{ fontSize: 15, fontWeight: 600, color: c.text }}>与我相关的市场资讯</span>
-          {statusTag(c.primaryBg, '#1677ff', `${personalNews.length} 条`)}
-          {highCount > 0 && statusTag(c.dangerBg, '#ff4d4f', `${highCount} 条高度相关`)}
+          {statusTag(c.primaryBg, 'var(--primary)', `${personalNews.length} 条`)}
+          {highCount > 0 && statusTag(c.dangerBg, 'var(--danger)', `${highCount} 条高度相关`)}
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', gap: 0, borderRadius: 6, overflow: 'hidden', border: `1px solid ${c.border}` }}>
             {[
@@ -534,7 +536,7 @@ function PersonalNewsPanel() {
             ].map(opt => (
               <button key={opt.key} onClick={() => setFilterRelevance(opt.key)} style={{
                 padding: '4px 12px', border: 'none', cursor: 'pointer', fontSize: 12,
-                background: filterRelevance === opt.key ? '#1677ff' : c.btnBg,
+                background: filterRelevance === opt.key ? 'var(--primary)' : c.btnBg,
                 color: filterRelevance === opt.key ? '#fff' : c.text2,
                 fontWeight: filterRelevance === opt.key ? 500 : 400,
                 borderRight: opt.key !== 'medium' ? `1px solid ${c.border}` : 'none',
@@ -564,16 +566,16 @@ function PersonalNewsPanel() {
                         <span style={{ fontSize: 11, color: c.text3 }}>{formatTime(item.time)}</span>
                         {statusTag(c.tagBg, c.text2, item.source)}
                         {item.relevance === 'high'
-                          ? statusTag(c.dangerBg, '#ff4d4f', '高度相关')
-                          : statusTag(c.warningBg, '#faad14', '行业相关')}
-                        {item.impact === 'high' && statusTag(c.dangerBg, '#ff4d4f', '高影响')}
+                          ? statusTag(c.dangerBg, 'var(--danger)', '高度相关')
+                          : statusTag(c.warningBg, 'var(--warning)', '行业相关')}
+                        {item.impact === 'high' && statusTag(c.dangerBg, 'var(--danger)', '高影响')}
                       </div>
                       <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                         <span style={{ fontWeight: 600, fontSize: 14, color: c.text, lineHeight: 1.6 }}>{item.title}</span>
                       </a>
                       <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <LinkOutlined style={{ color: '#1677ff', fontSize: 11 }} />
-                        <span style={{ fontSize: 12, color: '#1677ff' }}>{item.matchReason}</span>
+                        <LinkOutlined style={{ color: 'var(--primary)', fontSize: 11 }} />
+                        <span style={{ fontSize: 12, color: 'var(--primary)' }}>{item.matchReason}</span>
                       </div>
                       {item.content && item.content !== item.title && (
                         <p style={{ margin: '6px 0 0', fontSize: 12, color: c.text2, lineHeight: 1.8 }}>
@@ -611,12 +613,12 @@ function PersonalNewsPanel() {
       <Col xs={24} lg={8}>
         {holdings.length > 0 && (
           <div className="card" style={{ marginBottom: 16 }}>
-            <h3 className="card-title"><StockOutlined style={{ color: '#1677ff' }} /> 我的持仓</h3>
+            <h3 className="card-title"><StockOutlined style={{ color: 'var(--primary)' }} /> 我的持仓</h3>
             <div style={{ maxHeight: 200, overflow: 'auto' }}>
               {holdings.map((h: any) => (
                 <div key={h.code} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${c.borderLight}`, fontSize: 13 }}>
-                  <Link to={`/funds/${h.code}`} style={{ color: '#1677ff', textDecoration: 'none', flex: 1 }}>{h.name || h.code}</Link>
-                  {statusTag(c.primaryBg, '#1677ff', h.industry || '-')}
+                  <Link to={`/funds/${h.code}`} style={{ color: 'var(--primary)', textDecoration: 'none', flex: 1 }}>{h.name || h.code}</Link>
+                  {statusTag(c.primaryBg, 'var(--primary)', h.industry || '-')}
                 </div>
               ))}
             </div>
@@ -634,11 +636,11 @@ function PersonalNewsPanel() {
 
         {watchlist.length > 0 && (
           <div className="card" style={{ marginBottom: 16 }}>
-            <h3 className="card-title"><StarOutlined style={{ color: '#faad14' }} /> 自选基金</h3>
+            <h3 className="card-title"><StarOutlined style={{ color: 'var(--warning)' }} /> 自选基金</h3>
             <div style={{ maxHeight: 150, overflow: 'auto' }}>
               {watchlist.map((w: any) => (
                 <div key={w.code} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${c.borderLight}`, fontSize: 13 }}>
-                  <Link to={`/funds/${w.code}`} style={{ color: '#1677ff', textDecoration: 'none', flex: 1 }}>{w.name || w.code}</Link>
+                  <Link to={`/funds/${w.code}`} style={{ color: 'var(--primary)', textDecoration: 'none', flex: 1 }}>{w.name || w.code}</Link>
                   {statusTag(c.tagBg, c.text2, w.industry || '-')}
                 </div>
               ))}
@@ -647,11 +649,11 @@ function PersonalNewsPanel() {
         )}
 
         <div className="card">
-          <h3 className="card-title"><ThunderboltOutlined style={{ color: '#fa8c16' }} /> 功能说明</h3>
+          <h3 className="card-title"><ThunderboltOutlined style={{ color: 'var(--warning)' }} /> 功能说明</h3>
           <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: c.text2, lineHeight: 2.2 }}>
             <li>自动从海量资讯中筛选与您持仓相关的新闻</li>
-            <li><b style={{ color: '#ff4d4f' }}>高度相关</b>：直接提及持仓基金名称或行业</li>
-            <li><b style={{ color: '#faad14' }}>行业相关</b>：持仓行业相关的宏观/政策新闻</li>
+            <li><b style={{ color: 'var(--danger)' }}>高度相关</b>：直接提及持仓基金名称或行业</li>
+            <li><b style={{ color: 'var(--warning)' }}>行业相关</b>：持仓行业相关的宏观/政策新闻</li>
             <li>每3分钟自动更新，结合事件给出操作建议</li>
             <li>导航栏铃铛同步显示持仓相关提醒</li>
           </ul>

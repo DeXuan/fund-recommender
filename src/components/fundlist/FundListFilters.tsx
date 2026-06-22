@@ -142,7 +142,7 @@ export function FundListFilters({
           </Button>
         )}
         {selectedCodes.length > 0 && selectedCodes.length < 2 && (
-          <span style={{ color: '#999', fontSize: 13 }}>请至少选择2只基金进行对比</span>
+          <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>请至少选择2只基金进行对比</span>
         )}
       </Space>
     </Card>

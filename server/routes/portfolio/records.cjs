@@ -79,11 +79,23 @@ router.post('/records', async (req, res) => {
     if (!fund_code || !fund_name || shares == null || cost_price == null || !buy_date) {
       return res.status(400).json({ error: '请填写完整的记录信息' });
     }
+    if (!/^\d{6}$/.test(fund_code)) {
+      return res.status(400).json({ error: '基金代码格式不正确，应为6位数字' });
+    }
+    if (fund_name.length > 100) {
+      return res.status(400).json({ error: '基金名称不能超过100个字符' });
+    }
     if (typeof shares !== 'number' || shares <= 0) {
       return res.status(400).json({ error: '份额必须大于0' });
     }
     if (typeof cost_price !== 'number' || cost_price <= 0) {
       return res.status(400).json({ error: '成本价必须大于0' });
+    }
+    if (notes && notes.length > 500) {
+      return res.status(400).json({ error: '备注不能超过500个字符' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(buy_date)) {
+      return res.status(400).json({ error: '日期格式不正确，应为 YYYY-MM-DD' });
     }
 
     const pool = getPool();

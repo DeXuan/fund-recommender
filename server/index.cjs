@@ -25,6 +25,9 @@ const { fetchAllNews, handleSSEConnection, FETCH_INTERVAL_MS } = require('./news
 const subscriptionRoutes = require('./routes/subscription.cjs');
 const stockPickerRoutes = require('./routes/stock-picker.cjs');
 const fundCompareRoutes = require('./routes/fund-compare.cjs');
+const portfolioAnalysisRoutes = require('./routes/portfolio-analysis.cjs');
+const watchlistRoutes = require('./routes/watchlist.cjs');
+const aiAssistantRoutes = require('./routes/ai-assistant.cjs');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -35,13 +38,23 @@ app.set('trust proxy', 1);
 // CORS: 仅允许前端域名
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://47.116.77.67:8688', 'http://localhost:5173', 'http://localhost:5174'];
+  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:8866'];
 
 app.use(cors({
   origin: (origin, callback) => {
     // 允许无 Origin 的请求（服务器到服务器、Postman 等非浏览器场景）
     // 浏览器跨域请求必须携带 Origin，且必须在白名单中
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+    // 支持精确匹配或无端口 origin 的端口通配（http://localhost 匹配 http://localhost:任意端口）
+    if (!origin || ALLOWED_ORIGINS.some(o => {
+      if (origin === o) return true;
+      // 如果白名单项不含端口，则匹配 origin 的 host 部分
+      try {
+        const allowedUrl = new URL(o);
+        const originUrl = new URL(origin);
+        if (!o.includes(':', o.indexOf('//') + 2) && allowedUrl.hostname === originUrl.hostname) return true;
+      } catch {}
+      return false;
+    })) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -53,6 +66,31 @@ app.use(cors({
 
 // 请求体大小限制
 app.use(express.json({ limit: '10kb' }));
+
+// 静态文件服务（前端构建产物，放在 helmet 之前避免 CSP 干扰）
+const distPath = path.join(__dirname, '..', 'dist');
+const fs = require('fs');
+const distPathResolved = path.resolve(distPath);
+if (fs.existsSync(distPathResolved)) {
+  const indexPath = path.join(distPathResolved, 'index.html');
+  // 手动处理 /web/ 请求：文件存在则发送，否则返回 index.html（SPA）
+  app.use('/web', (req, res, next) => {
+    const reqPath = req.path === '/' ? '/index.html' : req.path;
+    const filePath = path.join(distPathResolved, reqPath);
+    // 安全检查：防止路径穿越
+    if (!filePath.startsWith(distPathResolved)) {
+      return next();
+    }
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      return res.sendFile(filePath);
+    }
+    // SPA fallback
+    res.sendFile(indexPath);
+  });
+  console.log('[静态文件] 已挂载 /web/ → dist/', distPathResolved);
+} else {
+  console.warn('[静态文件] dist/ 目录不存在，请先运行 npm run build');
+}
 
 // 速率限制（使用共享模块）
 const generalLimiter = createRateLimit(60 * 1000, 300, 'general');
@@ -66,7 +104,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
       fontSrc: ["'self'", "data:"],
@@ -102,6 +140,7 @@ setInterval(resetQpsCounter, 60 * 1000);
 app.use('/api/auth', authRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/admin', adminRoutes);
+app.use(portfolioAnalysisRoutes);
 
 // 数据更新状态
 const dataUpdateStatus = {
@@ -133,6 +172,8 @@ app.use(apiRoutes);
 app.use(subscriptionRoutes);
 app.use(stockPickerRoutes);
 app.use(fundCompareRoutes);
+app.use(watchlistRoutes);
+app.use(aiAssistantRoutes);
 
 // 定时更新资金流向（使用递归 setTimeout 避免堆叠）
 function scheduleCapitalFlowUpdate() {
@@ -368,8 +409,9 @@ process.on('SIGINT', () => {
 
 // 防止未处理的错误导致进程崩溃
 process.on('uncaughtException', (err) => {
-  console.error('未捕获的异常:', err.message);
-  // 不退出进程，让连接池自行恢复
+  console.error('未捕获的异常:', err.stack || err);
+  // 给予短暂时间刷写日志后退出，PM2 会自动重启
+  setTimeout(() => process.exit(1), 1000);
 });
 
 process.on('unhandledRejection', (reason, promise) => {

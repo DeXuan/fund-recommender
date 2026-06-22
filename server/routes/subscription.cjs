@@ -108,7 +108,7 @@ router.post('/api/subscription/check-order', authMiddleware, async (req, res) =>
       const alipayRes = await queryPayment(outTradeNo);
       const tradeRes = alipayRes.alipay_trade_query_response || alipayRes;
       if (tradeRes.code === '10000' && (tradeRes.tradeStatus === 'TRADE_SUCCESS' || tradeRes.tradeStatus === 'TRADE_FINISHED')) {
-        const order = await pool.query('SELECT id FROM subscription_orders WHERE out_trade_no = $1', [outTradeNo]);
+        const order = await pool.query('SELECT id FROM subscription_orders WHERE out_trade_no = $1 AND user_id = $2', [outTradeNo, req.user.id]);
         if (order.rows.length > 0) {
           await subService.activateByTradeNo(outTradeNo, tradeRes.tradeNo || '');
           return res.json({ paid: true });
@@ -125,8 +125,25 @@ router.post('/api/subscription/check-order', authMiddleware, async (req, res) =>
   }
 });
 
-// POST /api/subscription/notify — 支付宝异步回调（无需登录）
+// Rate limiting for Alipay callback (100 per minute per IP — generous for legitimate callbacks)
+const notifyRateLimit = new Map();
+function checkNotifyRateLimit(ip) {
+  const now = Date.now();
+  const record = notifyRateLimit.get(ip) || { count: 0, resetTime: now + 60000 };
+  if (now > record.resetTime) { record.count = 0; record.resetTime = now + 60000; }
+  record.count++;
+  notifyRateLimit.set(ip, record);
+  return record.count <= 100;
+}
+setInterval(() => { const now = Date.now(); for (const [ip, r] of notifyRateLimit) { if (now > r.resetTime + 60000) notifyRateLimit.delete(ip); } }, 5 * 60 * 1000);
+
+// POST /api/subscription/notify — 支付宝异步回调（无需登录，但验证签名+限流）
 router.post('/api/subscription/notify', express.urlencoded({ extended: false }), async (req, res) => {
+  const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+  if (!checkNotifyRateLimit(clientIp)) {
+    console.warn('[支付宝回调] 速率限制触发:', clientIp);
+    return res.send('failure');
+  }
   try {
     const params = req.body;
     if (!verifyNotification(params)) {

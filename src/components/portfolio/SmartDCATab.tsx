@@ -3,6 +3,7 @@ import { Card, Select, InputNumber, Slider, Button, Row, Col, Statistic, Tag, Ta
 import { CalculatorOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { fundApi } from '../../services/api';
+import { getEchartsTheme } from '../../utils/echarts-theme';
 
 function getSmartMultiplier(pePercentile: number) {
   if (pePercentile < 15) return { multiplier: 2.0, label: '极度低估-加倍', color: '#52c41a' };
@@ -231,7 +232,7 @@ export function SmartDCATab({ isDark }: Props) {
                 </Row>
                 {smartChartOption && (
                   <Card title={<span style={{ fontWeight: 600 }}>定投模拟曲线</span>} style={{ marginBottom: 16 }}>
-                    <ReactECharts option={smartChartOption} style={{ height: 350 }} />
+                    <ReactECharts option={smartChartOption} theme={getEchartsTheme(isDark)} style={{ height: 350 }} />
                   </Card>
                 )}
                 <Card title={<span style={{ fontWeight: 600 }}>逐期明细</span>}>

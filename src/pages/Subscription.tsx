@@ -50,8 +50,16 @@ export default function Subscription() {
       setQrBase64(res.qrCodeBase64);
       setQrModal(true);
       setPaySuccess(false);
-      // 轮询支付结果
+      // 轮询支付结果（最多5分钟）
+      let pollCount = 0;
+      const maxPolls = 100; // 100 * 3s = 300s = 5min
       pollRef.current = setInterval(async () => {
+        pollCount++;
+        if (pollCount >= maxPolls) {
+          clearInterval(pollRef.current!);
+          message.warning('支付查询超时，请在订单记录中查看支付状态');
+          return;
+        }
         try {
           const check = await subscriptionApi.checkOrder(res.outTradeNo);
           if (check.paid) {
@@ -64,7 +72,9 @@ export default function Subscription() {
               setUser({ ...user, subscription_status: 'premium' });
             }
           }
-        } catch (e) { console.error('支付状态轮询失败:', e); }
+        } catch (e) {
+          console.error('查询订单状态失败:', e);
+        }
       }, 3000);
     } catch (e: any) {
       message.error(e.message || '创建订单失败');
@@ -85,18 +95,18 @@ export default function Subscription() {
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       {/* 当前状态 */}
-      <Card style={{ marginBottom: 24, textAlign: 'center', background: isPremium ? 'linear-gradient(135deg, #ffd700 0%, #ffed4a 100%)' : undefined }}>
+      <Card style={{ marginBottom: 24, textAlign: 'center', background: isPremium ? (isDark ? 'linear-gradient(135deg, #b8860b 0%, #daa520 100%)' : 'linear-gradient(135deg, #ffd700 0%, #ffed4a 100%)') : undefined }}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           {isPremium ? (
             <>
-              <CrownOutlined style={{ fontSize: 48, color: '#d48806' }} />
-              <Title level={3} style={{ margin: 0, color: '#614700' }}>尊享会员</Title>
-              <Text style={{ color: '#876800' }}>到期时间：{new Date(status.expiresAt).toLocaleDateString('zh-CN')}（剩余{status.daysRemaining}天）</Text>
+              <CrownOutlined style={{ fontSize: 48, color: isDark ? '#faad14' : '#d48806' }} />
+              <Title level={3} style={{ margin: 0, color: isDark ? '#ffd700' : '#614700' }}>尊享会员</Title>
+              <Text style={{ color: isDark ? '#ffc53d' : '#876800' }}>到期时间：{new Date(status.expiresAt).toLocaleDateString('zh-CN')}（剩余{status.daysRemaining}天）</Text>
               <Tag color="gold">{status.planName}</Tag>
             </>
           ) : (
             <>
-              <LockOutlined style={{ fontSize: 48, color: '#999' }} />
+              <LockOutlined style={{ fontSize: 48, color: 'var(--color-text-muted)' }} />
               <Title level={3} style={{ margin: 0 }}>免费用户</Title>
               <Text type="secondary">开通会员解锁全部功能</Text>
             </>
@@ -110,7 +120,7 @@ export default function Subscription() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
             <div>
               <Title level={4} style={{ margin: 0 }}>{plan.name}</Title>
-              <Title level={2} style={{ margin: '8px 0', color: '#1677ff' }}>
+              <Title level={2} style={{ margin: '8px 0', color: 'var(--primary)' }}>
                 ¥{plan.price}<Text type="secondary" style={{ fontSize: 14 }}> / {plan.duration_days}天</Text>
               </Title>
               <Space wrap>

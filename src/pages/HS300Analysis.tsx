@@ -94,10 +94,10 @@ export default function HS300Analysis() {
       <h1 style={{ marginBottom: 24 }}>📊 沪深300指数基金深度分析</h1>
 
       {/* 估值概览卡片 */}
-      <div className="card" style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)', color: 'white', marginBottom: 20 }}>
+      <div className="card" style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)', color: 'var(--color-text-on-dark)', marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 20 }}>
           <div>
-            <h3 style={{ color: 'white', marginBottom: 8 }}>沪深300指数估值</h3>
+            <h3 style={{ color: 'var(--color-text-on-dark)', marginBottom: 8 }}>沪深300指数估值</h3>
             <p style={{ opacity: 0.85, fontSize: 14 }}>{data.recommendation.summary}</p>
           </div>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -137,8 +137,8 @@ export default function HS300Analysis() {
                 border: 'none',
                 background: 'none',
                 cursor: 'pointer',
-                borderBottom: activeTab === tab.key ? '2px solid #1677ff' : '2px solid transparent',
-                color: activeTab === tab.key ? '#1677ff' : (isDark ? '#a0a0a0' : '#666'),
+                borderBottom: activeTab === tab.key ? '2px solid var(--primary)' : '2px solid transparent',
+                color: activeTab === tab.key ? 'var(--primary)' : (isDark ? '#a0a0a0' : '#666'),
                 fontWeight: activeTab === tab.key ? 600 : 400,
                 whiteSpace: 'nowrap',
               }}
@@ -167,10 +167,10 @@ export default function HS300Analysis() {
                   onClick={() => setFundFilter(f.key as any)}
                   style={{
                     padding: '4px 12px',
-                    border: fundFilter === f.key ? '1px solid #1677ff' : (isDark ? '1px solid #444' : '1px solid #d9d9d9'),
+                    border: fundFilter === f.key ? '1px solid var(--primary)' : (isDark ? '1px solid #444' : '1px solid #d9d9d9'),
                     borderRadius: 4,
                     background: fundFilter === f.key ? (isDark ? '#111a2c' : '#e6f4ff') : (isDark ? '#1a1a1a' : 'white'),
-                    color: fundFilter === f.key ? '#1677ff' : (isDark ? '#a0a0a0' : '#666'),
+                    color: fundFilter === f.key ? 'var(--primary)' : (isDark ? '#a0a0a0' : '#666'),
                     cursor: 'pointer',
                     fontSize: 13,
                   }}
@@ -183,11 +183,11 @@ export default function HS300Analysis() {
 
           {/* 首选推荐 */}
           <div className="card" style={{ background: isDark ? '#162312' : '#f6ffed', border: '1px solid #b7eb8f' }}>
-            <h4 style={{ color: '#52c41a', marginBottom: 12 }}>首选推荐</h4>
+            <h4 style={{ color: 'var(--success)', marginBottom: 12 }}>首选推荐</h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
               {data.recommendation.bestPicks.map(pick => (
                 <div key={pick.code} style={{ background: isDark ? '#1a1a1a' : 'white', padding: 12, borderRadius: 8 }}>
-                  <Link to={`/funds/${pick.code}`} style={{ fontWeight: 600, color: '#1677ff' }}>
+                  <Link to={`/funds/${pick.code}`} style={{ fontWeight: 600, color: 'var(--primary)' }}>
                     {pick.name} ({pick.code})
                   </Link>
                   <p style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>{pick.reason}</p>
@@ -222,9 +222,9 @@ export default function HS300Analysis() {
                 <tbody>
                   {filteredFunds.map(fund => (
                     <tr key={fund.code}>
-                      <td><Link to={`/funds/${fund.code}`} style={{ color: '#1677ff' }}>{fund.code}</Link></td>
+                      <td><Link to={`/funds/${fund.code}`} style={{ color: 'var(--primary)' }}>{fund.code}</Link></td>
                       <td style={{ maxWidth: 200 }}>
-                        <Link to={`/funds/${fund.code}`} style={{ textDecoration: 'none', color: '#1677ff' }}>
+                        <Link to={`/funds/${fund.code}`} style={{ textDecoration: 'none', color: 'var(--primary)' }}>
                           {fund.name}
                         </Link>
                         {fund.isEnhanced && <span className="badge badge-warning" style={{ marginLeft: 4, fontSize: 10 }}>增强</span>}
@@ -238,15 +238,15 @@ export default function HS300Analysis() {
                       <td style={{ fontWeight: 600 }}>{fund.totalFee.toFixed(2)}%</td>
                       <td style={{ fontSize: 12 }}>
                         {fund.purchaseFee !== undefined ? (
-                          fund.purchaseFee === 0 ? <span style={{ color: '#52c41a' }}>免申购费</span> :
-                          <span>{fund.purchaseFee}% <span style={{ color: '#999', textDecoration: 'line-through' }}>{fund.purchaseFeeOriginal}%</span></span>
+                          fund.purchaseFee === 0 ? <span style={{ color: 'var(--success)' }}>免申购费</span> :
+                          <span>{fund.purchaseFee}% <span style={{ color: 'var(--color-text-muted)', textDecoration: 'line-through' }}>{fund.purchaseFeeOriginal}%</span></span>
                         ) : '-'}
                       </td>
                       <td>{fund.scale.toFixed(1)}</td>
                       <td>
                         {fund.isEnhanced && fund.alpha ? (
                           <span className="rise" style={{ fontWeight: 600 }}>+{fund.alpha.toFixed(2)}%</span>
-                        ) : <span style={{ color: '#999' }}>-</span>}
+                        ) : <span style={{ color: 'var(--color-text-muted)' }}>-</span>}
                       </td>
                       <td><span className="rating">{'★'.repeat(fund.rating)}</span></td>
                       <td>
@@ -290,11 +290,11 @@ export default function HS300Analysis() {
                 {data.topHoldings.map(h => (
                   <tr key={h.code}>
                     <td style={{ fontWeight: 600 }}>{h.name}</td>
-                    <td style={{ fontSize: 12, color: '#999' }}>{h.code}</td>
+                    <td style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{h.code}</td>
                     <td><span className="tag tag-active">{h.industry}</span></td>
                     <td style={{ fontWeight: 600 }}>{h.weight}%</td>
                     <td>{h.pe}x</td>
-                    <td style={{ fontWeight: 600, color: h.roe > 20 ? '#52c41a' : h.roe > 10 ? '#1677ff' : '#faad14' }}>
+                    <td style={{ fontWeight: 600, color: h.roe > 20 ? 'var(--success)' : h.roe > 10 ? 'var(--primary)' : 'var(--warning)' }}>
                       {h.roe}%
                     </td>
                     <td className={h.revenueGrowth > 0 ? 'rise' : 'fall'}>
@@ -335,15 +335,15 @@ export default function HS300Analysis() {
             <h3 className="card-title">投资策略建议</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
               <div style={{ padding: 16, background: isDark ? '#162312' : '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
-                <h4 style={{ color: '#52c41a', marginBottom: 8 }}>短期（3个月）</h4>
+                <h4 style={{ color: 'var(--success)', marginBottom: 8 }}>短期（3个月）</h4>
                 <p style={{ fontSize: 13 }}>{data.recommendation.strategy.shortTerm}</p>
               </div>
               <div style={{ padding: 16, background: isDark ? '#111a2c' : '#e6f4ff', borderRadius: 8, border: '1px solid #91caff' }}>
-                <h4 style={{ color: '#1677ff', marginBottom: 8 }}>中期（6个月）</h4>
+                <h4 style={{ color: 'var(--primary)', marginBottom: 8 }}>中期（6个月）</h4>
                 <p style={{ fontSize: 13 }}>{data.recommendation.strategy.mediumTerm}</p>
               </div>
               <div style={{ padding: 16, background: isDark ? '#2b2111' : '#fff7e6', borderRadius: 8, border: '1px solid #ffd591' }}>
-                <h4 style={{ color: '#fa8c16', marginBottom: 8 }}>长期（1年）</h4>
+                <h4 style={{ color: 'var(--warning)', marginBottom: 8 }}>长期（1年）</h4>
                 <p style={{ fontSize: 13 }}>{data.recommendation.strategy.longTerm}</p>
               </div>
             </div>
@@ -354,7 +354,7 @@ export default function HS300Analysis() {
             <h3 className="card-title">看多因素</h3>
             <ul style={{ paddingLeft: 20, fontSize: 14, lineHeight: 2 }}>
               {data.recommendation.bullFactors.map((f, i) => (
-                <li key={i} style={{ color: '#52c41a' }}>{f}</li>
+                <li key={i} style={{ color: 'var(--success)' }}>{f}</li>
               ))}
             </ul>
           </div>
@@ -364,7 +364,7 @@ export default function HS300Analysis() {
             <h3 className="card-title">风险因素</h3>
             <ul style={{ paddingLeft: 20, fontSize: 14, lineHeight: 2 }}>
               {data.recommendation.bearFactors.map((f, i) => (
-                <li key={i} style={{ color: '#ff4d4f' }}>{f}</li>
+                <li key={i} style={{ color: 'var(--danger)' }}>{f}</li>
               ))}
             </ul>
           </div>
@@ -383,7 +383,7 @@ export default function HS300Analysis() {
                 <div key={idx} style={{ marginBottom: 24, position: 'relative' }}>
                   <div style={{
                     position: 'absolute', left: -22, top: 4, width: 12, height: 12,
-                    borderRadius: '50%', background: '#1677ff', border: '2px solid white',
+                    borderRadius: '50%', background: 'var(--primary)', border: '2px solid var(--color-text-on-dark)',
                     boxShadow: '0 0 0 2px #1677ff',
                   }}></div>
                   <div style={{ background: isDark ? '#1a1a1a' : 'white', padding: 16, borderRadius: 8, border: isDark ? '1px solid #333' : '1px solid #e8e8e8' }}>
@@ -432,8 +432,8 @@ export default function HS300Analysis() {
               </table>
             </div>
             <p style={{ marginTop: 12, fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>
-              当前沪深300 PE分位约 <strong style={{ color: '#ff4d4f' }}>{data.valuation.pePercentile}%</strong>，
-              处于<strong style={{ color: '#ff4d4f' }}>{data.valuation.valuation}</strong>区间，
+              当前沪深300 PE分位约 <strong style={{ color: 'var(--danger)' }}>{data.valuation.pePercentile}%</strong>，
+              处于<strong style={{ color: 'var(--danger)' }}>{data.valuation.valuation}</strong>区间，
               {data.valuation.suggestion}。
             </p>
           </div>

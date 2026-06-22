@@ -282,51 +282,8 @@ export interface SubscriptionOrder {
 export interface StockPickResult {
   fund: { code: string; name: string; type: string; industry: string; nav: number; return1y: number; return6m: number; return3m: number; return1m: number; return1w: number; totalFee: number; mgmtFee: number; custodyFee: number; scale: number; rating: number; manager: string };
   score: number;
-  breakdown: { return1y: number; fee: number; scale: number; valuation: number; momentum: number; riskAdjusted?: number; stability?: number };
+  breakdown: { return1y: number; fee: number; scale: number; valuation: number; momentum: number };
   reasoning: string;
-  riskMetrics?: RiskMetrics;
-}
-
-export interface RiskMetrics {
-  sharpe: number;
-  sortino: number;
-  calmar: number;
-  maxDrawdown: number;
-  annualReturn: number;
-  annualVolatility: number;
-  dataPoints: number;
-}
-
-export interface IndustryInsight {
-  industry: string;
-  meta: { index: string; keywords: string[]; seasonal: number[]; peakMonths: number[]; desc: string } | null;
-  fundCount: number;
-  avgReturn1y: number;
-  avgReturn3m: number;
-  avgReturn1m: number;
-  avgFee: number;
-  totalScale: number;
-  valuation: string;
-  buySuggestion: string;
-  isBuySeason: boolean;
-  isPeakSeason: boolean;
-  currentMonth: number;
-}
-
-export interface BatchEntryPlan {
-  batch: number;
-  ratio: number;
-  amount: number;
-  perFund: number;
-  description: string;
-  timing: string;
-  funds: { code: string; name: string; amount: number }[];
-}
-
-export interface ScreenedFund {
-  fund: { code: string; name: string; type: string; industry: string; nav: number; return1y: number; return3m: number; return1m: number; totalFee: number; scale: number; manager: string };
-  riskMetrics: RiskMetrics;
-  screenScore: number;
 }
 
 // 理财记账
@@ -340,16 +297,6 @@ export interface FundRecord {
   buy_date: string;
   buy_fee: number;
   notes: string;
-  record_type?: 'buy' | 'sell';
-  sell_price?: number;
-  sell_date?: string;
-  sell_fee?: number;
-  realized_pnl?: number;
-  current_nav?: number;
-  market_value?: number;
-  pnl?: number;
-  pnl_percent?: number;
-  nav_updated_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -376,6 +323,22 @@ export interface PortfolioSummary {
   totalReturn: number;
 }
 
+export interface DcaPlan {
+  id: number;
+  user_id: number;
+  fund_code: string;
+  fund_name: string;
+  amount: number;
+  frequency: 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
+  day_of_month: number;
+  day_of_week: number;
+  start_date: string;
+  end_date: string;
+  status: string;
+  last_executed: string;
+  notes: string;
+}
+
 export interface Transaction {
   id: number;
   fund_code: string;
@@ -383,62 +346,49 @@ export interface Transaction {
   shares: number;
   cost_price: number;
   buy_date: string;
-  buy_fee: number;
-  notes: string;
-  record_type: 'buy' | 'sell';
-  sell_price?: number;
-  sell_date?: string;
-  sell_fee?: number;
-  realized_pnl?: number;
+  record_type: string;
+  sell_price: number;
+  sell_date: string;
+  sell_fee: number;
+  realized_pnl: number;
   created_at: string;
 }
 
-export interface FeeSummary {
-  totalBuyFees: number;
-  totalSellFees: number;
-  totalFees: number;
-  totalInvestment: number;
-  feeRate: number;
+export interface ReturnsMapDay {
+  date: string;
+  return: number;
+  value: number;
 }
 
-export interface FundFee {
-  code: string;
-  name: string;
-  buyFees: number;
-  sellFees: number;
-  totalFees: number;
-  feeRate: number;
-  investment: number;
+export interface ReturnsMapResponse {
+  data: ReturnsMapDay[];
+  year: number;
+  summary: {
+    totalDays: number;
+    profitDays: number;
+    lossDays: number;
+    flatDays: number;
+    totalReturn: number;
+    maxProfit: number;
+    maxLoss: number;
+  };
 }
 
-export interface IndustryAllocation {
-  industry: string;
-  totalValue: number;
-  totalPnl: number;
-  weight: number;
-  returnRate: number;
-  fundCount: number;
-  funds: { code: string; name: string; value: number; pnl: number; pnlPercent: number }[];
+export interface SellResponse {
+  record: Transaction;
+  summary: {
+    sellShares: number;
+    avgCost: number;
+    sellPrice: number;
+    realizedPnl: number;
+    returnRate: number;
+    remainingShares: number;
+  };
 }
 
-export interface HoldingRisk {
-  fundCode: string;
-  fundName: string;
-  totalShares: number;
-  totalCost: number;
-  metrics: RiskMetrics | null;
-  industry: string;
-  valuation: string;
-  scale: number;
-}
-
-export interface PerformanceAttribution {
-  fundCode: string;
-  fundName: string;
-  cost: number;
-  marketValue: number;
-  pnl: number;
-  returnRate: number;
-  contribution: number;
-  weight: number;
+export interface ImportResponse {
+  imported: number;
+  skipped: number;
+  errors: string[];
+  message: string;
 }

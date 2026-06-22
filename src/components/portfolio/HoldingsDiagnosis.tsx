@@ -49,23 +49,23 @@ export function HoldingsDiagnosis({ holdings, isDark, getHoldingDays, getFeeTier
             <Progress type="circle" percent={healthScore} size={100} strokeColor={healthColor}
               format={() => <span style={{ fontSize: 24, fontWeight: 700, color: healthColor }}>{healthScore}</span>} />
             <div style={{ marginTop: 8, fontWeight: 600, color: healthColor }}>组合健康 {healthLabel}</div>
-            <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999', marginTop: 4 }}>综合分散度、胜率、盈亏比、费用</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>综合分散度、胜率、盈亏比、费用</div>
           </Card>
         </Col>
         <Col xs={12} sm={4}>
           <Card size="small" style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 28, fontWeight: 700, color: winRate >= 50 ? '#52c41a' : '#ff4d4f' }}>{winRate.toFixed(0)}%</div>
             <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>持仓胜率</div>
-            <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999' }}>{winners.length}盈 / {losers.length}亏</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{winners.length}盈 / {losers.length}亏</div>
           </Card>
         </Col>
         <Col xs={12} sm={4}>
           <Card size="small" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#1677ff' }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--primary)' }}>
               {totalLossPnl !== 0 ? Math.abs(totalWinPnl / totalLossPnl).toFixed(2) : '-'}
             </div>
             <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>盈亏比</div>
-            <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999' }}>盈¥{totalWinPnl.toFixed(0)}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>盈¥{totalWinPnl.toFixed(0)}</div>
           </Card>
         </Col>
         <Col xs={12} sm={4}>
@@ -74,7 +74,7 @@ export function HoldingsDiagnosis({ holdings, isDark, getHoldingDays, getFeeTier
               {topWinner ? `+¥${topWinner.pnl.toFixed(0)}` : '-'}
             </div>
             <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>最大盈利</div>
-            <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999' }}>{topWinner?.fund_name?.slice(0, 6) || '-'}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{topWinner?.fund_name?.slice(0, 6) || '-'}</div>
           </Card>
         </Col>
         <Col xs={12} sm={4}>
@@ -83,7 +83,7 @@ export function HoldingsDiagnosis({ holdings, isDark, getHoldingDays, getFeeTier
               {topLoser ? `-¥${Math.abs(topLoser.pnl).toFixed(0)}` : '-'}
             </div>
             <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>最大亏损</div>
-            <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999' }}>{topLoser?.fund_name?.slice(0, 6) || '-'}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{topLoser?.fund_name?.slice(0, 6) || '-'}</div>
           </Card>
         </Col>
       </Row>

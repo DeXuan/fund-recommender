@@ -71,10 +71,10 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
   }, [hs300Data, hs300SortField, hs300SortOrder, hs300FundFilter]);
 
   const hs300GetValuationColor = (v: string) => {
-    if (v.includes('极低') || v.includes('低估')) return '#52c41a';
+    if (v.includes('极低') || v.includes('低估')) return 'var(--success)';
     if (v.includes('偏低')) return '#73d13d';
-    if (v.includes('合理')) return '#1677ff';
-    if (v.includes('偏高') || v.includes('高')) return '#ff4d4f';
+    if (v.includes('合理')) return 'var(--primary)';
+    if (v.includes('偏高') || v.includes('高')) return 'var(--danger)';
     return isDark ? '#a0a0a0' : '#666';
   };
 
@@ -99,8 +99,8 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
           <Card style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)', border: 'none', marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 20 }}>
               <div>
-                <h3 style={{ color: 'white', marginBottom: 8 }}>沪深300指数估值</h3>
-                <p style={{ opacity: 0.85, fontSize: 14, color: 'white' }}>{hs300Data.recommendation.summary}</p>
+                <h3 style={{ color: 'var(--color-text-on-dark)', marginBottom: 8 }}>沪深300指数估值</h3>
+                <p style={{ opacity: 0.85, fontSize: 14, color: 'var(--color-text-on-dark)' }}>{hs300Data.recommendation.summary}</p>
               </div>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 {[
@@ -110,8 +110,8 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
                   { label: '股息率', value: `${hs300Data.valuation.dividendYield ?? '--'}%` },
                 ].map(item => (
                   <div key={item.label} style={{ background: 'rgba(255,255,255,0.15)', padding: '10px 16px', borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: 'white' }}>{item.value}</div>
-                    <div style={{ fontSize: 11, opacity: 0.8, color: 'white' }}>{item.label}</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-on-dark)' }}>{item.value}</div>
+                    <div style={{ fontSize: 11, opacity: 0.8, color: 'var(--color-text-on-dark)' }}>{item.label}</div>
                   </div>
                 ))}
               </div>
@@ -131,8 +131,8 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
                   onClick={() => setHs300Tab(tab.key)}
                   style={{
                     padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer',
-                    borderBottom: hs300Tab === tab.key ? '2px solid #1677ff' : '2px solid transparent',
-                    color: hs300Tab === tab.key ? '#1677ff' : (isDark ? '#a0a0a0' : '#666'),
+                    borderBottom: hs300Tab === tab.key ? '2px solid var(--primary)' : '2px solid transparent',
+                    color: hs300Tab === tab.key ? 'var(--primary)' : (isDark ? '#a0a0a0' : '#666'),
                     fontWeight: hs300Tab === tab.key ? 600 : 400, whiteSpace: 'nowrap',
                   }}
                 >
@@ -159,10 +159,10 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
                       onClick={() => setHs300FundFilter(f.key as any)}
                       style={{
                         padding: '4px 12px',
-                        border: hs300FundFilter === f.key ? '1px solid #1677ff' : (isDark ? '1px solid #444' : '1px solid #d9d9d9'),
+                        border: hs300FundFilter === f.key ? '1px solid var(--primary)' : (isDark ? '1px solid #444' : '1px solid #d9d9d9'),
                         borderRadius: 4,
                         background: hs300FundFilter === f.key ? (isDark ? '#111a2c' : '#e6f4ff') : (isDark ? '#1a1a1a' : 'white'),
-                        color: hs300FundFilter === f.key ? '#1677ff' : (isDark ? '#a0a0a0' : '#666'),
+                        color: hs300FundFilter === f.key ? 'var(--primary)' : (isDark ? '#a0a0a0' : '#666'),
                         cursor: 'pointer', fontSize: 13,
                       }}
                     >
@@ -173,11 +173,11 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
               </Card>
 
               <Card style={{ background: isDark ? '#162312' : '#f6ffed', border: '1px solid #b7eb8f', marginBottom: 16 }}>
-                <h4 style={{ color: '#52c41a', marginBottom: 12 }}>首选推荐</h4>
+                <h4 style={{ color: 'var(--success)', marginBottom: 12 }}>首选推荐</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
                   {hs300Data.recommendation.bestPicks.map(pick => (
                     <div key={pick.code} style={{ background: isDark ? '#1a1a1a' : 'white', padding: 12, borderRadius: 8 }}>
-                      <Link to={`/funds/${pick.code}`} style={{ fontWeight: 600, color: '#1677ff' }}>{pick.name} ({pick.code})</Link>
+                      <Link to={`/funds/${pick.code}`} style={{ fontWeight: 600, color: 'var(--primary)' }}>{pick.name} ({pick.code})</Link>
                       <p style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginTop: 4 }}>{pick.reason}</p>
                     </div>
                   ))}
@@ -209,9 +209,9 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
                     <tbody>
                       {hs300FilteredFunds.map(fund => (
                         <tr key={fund.code}>
-                          <td><Link to={`/funds/${fund.code}`} style={{ color: '#1677ff' }}>{fund.code}</Link></td>
+                          <td><Link to={`/funds/${fund.code}`} style={{ color: 'var(--primary)' }}>{fund.code}</Link></td>
                           <td style={{ maxWidth: 200 }}>
-                            <Link to={`/funds/${fund.code}`} style={{ textDecoration: 'none', color: '#1677ff' }}>{fund.name}</Link>
+                            <Link to={`/funds/${fund.code}`} style={{ textDecoration: 'none', color: 'var(--primary)' }}>{fund.name}</Link>
                             {fund.isEnhanced && <span className="badge badge-warning" style={{ marginLeft: 4, fontSize: 10 }}>增强</span>}
                           </td>
                           <td style={{ fontSize: 12 }}>{fund.type}</td>
@@ -223,7 +223,7 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
                           <td style={{ fontWeight: 600 }}>{(fund.totalFee ?? 0).toFixed(2)}%</td>
                           <td style={{ fontSize: 12 }}>
                             {fund.purchaseFee !== undefined ? (
-                              fund.purchaseFee === 0 ? <span style={{ color: '#52c41a' }}>免申购费</span> :
+                              fund.purchaseFee === 0 ? <span style={{ color: 'var(--success)' }}>免申购费</span> :
                               <span>{fund.purchaseFee}% <span style={{ color: isDark ? '#6b6b6b' : '#999', textDecoration: 'line-through' }}>{fund.purchaseFeeOriginal}%</span></span>
                             ) : '-'}
                           </td>
@@ -264,7 +264,7 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
                         <td style={{ fontSize: 12 }}>{h.industry}</td>
                         <td style={{ fontWeight: 600 }}>{h.weight}%</td>
                         <td>{h.pe ?? '--'}x</td>
-                        <td style={{ fontWeight: 600, color: (h.roe ?? 0) > 20 ? '#52c41a' : (h.roe ?? 0) > 10 ? '#1677ff' : '#faad14' }}>{h.roe ?? '--'}%</td>
+                        <td style={{ fontWeight: 600, color: (h.roe ?? 0) > 20 ? 'var(--success)' : (h.roe ?? 0) > 10 ? 'var(--primary)' : 'var(--warning)' }}>{h.roe ?? '--'}%</td>
                         <td className={(h.revenueGrowth ?? 0) > 0 ? 'rise' : 'fall'}>{(h.revenueGrowth ?? 0) > 0 ? '+' : ''}{h.revenueGrowth ?? 0}%</td>
                         <td className={(h.epsGrowth ?? 0) > 0 ? 'rise' : 'fall'}>{(h.epsGrowth ?? 0) > 0 ? '+' : ''}{h.epsGrowth ?? 0}%</td>
                         <td><span className={`badge ${h.analystConsensus === '强烈买入' ? 'badge-success' : 'badge-warning'}`}>{h.analystConsensus}</span></td>
@@ -292,15 +292,15 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
                 <h3 className="card-title">投资策略建议</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
                   <div style={{ padding: 16, background: isDark ? '#162312' : '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
-                    <h4 style={{ color: '#52c41a', marginBottom: 8 }}>短期（3个月）</h4>
+                    <h4 style={{ color: 'var(--success)', marginBottom: 8 }}>短期（3个月）</h4>
                     <p style={{ fontSize: 13 }}>{hs300Data.recommendation.strategy.shortTerm}</p>
                   </div>
                   <div style={{ padding: 16, background: isDark ? '#111a2c' : '#e6f4ff', borderRadius: 8, border: '1px solid #91caff' }}>
-                    <h4 style={{ color: '#1677ff', marginBottom: 8 }}>中期（6个月）</h4>
+                    <h4 style={{ color: 'var(--primary)', marginBottom: 8 }}>中期（6个月）</h4>
                     <p style={{ fontSize: 13 }}>{hs300Data.recommendation.strategy.mediumTerm}</p>
                   </div>
                   <div style={{ padding: 16, background: isDark ? '#2b2111' : '#fff7e6', borderRadius: 8, border: '1px solid #ffd591' }}>
-                    <h4 style={{ color: '#fa8c16', marginBottom: 8 }}>长期（1年）</h4>
+                    <h4 style={{ color: 'var(--warning)', marginBottom: 8 }}>长期（1年）</h4>
                     <p style={{ fontSize: 13 }}>{hs300Data.recommendation.strategy.longTerm}</p>
                   </div>
                 </div>
@@ -309,14 +309,14 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
               <Card style={{ marginBottom: 16 }}>
                 <h3 className="card-title">看多因素</h3>
                 <ul style={{ paddingLeft: 20, fontSize: 14, lineHeight: 2 }}>
-                  {hs300Data.recommendation.bullFactors.map((f, i) => <li key={i} style={{ color: '#52c41a' }}>{f}</li>)}
+                  {hs300Data.recommendation.bullFactors.map((f, i) => <li key={i} style={{ color: 'var(--success)' }}>{f}</li>)}
                 </ul>
               </Card>
 
               <Card style={{ marginBottom: 16 }}>
                 <h3 className="card-title">风险因素</h3>
                 <ul style={{ paddingLeft: 20, fontSize: 14, lineHeight: 2 }}>
-                  {hs300Data.recommendation.bearFactors.map((f, i) => <li key={i} style={{ color: '#ff4d4f' }}>{f}</li>)}
+                  {hs300Data.recommendation.bearFactors.map((f, i) => <li key={i} style={{ color: 'var(--danger)' }}>{f}</li>)}
                 </ul>
               </Card>
 
@@ -331,7 +331,7 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
                     { batch: 4, time: '2-3个月后', pct: 25, action: '最后25%，机动资金', reason: '预留资金应对持续下跌或追加定投' },
                   ].map((plan, idx) => (
                     <div key={idx} style={{ marginBottom: 24, position: 'relative' }}>
-                      <div style={{ position: 'absolute', left: -22, top: 4, width: 12, height: 12, borderRadius: '50%', background: '#1677ff', border: `2px solid ${isDark ? '#1a1a1a' : 'white'}`, boxShadow: '0 0 0 2px #1677ff' }}></div>
+                      <div style={{ position: 'absolute', left: -22, top: 4, width: 12, height: 12, borderRadius: '50%', background: 'var(--primary)', border: `2px solid ${isDark ? '#1a1a1a' : 'var(--color-text-on-dark)'}`, boxShadow: '0 0 0 2px var(--primary)' }}></div>
                       <div style={{ background: isDark ? '#1a1a1a' : 'white', padding: 16, borderRadius: 8, border: isDark ? '1px solid #333' : '1px solid #e8e8e8' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                           <h4>第 {plan.batch} 批</h4>
@@ -372,8 +372,8 @@ export function HS300AnalysisPanel({ visible, isDark }: HS300AnalysisPanelProps)
                   </table>
                 </div>
                 <p style={{ marginTop: 12, fontSize: 13, color: isDark ? '#a0a0a0' : '#666' }}>
-                  当前沪深300 PE分位约 <strong style={{ color: '#ff4d4f' }}>{hs300Data.valuation.pePercentile ?? '--'}%</strong>，
-                  处于<strong style={{ color: '#ff4d4f' }}>{hs300Data.valuation.valuation ?? '--'}</strong>区间，
+                  当前沪深300 PE分位约 <strong style={{ color: 'var(--danger)' }}>{hs300Data.valuation.pePercentile ?? '--'}%</strong>，
+                  处于<strong style={{ color: 'var(--danger)' }}>{hs300Data.valuation.valuation ?? '--'}</strong>区间，
                   {hs300Data.valuation.suggestion ?? ''}。
                 </p>
               </Card>

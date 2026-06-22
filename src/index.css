@@ -25,6 +25,31 @@
   --rise: #ff4d4f;
   --fall: #52c41a;
 
+  /* 扩展色 */
+  --color-purple: #722ed1;
+  --color-purple-bg: #f9f0ff;
+  --color-purple-border: #d3adf7;
+  --color-gold: #ffd700;
+  --color-gold-dark: #d48806;
+  --color-teal: #13c2c2;
+
+  /* 通用文本色 */
+  --color-text-muted: #999;
+  --color-text-on-dark: #fff;
+  --color-text-on-dark-secondary: rgba(255,255,255,0.7);
+  --color-text-on-dark-tertiary: rgba(255,255,255,0.5);
+
+  /* 渐变卡片 */
+  --gradient-card-purple: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-card-pink: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --gradient-card-blue: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --gradient-card-teal: linear-gradient(135deg, #13c2c2 0%, #36cfc9 100%);
+  --gradient-card-gold: linear-gradient(135deg, #faad14 0%, #ffd700 100%);
+  --gradient-card-red: linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%);
+  --gradient-card-green: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+  --gradient-hero: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  --gradient-subtle: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
+
   /* 中性色 */
   --text-primary: #1f1f1f;
   --text-secondary: #595959;
@@ -388,6 +413,26 @@ a:hover {
   transform: translateY(24px);
 }
 
+/* 用户偏好减少动画时直接显示，GSAP 未加载时的安全回退 */
+@media (prefers-reduced-motion: reduce) {
+  .ant-card,
+  .ant-statistic-content-value {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* GSAP 未加载时的安全回退：3秒后自动显示 */
+@keyframes gsap-fallback-reveal {
+  to { opacity: 1; transform: none; }
+}
+.ant-card:not(.gsap-revealed) {
+  animation: gsap-fallback-reveal 0.01s ease 3s forwards;
+}
+.ant-statistic-content-value:not(.gsap-revealed) {
+  animation: gsap-fallback-reveal 0.01s ease 3.5s forwards;
+}
+
 /* GSAP 动画完成后标记为已显示 */
 .ant-card.gsap-revealed,
 .ant-statistic-content-value.gsap-revealed {
@@ -587,6 +632,24 @@ a:hover {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+/* 玻璃态设计系统变量 */
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --glass-blur: 12px;
+  --glass-glow: rgba(22, 119, 255, 0.15);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+/* 命令面板粒子画布 */
+.particle-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
 /* 暗色模式 */
 [data-theme="dark"] {
   --primary: #4096ff;
@@ -618,9 +681,36 @@ a:hover {
   --border-color: #333;
   --border-color-light: #262626;
 
+  --color-purple: #b37feb;
+  --color-purple-bg: #1a1325;
+  --color-purple-border: #51258f;
+  --color-gold: #ffc53d;
+  --color-gold-dark: #faad14;
+  --color-teal: #36cfc9;
+
+  --color-text-muted: #6b6b6b;
+  --color-text-on-dark: #fff;
+  --color-text-on-dark-secondary: rgba(255,255,255,0.7);
+  --color-text-on-dark-tertiary: rgba(255,255,255,0.5);
+
+  --gradient-card-purple: linear-gradient(135deg, #4a5aa8 0%, #5a3d7a 100%);
+  --gradient-card-pink: linear-gradient(135deg, #a855c7 0%, #c44569 100%);
+  --gradient-card-blue: linear-gradient(135deg, #3a7bd5 0%, #00b4d8 100%);
+  --gradient-card-teal: linear-gradient(135deg, #0e8a8a 0%, #2a9d8f 100%);
+  --gradient-card-gold: linear-gradient(135deg, #b8860b 0%, #daa520 100%);
+  --gradient-card-red: linear-gradient(135deg, #d44040 0%, #a81c1c 100%);
+  --gradient-card-green: linear-gradient(135deg, #45a825 0%, #2d7a10 100%);
+  --gradient-hero: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1a2332 100%);
+  --gradient-subtle: linear-gradient(135deg, #1f1f1f 0%, #262626 100%);
+
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2), 0 1px 6px -1px rgba(0, 0, 0, 0.15);
   --shadow-md: 0 3px 6px -4px rgba(0, 0, 0, 0.3), 0 6px 16px 0 rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 6px 16px -8px rgba(0, 0, 0, 0.4), 0 9px 28px 0 rgba(0, 0, 0, 0.25);
+
+  --glass-bg: rgba(26, 26, 26, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-glow: rgba(64, 150, 255, 0.12);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 [data-theme="dark"] body {
@@ -628,12 +718,25 @@ a:hover {
   color: var(--text-primary);
 }
 
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
 [data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: #484848;
+  background: #444;
 }
 
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: #595959;
+}
+
+/* 暗色模式主按钮发光 */
+[data-theme="dark"] .ant-btn-primary {
+  box-shadow: 0 2px 12px rgba(64, 150, 255, 0.25);
+}
+
+[data-theme="dark"] .ant-btn-primary:hover {
+  box-shadow: 0 4px 16px rgba(64, 150, 255, 0.35);
 }
 
 /* 暗色模式下 Ant Design 覆盖 */
@@ -732,6 +835,46 @@ a:hover {
   color: var(--text-tertiary);
 }
 
+[data-theme="dark"] .ant-pagination-item {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .ant-pagination-item a {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .ant-pagination-item-active {
+  border-color: var(--primary);
+}
+
+[data-theme="dark"] .ant-pagination-item-active a {
+  color: var(--primary);
+}
+
+[data-theme="dark"] .ant-breadcrumb-link {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .ant-breadcrumb-separator {
+  color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .ant-tooltip-inner {
+  background: #333;
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .ant-message-notice-content {
+  background: var(--bg-container);
+  border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .ant-notification-notice {
+  background: var(--bg-container);
+  border: 1px solid var(--border-color);
+}
+
 /* 暗色模式下 ECharts 容器 */
 [data-theme="dark"] .echarts-for-react {
   filter: none;
@@ -767,6 +910,265 @@ a:hover {
   pointer-events: none;
   opacity: 0.15;
   animation: float 6s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════
+   大屏监控 Dashboard 专用样式
+   ═══════════════════════════════════════════════ */
+
+/* 实时脉冲指示器 */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.8); }
+}
+.live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #52c41a;
+  margin-right: 6px;
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+/* 数字滚动动画 */
+@keyframes numberSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.number-animate {
+  animation: numberSlideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* 数据卡片渐变背景 */
+.dashboard-gradient-blue {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+.dashboard-gradient-green {
+  background: linear-gradient(135deg, #0d3320 0%, #1a4a2e 50%, #0f3460 100%);
+}
+.dashboard-gradient-purple {
+  background: linear-gradient(135deg, #1a1a2e 0%, #2d1b4e 50%, #0f3460 100%);
+}
+.dashboard-gradient-amber {
+  background: linear-gradient(135deg, #2a1f0d 0%, #3d2b10 50%, #1a1a2e 100%);
+}
+
+/* 玻璃态 KPI 卡片 */
+.kpi-glass {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  padding: 16px 20px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+.kpi-glass:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* 分区标题装饰线 */
+.section-title-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.section-title-bar::before {
+  content: '';
+  display: block;
+  width: 3px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--primary);
+}
+
+/* 风险预警脉冲 */
+@keyframes alertPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 77, 79, 0); }
+}
+.alert-pulse {
+  animation: alertPulse 2s ease-in-out infinite;
+}
+
+/* 实时刷新旋转 */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spin-icon {
+  animation: spin 1.5s linear infinite;
+}
+
+/* ═══════════════════════════════════════════════
+   TiltCard 3D 光效卡片
+   ═══════════════════════════════════════════════ */
+
+/* @property 让 CSS 可以对自定义属性做动画 */
+@property --tilt-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* 旋转光晕边框 — indigo→purple→pink 渐变旋转 */
+.tilt-border {
+  background: conic-gradient(
+    from var(--tilt-angle),
+    #6366f1,
+    #8b5cf6,
+    #a855f7,
+    #ec4899,
+    #6366f1
+  );
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.tilt-border-active {
+  opacity: 1;
+  animation: tiltBorderSpin 3s linear infinite;
+}
+
+@keyframes tiltBorderSpin {
+  from { --tilt-angle: 0deg; }
+  to { --tilt-angle: 360deg; }
+}
+
+/* 金属光泽扫过 */
+.tilt-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.tilt-sheen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.15) 45%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0.15) 55%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  animation: tiltSheenSweep 1.2s ease-out forwards;
+}
+
+@keyframes tiltSheenSweep {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(120%); }
+}
+
+/* ═══════════════════════════════════════════════
+   AI 助手模块专用样式
+   ═══════════════════════════════════════════════ */
+
+/* AI 消息入场动画 */
+@keyframes aiMsgEnter {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.ai-message-enter {
+  animation: aiMsgEnter 0.3s ease-out;
+}
+
+/* AI 气泡渐变光效 */
+.ai-bubble-user {
+  position: relative;
+  overflow: hidden;
+}
+.ai-bubble-user::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+.ai-bubble-bot {
+  transition: background 0.2s;
+}
+.ai-bubble-bot:hover {
+  background: rgba(0,0,0,0.02) !important;
+}
+[data-theme="dark"] .ai-bubble-bot:hover {
+  background: rgba(255,255,255,0.08) !important;
+}
+
+/* AI 头像悬浮效果 */
+.ai-avatar-bot, .ai-avatar-user {
+  transition: transform 0.2s;
+}
+.ai-avatar-bot:hover, .ai-avatar-user:hover {
+  transform: scale(1.08);
+}
+
+/* AI 基金卡片悬浮 */
+.ai-fund-card {
+  transition: all 0.2s ease;
+}
+.ai-fund-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* AI 欢迎页 Logo 脉冲 */
+.ai-welcome-logo {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* AI 快捷芯片 */
+.ai-quick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+.ai-quick-chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-bg);
+}
+
+/* AI 分类卡片 */
+.ai-category-card {
+  transition: all 0.2s ease;
+}
+.ai-category-card:hover {
+  transform: translateY(-2px);
+}
+
+/* AI 侧边栏按钮 */
+.ai-sidebar-btn {
+  transition: all 0.2s;
+}
+.ai-sidebar-btn:hover {
+  background: rgba(0,0,0,0.04);
+}
+[data-theme="dark"] .ai-sidebar-btn:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+/* AI 页面全屏模式适配 */
+.ai-fullpage .ant-card {
+  opacity: 1 !important;
+  transform: none !important;
 }
 
 /* 打印样式 */

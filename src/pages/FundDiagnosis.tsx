@@ -273,7 +273,7 @@ export default function FundDiagnosis() {
                   strokeColor={getScoreColor(s.score, dim.max)}
                   size="small"
                 />
-                <div style={{ fontSize: 12, color: isDark ? '#aaa' : '#888', marginTop: 8 }}>{s.detail}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>{s.detail}</div>
               </Card>
             </Col>
           );
@@ -283,7 +283,7 @@ export default function FundDiagnosis() {
       {/* 诊断建议 */}
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} md={12}>
-          <Card title={<span><CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />优势分析</span>}>
+          <Card title={<span><CheckCircleOutlined style={{ color: 'var(--success)', marginRight: 8 }} />优势分析</span>}>
             {diagnosis.advantages.length > 0 ? (
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 {diagnosis.advantages.map((a, i) => (
@@ -296,7 +296,7 @@ export default function FundDiagnosis() {
           </Card>
         </Col>
         <Col xs={24} md={12}>
-          <Card title={<span><WarningOutlined style={{ color: '#faad14', marginRight: 8 }} />风险提示</span>}>
+          <Card title={<span><WarningOutlined style={{ color: 'var(--warning)', marginRight: 8 }} />风险提示</span>}>
             {diagnosis.risks.length > 0 ? (
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 {diagnosis.risks.map((r, i) => (
@@ -327,7 +327,7 @@ export default function FundDiagnosis() {
           ].map(item => (
             <Col xs={12} sm={6} key={item.label}>
               <Card size="small" style={{ textAlign: 'center' }}>
-                <div style={{ color: isDark ? '#aaa' : '#888', fontSize: 12, marginBottom: 4 }}>{item.label}</div>
+                <div style={{ color: 'var(--text-tertiary)', fontSize: 12, marginBottom: 4 }}>{item.label}</div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: getReturnColor(item.value) }}>
                   {item.value >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />} {formatReturn(item.value)}
                 </div>
@@ -340,15 +340,15 @@ export default function FundDiagnosis() {
       {/* 基金基本信息 */}
       <Card title="基金基本信息" style={{ marginBottom: 16 }}>
         <Row gutter={[16, 12]}>
-          <Col xs={12} sm={8}><span style={{ color: isDark ? '#aaa' : '#888' }}>基金代码：</span>{fund.code}</Col>
-          <Col xs={12} sm={8}><span style={{ color: isDark ? '#aaa' : '#888' }}>基金类型：</span>{fund.type}</Col>
-          <Col xs={12} sm={8}><span style={{ color: isDark ? '#aaa' : '#888' }}>行业板块：</span>{fund.industry || '-'}</Col>
-          <Col xs={12} sm={8}><span style={{ color: isDark ? '#aaa' : '#888' }}>基金经理：</span>{fund.manager || '-'}</Col>
-          <Col xs={12} sm={8}><span style={{ color: isDark ? '#aaa' : '#888' }}>综合费率：</span>{fund.totalFee != null ? Number(fund.totalFee).toFixed(2) : '-'}%/年</Col>
-          <Col xs={12} sm={8}><span style={{ color: isDark ? '#aaa' : '#888' }}>基金规模：</span>{fund.scale != null ? Number(fund.scale).toFixed(2) : '-'} 亿</Col>
-          <Col xs={12} sm={8}><span style={{ color: isDark ? '#aaa' : '#888' }}>评级：</span><span style={{ color: '#faad14' }}>{'★'.repeat(fund.rating)}</span></Col>
+          <Col xs={12} sm={8}><span style={{ color: 'var(--text-tertiary)' }}>基金代码：</span>{fund.code}</Col>
+          <Col xs={12} sm={8}><span style={{ color: 'var(--text-tertiary)' }}>基金类型：</span>{fund.type}</Col>
+          <Col xs={12} sm={8}><span style={{ color: 'var(--text-tertiary)' }}>行业板块：</span>{fund.industry || '-'}</Col>
+          <Col xs={12} sm={8}><span style={{ color: 'var(--text-tertiary)' }}>基金经理：</span>{fund.manager || '-'}</Col>
+          <Col xs={12} sm={8}><span style={{ color: 'var(--text-tertiary)' }}>综合费率：</span>{fund.totalFee != null ? Number(fund.totalFee).toFixed(2) : '-'}%/年</Col>
+          <Col xs={12} sm={8}><span style={{ color: 'var(--text-tertiary)' }}>基金规模：</span>{fund.scale != null ? Number(fund.scale).toFixed(2) : '-'} 亿</Col>
+          <Col xs={12} sm={8}><span style={{ color: 'var(--text-tertiary)' }}>评级：</span><span style={{ color: 'var(--warning)' }}>{'★'.repeat(fund.rating)}</span></Col>
           {fund.buySuggestion && (
-            <Col span={24}><span style={{ color: isDark ? '#aaa' : '#888' }}>买入建议：</span>{fund.buySuggestion}</Col>
+            <Col span={24}><span style={{ color: 'var(--text-tertiary)' }}>买入建议：</span>{fund.buySuggestion}</Col>
           )}
         </Row>
       </Card>

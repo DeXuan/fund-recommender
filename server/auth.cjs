@@ -8,6 +8,9 @@ const { getOAuthToken, getUserInfo, isAlipayConfigured } = require('./utils/alip
 
 const router = express.Router();
 
+// 管理员订阅永不过期的哨兵日期
+const ADMIN_SUB_END = '2099-12-31';
+
 // Fail loudly if JWT_SECRET is not set or is the default template value
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET === 'change-me-to-a-random-string-at-least-32-chars' || JWT_SECRET.length < 32) {
@@ -144,7 +147,9 @@ router.post('/register', strictLimit, async (req, res) => {
       if (regConfig.rows[0]?.value === 'false') {
         return res.status(403).json({ error: '注册功能已关闭，请联系管理员' });
       }
-    } catch {}
+    } catch (e) {
+      console.error('[auth] 查询注册配置失败:', e.message);
+    }
 
     if (!username || !password) {
       return res.status(400).json({ error: '用户名和密码不能为空' });
@@ -161,7 +166,9 @@ router.post('/register', strictLimit, async (req, res) => {
     try {
       const pwdConfig = await pool.query("SELECT value FROM system_config WHERE key = 'password_min_length'");
       minLen = parseInt(pwdConfig.rows[0]?.value) || 8;
-    } catch {}
+    } catch (e) {
+      console.error('[auth] 查询密码策略失败:', e.message);
+    }
     if (password.length < minLen) {
       return res.status(400).json({ error: `密码长度不能少于${minLen}个字符` });
     }
@@ -189,34 +196,6 @@ router.post('/register', strictLimit, async (req, res) => {
   } catch (error) {
     console.error('注册失败:', error.message);
     res.status(500).json({ error: '注册失败' });
-  }
-});
-
-// POST /api/auth/guest — 游客快速体验
-router.post('/guest', strictLimit, async (req, res) => {
-  try {
-    const pool = getPool();
-    const guestId = crypto.randomBytes(6).toString('hex');
-    const username = `guest_${guestId}`;
-    const nickname = `游客${guestId.slice(0, 6)}`;
-    const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
-
-    const result = await pool.query(
-      'INSERT INTO users (username, password_hash, nickname, role) VALUES ($1, $2, $3, $4) RETURNING id',
-      [username, passwordHash, nickname, 'guest']
-    );
-    const userId = result.rows[0].id;
-
-    const token = jwt.sign(
-      { id: userId, username, nickname, role: 'guest' },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.json({ token, user: { id: userId, username, nickname, role: 'guest', subscription_status: 'free' } });
-  } catch (error) {
-    console.error('游客登录失败:', error.message);
-    res.status(500).json({ error: '游客登录失败' });
   }
 });
 
@@ -267,7 +246,9 @@ router.post('/login', strictLimit, async (req, res) => {
     try {
       const regConfig = await pool.query("SELECT value FROM system_config WHERE key = 'registration_enabled'");
       // This is login, not registration, so we don't block here
-    } catch {}
+    } catch (e) {
+      console.error('[auth] 查询注册配置失败:', e.message);
+    }
 
     const result = await pool.query(
       'SELECT id, username, password_hash, nickname, avatar_url, role, status, login_fail_count, locked_until, subscription_status, subscription_end FROM users WHERE username = $1',
@@ -306,7 +287,9 @@ router.post('/login', strictLimit, async (req, res) => {
         if (failCount >= maxAtt) {
           lockUntil = new Date(Date.now() + lockMin * 60 * 1000);
         }
-      } catch {}
+      } catch (e) {
+        console.error('[auth] 查询锁定配置失败:', e.message);
+      }
       await pool.query('UPDATE users SET login_fail_count = $1, locked_until = $2 WHERE id = $3',
         [failCount, lockUntil, id]);
       await logLogin(pool, id, username, loginIp, userAgent, 'failed', `密码错误(${failCount}次)`);
@@ -330,7 +313,7 @@ router.post('/login', strictLimit, async (req, res) => {
 
     res.json({
       token,
-      user: { id, username: uname, nickname, avatar_url: avatarUrl || '', role: role || 'user', subscription_status: role === 'admin' ? 'premium' : (subscription_status || 'free'), subscription_end: role === 'admin' ? '2099-12-31' : subscription_end },
+      user: { id, username: uname, nickname, avatar_url: avatarUrl || '', role: role || 'user', subscription_status: role === 'admin' ? 'premium' : (subscription_status || 'free'), subscription_end: role === 'admin' ? ADMIN_SUB_END : subscription_end },
     });
   } catch (error) {
     console.error('登录失败:', error.message);
@@ -359,7 +342,7 @@ router.get('/me', authMiddleware, async (req, res) => {
     );
 
     const subStatus = user.role === 'admin' ? 'premium' : (user.subscription_status || 'free');
-    const subEnd = user.role === 'admin' ? '2099-12-31' : user.subscription_end;
+    const subEnd = user.role === 'admin' ? ADMIN_SUB_END : user.subscription_end;
     res.json({
       user: { id: user.id, username: user.username, nickname: user.nickname, avatar_url: user.avatar_url || '', role: user.role || 'user', created_at: user.created_at, subscription_status: subStatus, subscription_end: subEnd },
       oauthAccounts: oauthResult.rows,
@@ -392,7 +375,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
         if (avatar_url.length > 500) return res.status(400).json({ error: '头像URL过长' });
         try {
           const parsed = new URL(avatar_url);
-          if (!['http:', 'https:', 'data:'].includes(parsed.protocol)) {
+          if (!['http:', 'https:'].includes(parsed.protocol)) {
             return res.status(400).json({ error: '不支持的URL协议' });
           }
         } catch {
@@ -420,7 +403,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
     );
     const user = result.rows[0];
     const subStatus = user.role === 'admin' ? 'premium' : (user.subscription_status || 'free');
-    const subEnd = user.role === 'admin' ? '2099-12-31' : user.subscription_end;
+    const subEnd = user.role === 'admin' ? ADMIN_SUB_END : user.subscription_end;
 
     res.json({
       success: true,
@@ -494,8 +477,11 @@ router.get('/alipay/qrcode', (req, res) => {
     return res.status(503).json({ error: '支付宝登录暂未配置，请联系管理员', mock: true });
   }
 
-  // 使用后端回调地址（优先从环境变量读取）
-  const returnUrl = process.env.ALIPAY_RETURN_URL || 'http://47.116.77.67:8688/api/auth/alipay/callback';
+  // 使用后端回调地址（必须从环境变量读取，不使用硬编码IP）
+  const returnUrl = process.env.ALIPAY_RETURN_URL;
+  if (!returnUrl) {
+    return res.status(503).json({ error: '支付宝回调地址未配置，请设置 ALIPAY_RETURN_URL 环境变量' });
+  }
   // Use cryptographically secure random for OAuth state parameter
   const state = crypto.randomBytes(16).toString('hex');
 
@@ -531,7 +517,7 @@ router.post('/alipay/mock-login', strictLimit, async (req, res) => {
       username = existing.rows[0].username;
       userRole = existing.rows[0].role || 'user';
       subStatus = userRole === 'admin' ? 'premium' : (existing.rows[0].subscription_status || 'free');
-      subEnd = userRole === 'admin' ? '2099-12-31' : existing.rows[0].subscription_end;
+      subEnd = userRole === 'admin' ? ADMIN_SUB_END : existing.rows[0].subscription_end;
     } else {
       username = 'alipay_demo_user';
       const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
@@ -560,6 +546,38 @@ router.post('/alipay/mock-login', strictLimit, async (req, res) => {
   } catch (error) {
     console.error('模拟登录失败:', error.message);
     res.status(500).json({ error: '模拟登录失败' });
+  }
+});
+
+// POST /api/auth/guest — 游客快速体验（复用 test01 账户）
+router.post('/guest', strictLimit, async (req, res) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT id, username, nickname, avatar_url, role, subscription_status, subscription_end FROM users WHERE username = $1',
+      ['test01']
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: '游客账户不存在，请先注册 test01' });
+    }
+
+    const u = result.rows[0];
+    // 游客始终以普通用户身份登录，即使 test01 是管理员
+    const guestRole = 'user';
+    const token = jwt.sign(
+      { id: u.id, username: u.username, nickname: u.nickname, role: guestRole },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.json({
+      token,
+      user: { id: u.id, username: u.username, nickname: u.nickname, avatar_url: u.avatar_url || '', role: guestRole, subscription_status: 'free', subscription_end: null },
+    });
+  } catch (error) {
+    console.error('游客登录失败:', error.message);
+    res.status(500).json({ error: '游客登录失败' });
   }
 });
 
@@ -620,7 +638,7 @@ router.get('/alipay/callback', async (req, res) => {
       userId = row.id; username = row.username; nickname = row.nickname; avatarUrl = row.avatar_url;
       oauthRole = row.role || 'user';
       oauthSubStatus = oauthRole === 'admin' ? 'premium' : (row.subscription_status || 'free');
-      oauthSubEnd = oauthRole === 'admin' ? '2099-12-31' : row.subscription_end;
+      oauthSubEnd = oauthRole === 'admin' ? ADMIN_SUB_END : row.subscription_end;
       await pool.query('UPDATE oauth_accounts SET access_token = $1 WHERE provider = $2 AND provider_user_id = $3',
         [encryptToken(access_token), 'alipay', user_id]);
     } else {

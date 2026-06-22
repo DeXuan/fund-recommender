@@ -4,6 +4,7 @@ import { ConfigProvider, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { registerEchartsDarkTheme } from './utils/echarts-theme'
+import { ANTD_THEME_TOKEN, getDarkAwareTokens } from './constants/theme'
 import App from './App'
 import './index.css'
 
@@ -17,11 +18,8 @@ function ThemedApp() {
       theme={{
         algorithm: isDark ? theme.darkAlgorithm : undefined,
         token: {
-          colorPrimary: '#1677ff',
-          borderRadius: 6,
-          colorSuccess: '#52c41a',
-          colorWarning: '#faad14',
-          colorError: '#ff4d4f',
+          ...ANTD_THEME_TOKEN.token,
+          ...getDarkAwareTokens(isDark),
         },
       }}
     >

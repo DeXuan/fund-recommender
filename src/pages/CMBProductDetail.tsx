@@ -227,7 +227,7 @@ export default function CMBProductDetail() {
                 title="最新净值"
                 value={stats.latestNav}
                 precision={4}
-                valueStyle={{ color: '#1890ff', fontWeight: 700 }}
+                valueStyle={{ color: 'var(--primary)', fontWeight: 700 }}
               />
               <Text type="secondary" style={{ fontSize: 12 }}>{stats.latestDate}</Text>
             </Card>
@@ -240,7 +240,7 @@ export default function CMBProductDetail() {
                 precision={2}
                 suffix="%"
                 prefix={stats.latestReturn >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
-                valueStyle={{ color: stats.latestReturn >= 0 ? '#f5222d' : '#52c41a', fontWeight: 700 }}
+                valueStyle={{ color: stats.latestReturn >= 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -250,7 +250,7 @@ export default function CMBProductDetail() {
                 title="最高净值"
                 value={stats.maxNav}
                 precision={4}
-                valueStyle={{ color: '#f5222d' }}
+                valueStyle={{ color: 'var(--danger)' }}
               />
             </Card>
           </Col>
@@ -260,7 +260,7 @@ export default function CMBProductDetail() {
                 title="最低净值"
                 value={stats.minNav}
                 precision={4}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: 'var(--success)' }}
               />
             </Card>
           </Col>
@@ -277,7 +277,7 @@ export default function CMBProductDetail() {
             opts={{ renderer: 'canvas' }}
           />
         ) : (
-          <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>暂无净值数据</div>
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-muted)' }}>暂无净值数据</div>
         )}
       </Card>
     </div>

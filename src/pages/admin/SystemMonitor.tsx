@@ -11,12 +11,15 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { adminApi } from '../../services/api';
+import { useTheme } from '../../contexts/ThemeContext';
+import { getEchartsTheme } from '../../utils/echarts-theme';
 
 const { Search } = Input;
 const { TextArea } = Input;
 
 // Gauge chart component
 function GaugeChart({ value, title, color, max }: { value: number; title: string; color: string; max?: number }) {
+  const { isDark } = useTheme();
   const option = {
     series: [{
       type: 'gauge',
@@ -35,11 +38,12 @@ function GaugeChart({ value, title, color, max }: { value: number; title: string
       data: [{ value, name: title }],
     }],
   };
-  return <ReactECharts option={option} style={{ height: 160 }} />;
+  return <ReactECharts option={option} style={{ height: 160 }} theme={getEchartsTheme(isDark)} />;
 }
 
 // Real-time metrics line chart
 function MetricsChart({ data }: { data: { timestamp: number; qps: number; cacheHit: number; connections: number; slowQueries: number }[] }) {
+  const { isDark } = useTheme();
   const option = {
     tooltip: { trigger: 'axis' },
     legend: { data: ['QPS', '缓存命中率(%)', '活跃连接', '慢查询'], bottom: 0 },
@@ -56,7 +60,7 @@ function MetricsChart({ data }: { data: { timestamp: number; qps: number; cacheH
       { name: '慢查询', type: 'line', smooth: true, data: data.map(d => d.slowQueries), lineStyle: { width: 2 }, color: '#ff4d4f' },
     ],
   };
-  return <ReactECharts option={option} style={{ height: 280 }} />;
+  return <ReactECharts option={option} style={{ height: 280 }} theme={getEchartsTheme(isDark)} />;
 }
 
 // Health check component
@@ -66,7 +70,7 @@ function HealthCheck() {
 
   const fetchData = useCallback(async () => {
     try { setData(await adminApi.getHealthCheck()); }
-    catch (e) { console.error('健康检查失败:', e); message.error('健康检查失败'); }
+    catch { message.error('健康检查失败'); }
     finally { setLoading(false); }
   }, []);
 
@@ -76,13 +80,13 @@ function HealthCheck() {
   if (!data) return null;
 
   const statusIcon = (s: string) => {
-    if (s === 'healthy') return <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 18 }} />;
-    if (s === 'warning') return <WarningOutlined style={{ color: '#faad14', fontSize: 18 }} />;
-    if (s === 'critical' || s === 'unhealthy') return <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 18 }} />;
-    return <ExclamationCircleOutlined style={{ color: '#999', fontSize: 18 }} />;
+    if (s === 'healthy') return <CheckCircleOutlined style={{ color: 'var(--success)', fontSize: 18 }} />;
+    if (s === 'warning') return <WarningOutlined style={{ color: 'var(--warning)', fontSize: 18 }} />;
+    if (s === 'critical' || s === 'unhealthy') return <CloseCircleOutlined style={{ color: 'var(--danger)', fontSize: 18 }} />;
+    return <ExclamationCircleOutlined style={{ color: 'var(--color-text-muted)', fontSize: 18 }} />;
   };
 
-  const overallColor = data.status === 'healthy' ? '#52c41a' : data.status === 'warning' ? '#faad14' : '#ff4d4f';
+  const overallColor = data.status === 'healthy' ? 'var(--success)' : data.status === 'warning' ? 'var(--warning)' : 'var(--danger)';
   const overallLabel = data.status === 'healthy' ? '健康' : data.status === 'warning' ? '警告' : '异常';
 
   return (
@@ -106,7 +110,7 @@ function HealthCheck() {
       <Row gutter={[12, 12]}>
         {data.checks?.map((check: any, idx: number) => (
           <Col xs={24} sm={12} md={8} key={idx}>
-            <Card size="small" hoverable style={{ borderLeft: `3px solid ${check.status === 'healthy' ? '#52c41a' : check.status === 'warning' ? '#faad14' : '#ff4d4f'}` }}>
+            <Card size="small" hoverable style={{ borderLeft: `3px solid ${check.status === 'healthy' ? 'var(--success)' : check.status === 'warning' ? 'var(--warning)' : 'var(--danger)'}` }}>
               <Space>
                 {statusIcon(check.status)}
                 <div>
@@ -129,13 +133,14 @@ function HealthCheck() {
 
 // API statistics component
 function ApiStats() {
+  const { isDark } = useTheme();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [hours, setHours] = useState(24);
 
   const fetchData = useCallback(async () => {
     try { setLoading(true); setData(await adminApi.getApiStats(hours)); }
-    catch (e) { console.error('获取API统计失败:', e); message.error('获取API统计失败'); }
+    catch { message.error('获取API统计失败'); }
     finally { setLoading(false); }
   }, [hours]);
 
@@ -167,10 +172,10 @@ function ApiStats() {
           <Card size="small"><Statistic title="24h总请求" value={parseInt(data.errorRate?.total) || 0} prefix={<ApiOutlined />} /></Card>
         </Col>
         <Col xs={12} sm={6}>
-          <Card size="small"><Statistic title="24h错误" value={parseInt(data.errorRate?.errors) || 0} valueStyle={{ color: parseInt(data.errorRate?.errors) > 0 ? '#ff4d4f' : '#52c41a' }} /></Card>
+          <Card size="small"><Statistic title="24h错误" value={parseInt(data.errorRate?.errors) || 0} valueStyle={{ color: parseInt(data.errorRate?.errors) > 0 ? 'var(--danger)' : 'var(--success)' }} /></Card>
         </Col>
         <Col xs={12} sm={6}>
-          <Card size="small"><Statistic title="错误率" value={parseFloat(data.errorRate?.error_rate) || 0} suffix="%" valueStyle={{ color: parseFloat(data.errorRate?.error_rate) > 5 ? '#ff4d4f' : '#52c41a' }} /></Card>
+          <Card size="small"><Statistic title="错误率" value={parseFloat(data.errorRate?.error_rate) || 0} suffix="%" valueStyle={{ color: parseFloat(data.errorRate?.error_rate) > 5 ? 'var(--danger)' : 'var(--success)' }} /></Card>
         </Col>
         <Col xs={12} sm={6}>
           <Select value={hours} onChange={setHours} style={{ width: '100%' }}
@@ -180,7 +185,7 @@ function ApiStats() {
 
       {trendOption && (
         <Card size="small" title="请求趋势" style={{ marginBottom: 16 }}>
-          <ReactECharts option={trendOption} style={{ height: 240 }} />
+          <ReactECharts option={trendOption} style={{ height: 240 }} theme={getEchartsTheme(isDark)} />
         </Card>
       )}
 
@@ -195,8 +200,8 @@ function ApiStats() {
               </Space>
             )},
             { title: '请求数', dataIndex: 'total_requests', width: 90, sorter: (a: any, b: any) => a.total_requests - b.total_requests, render: (v: number) => (parseInt(String(v)) || 0).toLocaleString() },
-            { title: '错误数', dataIndex: 'total_errors', width: 80, render: (v: number) => <span style={{ color: parseInt(String(v)) > 0 ? '#ff4d4f' : undefined }}>{parseInt(String(v)) || 0}</span> },
-            { title: '平均响应', dataIndex: 'avg_ms', width: 100, render: (v: number) => <span style={{ color: parseFloat(String(v)) > 1000 ? '#ff4d4f' : parseFloat(String(v)) > 500 ? '#faad14' : undefined }}>{parseFloat(String(v)) || 0}ms</span> },
+            { title: '错误数', dataIndex: 'total_errors', width: 80, render: (v: number) => <span style={{ color: parseInt(String(v)) > 0 ? 'var(--danger)' : undefined }}>{parseInt(String(v)) || 0}</span> },
+            { title: '平均响应', dataIndex: 'avg_ms', width: 100, render: (v: number) => <span style={{ color: parseFloat(String(v)) > 1000 ? 'var(--danger)' : parseFloat(String(v)) > 500 ? 'var(--warning)' : undefined }}>{parseFloat(String(v)) || 0}ms</span> },
             { title: 'P95', dataIndex: 'p95_ms', width: 100, render: (v: number) => `${parseFloat(String(v)) || 0}ms` },
             { title: '最大响应', dataIndex: 'max_ms', width: 100, render: (v: number) => `${parseFloat(String(v)) || 0}ms` },
           ]}
@@ -219,13 +224,13 @@ function AlertManagement() {
 
   const fetchRules = useCallback(async () => {
     try { setLoading(true); const res = await adminApi.getAlertRules(); setRules(res.rules); }
-    catch (e) { console.error('获取告警规则失败:', e); message.error('获取告警规则失败'); }
+    catch { message.error('获取告警规则失败'); }
     finally { setLoading(false); }
   }, []);
 
   const fetchHistory = useCallback(async () => {
     try { setHistoryLoading(true); const res = await adminApi.getAlertHistory({ pageSize: 100 }); setHistory(res.history); setHistoryStats(res.stats); }
-    catch (e) { console.error('获取告警历史失败:', e); message.error('获取告警历史失败'); }
+    catch { message.error('获取告警历史失败'); }
     finally { setHistoryLoading(false); }
   }, []);
 
@@ -250,12 +255,12 @@ function AlertManagement() {
 
   const handleDelete = async (id: number) => {
     try { await adminApi.deleteAlertRule(id); message.success('规则已删除'); fetchRules(); }
-    catch (e) { console.error('删除告警规则失败:', e); message.error('删除失败'); }
+    catch { message.error('删除失败'); }
   };
 
   const handleResolve = async (id: number) => {
     try { await adminApi.resolveAlert(id); message.success('告警已解决'); fetchHistory(); }
-    catch (e) { console.error('解决告警失败:', e); message.error('操作失败'); }
+    catch { message.error('操作失败'); }
   };
 
   const metricLabels: Record<string, string> = {
@@ -269,9 +274,9 @@ function AlertManagement() {
     <div>
       {historyStats && (
         <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-          <Col xs={12} sm={6}><Card size="small"><Statistic title="触发中" value={parseInt(historyStats.firing_count) || 0} valueStyle={{ color: '#ff4d4f' }} prefix={<AlertOutlined />} /></Card></Col>
-          <Col xs={12} sm={6}><Card size="small"><Statistic title="已解决" value={parseInt(historyStats.resolved_count) || 0} valueStyle={{ color: '#52c41a' }} /></Card></Col>
-          <Col xs={12} sm={6}><Card size="small"><Statistic title="严重" value={parseInt(historyStats.critical_count) || 0} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+          <Col xs={12} sm={6}><Card size="small"><Statistic title="触发中" value={parseInt(historyStats.firing_count) || 0} valueStyle={{ color: 'var(--danger)' }} prefix={<AlertOutlined />} /></Card></Col>
+          <Col xs={12} sm={6}><Card size="small"><Statistic title="已解决" value={parseInt(historyStats.resolved_count) || 0} valueStyle={{ color: 'var(--success)' }} /></Card></Col>
+          <Col xs={12} sm={6}><Card size="small"><Statistic title="严重" value={parseInt(historyStats.critical_count) || 0} valueStyle={{ color: 'var(--danger)' }} /></Card></Col>
           <Col xs={12} sm={6}><Card size="small"><Statistic title="24h告警" value={parseInt(historyStats.last_24h) || 0} /></Card></Col>
         </Row>
       )}
@@ -379,7 +384,7 @@ function DBDetails() {
 
   const fetchData = async () => {
     try { setLoading(true); setData(await adminApi.getDbDetails()); }
-    catch (e) { console.error('获取数据库详情失败:', e); message.error('获取数据库详情失败'); }
+    catch { message.error('获取数据库详情失败'); }
     finally { setLoading(false); }
   };
 
@@ -392,7 +397,7 @@ function DBDetails() {
     <Row gutter={[16, 16]}>
       <Col xs={24}>
         <Row gutter={[12, 12]}>
-          <Col xs={12} sm={8} md={4}><Card size="small"><Statistic title="死锁次数" value={data.deadlocks} valueStyle={{ color: data.deadlocks > 0 ? '#ff4d4f' : '#52c41a' }} /></Card></Col>
+          <Col xs={12} sm={8} md={4}><Card size="small"><Statistic title="死锁次数" value={data.deadlocks} valueStyle={{ color: data.deadlocks > 0 ? 'var(--danger)' : 'var(--success)' }} /></Card></Col>
           <Col xs={12} sm={8} md={4}><Card size="small"><Statistic title="磁盘临时文件" value={data.temp.files} /></Card></Col>
           <Col xs={12} sm={8} md={4}><Card size="small"><Statistic title="临时文件大小" value={data.temp.bytesFormatted} /></Card></Col>
           <Col xs={12} sm={8} md={4}><Card size="small"><Statistic title="共享缓冲区" value={data.sharedBuffers} /></Card></Col>
@@ -482,6 +487,7 @@ function DBDetails() {
 
 // Table space component
 function TableSpace() {
+  const { isDark } = useTheme();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -510,12 +516,12 @@ function TableSpace() {
         <Col xs={12} sm={6}><Card size="small"><Statistic title="表数量" value={data.tables?.length || 0} /></Card></Col>
         <Col xs={12} sm={6}><Card size="small"><Statistic title="总行数" value={data.tables?.reduce((s: number, t: any) => s + (t.row_count || 0), 0).toLocaleString()} /></Card></Col>
         <Col xs={12} sm={6}><Card size="small"><Statistic title="总死行" value={data.tables?.reduce((s: number, t: any) => s + (t.dead_rows || 0), 0).toLocaleString()}
-          valueStyle={{ color: data.tables?.reduce((s: number, t: any) => s + (t.dead_rows || 0), 0) > 10000 ? '#ff4d4f' : undefined }} /></Card></Col>
+          valueStyle={{ color: data.tables?.reduce((s: number, t: any) => s + (t.dead_rows || 0), 0) > 10000 ? 'var(--danger)' : undefined }} /></Card></Col>
       </Row>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={10}>
-          <Card title="表空间分布" size="small"><ReactECharts option={pieOption} style={{ height: 320 }} /></Card>
+          <Card title="表空间分布" size="small"><ReactECharts option={pieOption} style={{ height: 320 }} theme={getEchartsTheme(isDark)} /></Card>
         </Col>
         <Col xs={24} lg={14}>
           <Card title="数据表空间详情" size="small">
@@ -526,7 +532,7 @@ function TableSpace() {
                 { title: '数据', dataIndex: 'data_size', width: 90 },
                 { title: '索引', dataIndex: 'index_size', width: 90 },
                 { title: '行数', dataIndex: 'row_count', width: 80, render: (v: number) => (v || 0).toLocaleString() },
-                { title: '死行', dataIndex: 'dead_rows', width: 70, render: (v: number) => <span style={{ color: v > 1000 ? '#ff4d4f' : undefined }}>{(v || 0).toLocaleString()}</span> },
+                { title: '死行', dataIndex: 'dead_rows', width: 70, render: (v: number) => <span style={{ color: v > 1000 ? 'var(--danger)' : undefined }}>{(v || 0).toLocaleString()}</span> },
                 { title: '上次清理', dataIndex: 'last_autovacuum', width: 140, render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-' },
               ]}
             />
@@ -552,7 +558,7 @@ function LogViewer() {
       setLoading(true);
       const res = await adminApi.getLogs({ level: lvl, keyword: kw, page: pg, pageSize: 50 });
       setLogs(res.logs); setTotal(res.total); setTotalPages(res.totalPages); setPage(pg);
-    } catch (e) { console.error('获取日志失败:', e); message.error('获取日志失败'); }
+    } catch { message.error('获取日志失败'); }
     finally { setLoading(false); }
   }, [level, keyword]);
 
@@ -605,7 +611,7 @@ function LogViewer() {
                   <Tag color={levelColors[log.level] || 'default'} style={{ marginRight: 8, fontSize: 10, lineHeight: '16px', padding: '0 6px' }}>
                     {log.level.toUpperCase()}
                   </Tag>
-                  <span style={{ color: log.level === 'error' ? '#ff4d4f' : log.level === 'warn' || log.level === 'warning' ? '#d48806' : 'var(--text-primary)' }}>
+                  <span style={{ color: log.level === 'error' ? 'var(--danger)' : log.level === 'warn' || log.level === 'warning' ? 'var(--warning)' : 'var(--text-primary)' }}>
                     {log.message}
                   </span>
                 </div>
@@ -642,7 +648,7 @@ function SystemSettings() {
       await adminApi.updateSettings({ [key]: value });
       setConfig(prev => ({ ...prev, [key]: { ...prev[key], value } }));
       message.success('配置已更新');
-    } catch (e) { console.error('更新配置失败:', e); message.error('更新失败'); }
+    } catch { message.error('更新失败'); }
     finally { setSaving(false); }
   };
 
@@ -690,7 +696,7 @@ function ServerResources() {
 
   const fetchData = async () => {
     try { setData(await adminApi.getServerResources()); }
-    catch (e) { console.error('获取服务器资源失败:', e); message.error('获取服务器资源失败'); }
+    catch { message.error('获取服务器资源失败'); }
     finally { setLoading(false); }
   };
 
@@ -727,7 +733,7 @@ function ServerResources() {
                 <Col span={12}><Statistic title="核心数" value={data.cpu.cores} /></Col>
                 {data.cpu.loadAvg[0] > 0 ? (
                   <>
-                    <Col span={12}><Statistic title="1分钟负载" value={data.cpu.loadAvg[0]?.toFixed(2)} valueStyle={{ color: data.cpu.loadAvg[0] > data.cpu.cores ? '#ff4d4f' : undefined }} /></Col>
+                    <Col span={12}><Statistic title="1分钟负载" value={data.cpu.loadAvg[0]?.toFixed(2)} valueStyle={{ color: data.cpu.loadAvg[0] > data.cpu.cores ? 'var(--danger)' : undefined }} /></Col>
                     <Col span={12}><Statistic title="5分钟负载" value={data.cpu.loadAvg[1]?.toFixed(2)} /></Col>
                     <Col span={12}><Statistic title="15分钟负载" value={data.cpu.loadAvg[2]?.toFixed(2)} /></Col>
                   </>
@@ -754,7 +760,7 @@ function ServerResources() {
             <Col span={16}>
               <Row gutter={[8, 8]}>
                 <Col span={12}><Statistic title="总内存" value={data.memory.totalFormatted} /></Col>
-                <Col span={12}><Statistic title="已使用" value={data.memory.usedFormatted} valueStyle={{ color: data.memory.usagePercent > 90 ? '#ff4d4f' : undefined }} /></Col>
+                <Col span={12}><Statistic title="已使用" value={data.memory.usedFormatted} valueStyle={{ color: data.memory.usagePercent > 90 ? 'var(--danger)' : undefined }} /></Col>
                 <Col span={12}><Statistic title="可用" value={data.memory.freeFormatted} /></Col>
                 <Col span={12}><Statistic title="缓存" value={data.memory.cachedFormatted} /></Col>
                 <Col span={12}><Statistic title="缓冲" value={data.memory.buffersFormatted} /></Col>
@@ -787,8 +793,8 @@ function ServerResources() {
           <Row gutter={[16, 12]}>
             <Col span={12}><Statistic title="总接收" value={data.network.rxFormatted} prefix={<CloudOutlined />} /></Col>
             <Col span={12}><Statistic title="总发送" value={data.network.txFormatted} prefix={<CloudOutlined />} /></Col>
-            <Col span={8}><Statistic title="TCP 已建立" value={data.tcp.established} valueStyle={{ color: '#52c41a' }} /></Col>
-            <Col span={8}><Statistic title="TIME_WAIT" value={data.tcp.timeWait} valueStyle={{ color: data.tcp.timeWait > 1000 ? '#faad14' : undefined }} /></Col>
+            <Col span={8}><Statistic title="TCP 已建立" value={data.tcp.established} valueStyle={{ color: 'var(--success)' }} /></Col>
+            <Col span={8}><Statistic title="TIME_WAIT" value={data.tcp.timeWait} valueStyle={{ color: data.tcp.timeWait > 1000 ? 'var(--warning)' : undefined }} /></Col>
             <Col span={8}><Statistic title="打开文件" value={data.openFiles} /></Col>
           </Row>
           {data.network.interfaces?.length > 0 && (
@@ -818,7 +824,7 @@ function ServerResources() {
             columns={[
               { title: 'PID', dataIndex: 'pid', width: 70 },
               { title: '用户', dataIndex: 'user', width: 80 },
-              { title: 'CPU%', dataIndex: 'cpu', width: 70, sorter: (a: any, b: any) => a.cpu - b.cpu, render: (v: number) => <span style={{ color: v > 50 ? '#ff4d4f' : v > 20 ? '#faad14' : undefined }}>{v}%</span> },
+              { title: 'CPU%', dataIndex: 'cpu', width: 70, sorter: (a: any, b: any) => a.cpu - b.cpu, render: (v: number) => <span style={{ color: v > 50 ? 'var(--danger)' : v > 20 ? 'var(--warning)' : undefined }}>{v}%</span> },
               { title: '内存%', dataIndex: 'mem', width: 70, render: (v: number) => `${v}%` },
               { title: 'RSS', dataIndex: 'rss', width: 80 },
               { title: '命令', dataIndex: 'command', ellipsis: true },
@@ -846,7 +852,7 @@ export default function SystemMonitor() {
         const next = [...prev, { timestamp: res.timestamp, qps: res.qps, cacheHit: res.database.cacheHitRatio, connections: res.connections.active, slowQueries: res.database.activeSlowQueries }];
         return next.slice(-30);
       });
-    } catch (e) { /* silent */ console.error('获取监控指标失败:', e); }
+    } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
 
@@ -917,7 +923,7 @@ export default function SystemMonitor() {
                       <Col span={12}><Statistic title="数据库大小" value={metrics.database.sizeFormatted} prefix={<HddOutlined />} /></Col>
                       <Col span={12}><Statistic title="活跃连接 / 最大连接" value={metrics.connections.active} suffix={`/ ${metrics.connections.max}`} prefix={<ApiOutlined />} /></Col>
                       <Col span={12}><Statistic title="空闲连接" value={metrics.connections.idle} /></Col>
-                      <Col span={12}><Statistic title="死锁次数" value={metrics.database.deadlocks} valueStyle={{ color: metrics.database.deadlocks > 0 ? '#ff4d4f' : '#52c41a' }} /></Col>
+                      <Col span={12}><Statistic title="死锁次数" value={metrics.database.deadlocks} valueStyle={{ color: metrics.database.deadlocks > 0 ? 'var(--danger)' : 'var(--success)' }} /></Col>
                       <Col span={12}><Statistic title="请求总数" value={metrics.requestCount} /></Col>
                     </Row>
                   </Card>

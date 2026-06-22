@@ -30,6 +30,8 @@ import {
   CalendarOutlined,
   ThunderboltOutlined,
   CrownOutlined,
+  RobotOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -41,11 +43,10 @@ const navItems = [
   { key: '/', label: '首页', icon: <HomeOutlined /> },
   { key: '/funds', label: '基金列表', icon: <FundOutlined /> },
   { key: '/industry', label: '行业分析', icon: <BarChartOutlined /> },
-  { key: '/hs300', label: '沪深300', icon: <StockOutlined /> },
   { key: '/qdii', label: 'QDII基金', icon: <GlobalOutlined /> },
   { key: '/cmb-products', label: '招行理财', icon: <BankOutlined /> },
   { key: '/events', label: '事件日历', icon: <CalendarOutlined /> },
-  { key: '/ai-assistant', label: 'AI助手', icon: <ThunderboltOutlined /> },
+  { key: '/ai-assistant', label: 'AI助手', icon: <RobotOutlined /> },
 ];
 
 const DISMISSED_KEY = 'dismissed_alerts';
@@ -54,7 +55,7 @@ function getDismissedAlerts(): Set<string> {
   try {
     const raw = localStorage.getItem(DISMISSED_KEY);
     return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch (e) { console.error('解析已忽略告警数据失败:', e); return new Set(); }
+  } catch { return new Set(); }
 }
 
 function dismissAlert(key: string) {
@@ -143,6 +144,8 @@ export default function Navbar() {
 
   return (
     <Layout.Header
+      role="banner"
+      aria-label="主导航栏"
       style={{
         background: isDark ? 'rgba(26, 26, 26, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(10px)',
@@ -223,7 +226,7 @@ export default function Navbar() {
                 )}
               >
                 <Badge count={alerts.length} size="small" offset={[-2, 2]}>
-                  <Button type="text" icon={<BellOutlined />} style={{ color: 'var(--text-secondary)', fontSize: 16 }} />
+                  <Button type="text" icon={<BellOutlined />} aria-label={`通知 (${alerts.length}条)`} style={{ color: 'var(--text-secondary)', fontSize: 16 }} />
                 </Badge>
               </Dropdown>
               <Dropdown menu={{
@@ -238,6 +241,7 @@ export default function Navbar() {
                   ] : []),
                   { type: 'divider' as const },
                   { key: 'changePassword', label: '修改密码', icon: <KeyOutlined /> },
+                  { key: 'about', label: '关于', icon: <InfoCircleOutlined /> },
                   { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
                 ],
                 onClick: ({ key }) => {
@@ -247,6 +251,7 @@ export default function Navbar() {
                   if (key === 'subscription') navigate('/subscription');
                   if (key === '/admin/users' || key === '/admin/monitor') navigate(key);
                   if (key === 'changePassword') setPwdModalOpen(true);
+                  if (key === 'about') navigate('/about');
                 },
               }}>
                 <Space size={4}>
@@ -271,6 +276,8 @@ export default function Navbar() {
               type="text"
               icon={<MenuOutlined />}
               onClick={() => setDrawerOpen(true)}
+              aria-label="打开导航菜单"
+              aria-expanded={drawerOpen}
               style={{ fontSize: 18, color: 'var(--text-secondary)' }}
             />
           </Space>
@@ -289,6 +296,22 @@ export default function Navbar() {
               }}
             />
             <Space size={16} style={{ marginLeft: 16 }}>
+              <Tooltip title="命令面板 (Ctrl+K)">
+                <Button
+                  type="text"
+                  onClick={() => document.dispatchEvent(new Event('command-palette-open'))}
+                  style={{
+                    fontSize: 12, color: 'var(--text-tertiary)',
+                    padding: '2px 8px', borderRadius: 6,
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e8e8e8'}`,
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    lineHeight: 1,
+                  }}
+                >
+                  <SearchOutlined style={{ fontSize: 12 }} />
+                  <span style={{ fontSize: 11 }}>⌘K</span>
+                </Button>
+              </Tooltip>
               <Tooltip title={isDark ? '浅色模式' : '深色模式'}>
                 <Button
                   type="text"
@@ -371,6 +394,7 @@ export default function Navbar() {
                     ] : []),
                     { type: 'divider' as const },
                     { key: 'changePassword', label: '修改密码', icon: <KeyOutlined /> },
+                    { key: 'about', label: '关于', icon: <InfoCircleOutlined /> },
                     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
                   ],
                   onClick: ({ key }) => {
@@ -379,6 +403,7 @@ export default function Navbar() {
                     if (key === 'portfolio') navigate('/portfolio');
                     if (key === '/admin/users' || key === '/admin/monitor') navigate(key);
                     if (key === 'changePassword') setPwdModalOpen(true);
+                    if (key === 'about') navigate('/about');
                   },
                 }}>
                   <Space style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 8, transition: 'background 0.2s' }}>
@@ -435,6 +460,11 @@ export default function Navbar() {
             </Button>
           </div>
         )}
+        <div style={{ padding: '8px 24px', borderTop: '1px solid var(--border-color)' }}>
+          <Button block icon={<InfoCircleOutlined />} onClick={() => { navigate('/about'); setDrawerOpen(false); }}>
+            关于
+          </Button>
+        </div>
         <div style={{ padding: '8px 24px', borderTop: '1px solid var(--border-color)' }}>
           <Button block onClick={() => { toggleTheme(); setDrawerOpen(false); }}>
             {isDark ? '☀️ 切换浅色模式' : '🌙 切换深色模式'}

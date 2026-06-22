@@ -12,12 +12,12 @@ interface Props {
 export function TransactionBehaviorAnalysis({ holdings, txStats, isDark, getHoldingDays }: Props) {
   if (holdings.length === 0) return null;
 
-  const totalMV = holdings.reduce((s, h) => s + h.market_value, 0);
-  const totalUnrealizedPnl = holdings.reduce((s, h) => s + h.pnl, 0);
-  const realizedPnl = txStats?.total_realized_pnl || 0;
-  const totalFees = txStats?.total_buy_fees || 0;
-  const buyCount = txStats?.buy_count || 0;
-  const sellCount = txStats?.sell_count || 0;
+  const totalMV = holdings.reduce((s, h) => s + Number(h.market_value || 0), 0);
+  const totalUnrealizedPnl = holdings.reduce((s, h) => s + Number(h.pnl || 0), 0);
+  const realizedPnl = Number(txStats?.total_realized_pnl) || 0;
+  const totalFees = Number(txStats?.total_buy_fees) || 0;
+  const buyCount = Number(txStats?.buy_count) || 0;
+  const sellCount = Number(txStats?.sell_count) || 0;
   const avgHoldDays = holdings.length > 0
     ? Math.round(holdings.map(h => getHoldingDays(h)).reduce((a, b) => a + b, 0) / holdings.length)
     : 0;
@@ -28,7 +28,7 @@ export function TransactionBehaviorAnalysis({ holdings, txStats, isDark, getHold
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={8}>
           <Card size="small" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#1677ff' }}>{buyCount + sellCount}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--primary)' }}>{buyCount + sellCount}</div>
             <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>总交易笔数</div>
             <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999' }}>买{buyCount} / 卖{sellCount}</div>
           </Card>
@@ -55,7 +55,7 @@ export function TransactionBehaviorAnalysis({ holdings, txStats, isDark, getHold
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={8}>
           <Card size="small" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#fa8c16' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--warning)' }}>
               ¥{totalFees.toFixed(0)}
             </div>
             <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>累计手续费</div>
@@ -64,7 +64,7 @@ export function TransactionBehaviorAnalysis({ holdings, txStats, isDark, getHold
         </Col>
         <Col xs={12} sm={8}>
           <Card size="small" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#722ed1' }}>{avgHoldDays}天</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-purple)' }}>{avgHoldDays}天</div>
             <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>平均持仓天数</div>
             <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999' }}>
               {avgHoldDays >= 730 ? '长期持有型' : avgHoldDays >= 365 ? '中期持有型' : '短期交易型'}
@@ -73,7 +73,7 @@ export function TransactionBehaviorAnalysis({ holdings, txStats, isDark, getHold
         </Col>
         <Col xs={12} sm={8}>
           <Card size="small" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#52c41a' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--success)' }}>
               {(realizedPnl + totalUnrealizedPnl) >= 0 ? '+' : ''}¥{(realizedPnl + totalUnrealizedPnl).toFixed(0)}
             </div>
             <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>总收益合计</div>

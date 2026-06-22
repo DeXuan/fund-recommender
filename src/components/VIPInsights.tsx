@@ -12,6 +12,52 @@ import { portfolioApi } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { getEchartsTheme } from '../utils/echarts-theme';
 
+interface FundDetail {
+  code: string;
+  name: string;
+  shares: number;
+  costPrice: number;
+  currentNav: number;
+  marketValue: number;
+  pnl: number;
+  pnlPercent: number;
+  weight: number;
+  holdingDays: number;
+  riskLevel: string;
+  buyTimingScore: number;
+  diagnosis: string;
+  industry: string;
+  assetCategory: string;
+}
+
+interface LossDiagnosis {
+  totalLoss: number;
+  fundCount: number;
+  worstFund: { fundName: string; pnl: number; pnlPercent: number } | null;
+  analysis: { type: string; title: string; detail: string; funds?: string[] }[];
+}
+
+interface ProfitAnalysis {
+  totalProfit: number;
+  fundCount: number;
+  bestFund: { fundName: string; pnl: number; pnlPercent: number } | null;
+  analysis: { type: string; title: string; detail: string; funds?: string[] }[];
+}
+
+interface FeeImpact {
+  totalFees: number;
+  feeRate: number;
+  impactOnReturn: number;
+}
+
+interface BenchmarkComparison {
+  benchmarkName: string;
+  benchmarkReturn: number;
+  portfolioReturn: number;
+  alpha: number;
+  outperformed: boolean;
+}
+
 interface VIPData {
   healthScore: number;
   healthLevel: string;
@@ -36,6 +82,11 @@ interface VIPData {
   riskMetrics: { name: string; value: number; benchmark: number; status: string }[];
   alerts: { type: string; level: string; title: string; detail: string; action: string }[];
   aiAdvice: { priority: string; title: string; detail: string; impact: string }[];
+  fundDetails?: FundDetail[];
+  lossDiagnosis?: LossDiagnosis;
+  profitAnalysis?: ProfitAnalysis;
+  feeImpact?: FeeImpact;
+  benchmarkComparison?: BenchmarkComparison;
 }
 
 export default function VIPInsights() {
@@ -71,10 +122,10 @@ export default function VIPInsights() {
   const pnlSign = (v: number) => v >= 0 ? '+' : '';
 
   const qualityConfig: Record<string, { label: string; color: string; desc: string }> = {
-    excellent: { label: '数据充分', color: '#52c41a', desc: '近1年完整数据' },
-    good: { label: '数据良好', color: '#1890ff', desc: '近2月+数据' },
-    fair: { label: '数据较少', color: '#faad14', desc: '部分历史数据' },
-    poor: { label: '数据不足', color: '#ff4d4f', desc: '建议刷新净值' },
+    excellent: { label: '数据充分', color: 'var(--success)', desc: '近1年完整数据' },
+    good: { label: '数据良好', color: 'var(--primary)', desc: '近2月+数据' },
+    fair: { label: '数据较少', color: 'var(--warning)', desc: '部分历史数据' },
+    poor: { label: '数据不足', color: 'var(--danger)', desc: '建议刷新净值' },
   };
   const quality = qualityConfig[data.dataQuality] || qualityConfig.poor;
 
@@ -180,15 +231,15 @@ export default function VIPInsights() {
 
   const alertIcon = (type: string) => {
     switch (type) {
-      case 'risk': return <ExclamationCircleOutlined style={{ color: '#faad14' }} />;
-      case 'opportunity': return <BulbOutlined style={{ color: '#1890ff' }} />;
-      case 'warning': return <WarningOutlined style={{ color: '#ff4d4f' }} />;
-      default: return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
+      case 'risk': return <ExclamationCircleOutlined style={{ color: 'var(--warning)' }} />;
+      case 'opportunity': return <BulbOutlined style={{ color: 'var(--primary)' }} />;
+      case 'warning': return <WarningOutlined style={{ color: 'var(--danger)' }} />;
+      default: return <CheckCircleOutlined style={{ color: 'var(--success)' }} />;
     }
   };
 
   const priorityColor = (p: string) => {
-    switch (p) { case 'high': return '#ff4d4f'; case 'medium': return '#faad14'; default: return '#52c41a'; }
+    switch (p) { case 'high': return 'var(--danger)'; case 'medium': return 'var(--warning)'; default: return 'var(--success)'; }
   };
 
   return (
@@ -216,18 +267,18 @@ export default function VIPInsights() {
       {/* 0. 组合概览（真实持仓数据） */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         {[
-          { label: '总投入', value: data.totalCost, color: '#1677ff', bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
-          { label: '当前市值', value: data.totalValue, color: '#fff', bg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
-          { label: '总盈亏', value: data.totalPnl, color: '#fff', bg: data.totalPnl >= 0 ? 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)' : 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)', sign: true },
-          { label: '总收益率', value: data.totalReturn, color: '#fff', bg: data.totalReturn >= 0 ? 'linear-gradient(135deg, #faad14 0%, #d48806 100%)' : 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)', suffix: '%', sign: true },
+          { label: '总投入', value: Number(data.totalCost) || 0, color: 'var(--primary)', bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
+          { label: '当前市值', value: Number(data.totalValue) || 0, color: '#fff', bg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
+          { label: '总盈亏', value: Number(data.totalPnl) || 0, color: '#fff', bg: (Number(data.totalPnl) || 0) >= 0 ? 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)' : 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)', sign: true },
+          { label: '总收益率', value: Number(data.totalReturn) || 0, color: '#fff', bg: (Number(data.totalReturn) || 0) >= 0 ? 'linear-gradient(135deg, #faad14 0%, #d48806 100%)' : 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)', suffix: '%', sign: true },
         ].map((item, i) => (
           <Col xs={12} sm={12} lg={6} key={i}>
             <Card style={{ background: item.bg, border: 'none', borderRadius: 12 }} styles={{ body: { padding: 16 } }}>
               <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginBottom: 4 }}>{item.label}</div>
               <div style={{ color: item.color, fontSize: 22, fontWeight: 700 }}>
-                {item.sign && typeof item.value === 'number' ? (item.value >= 0 ? '+' : '-') : ''}
+                {item.sign ? (item.value >= 0 ? '+' : '-') : ''}
                 {item.suffix ? `${Math.abs(item.value).toFixed(2)}${item.suffix}` : `¥${Math.abs(item.value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                {item.sign && typeof item.value === 'number' && (
+                {item.sign && (
                   <span style={{ fontSize: 13, marginLeft: 4 }}>{item.value >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}</span>
                 )}
               </div>
@@ -239,40 +290,40 @@ export default function VIPInsights() {
       {/* 1. 健康评分 + 核心指标 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} md={8}>
-          <Card style={{ height: '100%', background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)', border: 'none' }}>
+          <Card style={{ height: '100%', background: isDark ? 'linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%)' : 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)', border: 'none' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 13, color: isDark ? '#a0a0a0' : '#666', marginBottom: 4 }}>
                 <HeartOutlined style={{ marginRight: 4 }} />组合健康评分
               </div>
-              <ReactECharts option={scoreOption} style={{ height: 160 }} />
+              <ReactECharts theme={getEchartsTheme(isDark)} option={scoreOption} style={{ height: 160 }} />
               <Tag color={data.healthScore >= 80 ? 'success' : data.healthScore >= 60 ? 'processing' : data.healthScore >= 40 ? 'warning' : 'error'} style={{ fontSize: 13, padding: '2px 12px' }}>
                 {data.healthLevel}
               </Tag>
-              <div style={{ fontSize: 11, color: '#999', marginTop: 8 }}>综合收益·风控·效率·分散·胜率</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>综合收益·风控·效率·分散·胜率</div>
             </div>
           </Card>
         </Col>
         <Col xs={24} md={16}>
-          <Card title={<><ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />核心指标</>} style={{ height: '100%' }} bodyStyle={{ padding: '12px 16px' }}>
+          <Card title={<><ThunderboltOutlined style={{ marginRight: 8, color: 'var(--warning)' }} />核心指标</>} style={{ height: '100%' }} bodyStyle={{ padding: '12px 16px' }}>
             <Row gutter={[12, 12]}>
               {[
                 { label: data.metrics.returnPeriod === '年化' ? '年化收益率' : `期间收益(${data.metrics.returnPeriod || '收益率'})`, value: data.metrics.annualizedReturn, suffix: '%', color: pnlColor(data.metrics.annualizedReturn), icon: <RiseOutlined /> },
-                { label: '最大回撤', value: data.metrics.maxDrawdown, suffix: '%', color: '#ff4d4f', icon: <FallOutlined /> },
-                { label: '夏普比率', value: data.metrics.sharpeRatio, suffix: '', color: data.metrics.sharpeRatio >= 1 ? '#52c41a' : data.metrics.sharpeRatio >= 0 ? '#faad14' : '#ff4d4f', icon: <FundOutlined />, tip: '每承担1单位风险的超额收益，>1为优秀' },
-                { label: '卡玛比率', value: data.metrics.calmarRatio, suffix: '', color: data.metrics.calmarRatio >= 1 ? '#52c41a' : '#faad14', icon: <SafetyOutlined />, tip: '年化收益/最大回撤，>1为优秀' },
-                { label: '年化波动率', value: data.metrics.volatility, suffix: '%', color: '#722ed1', icon: <BarChartOutlined /> },
-                { label: '胜率', value: data.metrics.winRate, suffix: '%', color: '#1890ff', icon: <CheckCircleOutlined /> },
-                { label: '盈亏比', value: data.metrics.profitLossRatio, suffix: ':1', color: '#13c2c2', icon: <PieChartOutlined /> },
+                { label: '最大回撤', value: data.metrics.maxDrawdown, suffix: '%', color: 'var(--danger)', icon: <FallOutlined /> },
+                { label: '夏普比率', value: data.metrics.sharpeRatio, suffix: '', color: data.metrics.sharpeRatio >= 1 ? 'var(--success)' : data.metrics.sharpeRatio >= 0 ? 'var(--warning)' : 'var(--danger)', icon: <FundOutlined />, tip: '每承担1单位风险的超额收益，>1为优秀' },
+                { label: '卡玛比率', value: data.metrics.calmarRatio, suffix: '', color: data.metrics.calmarRatio >= 1 ? 'var(--success)' : 'var(--warning)', icon: <SafetyOutlined />, tip: '年化收益/最大回撤，>1为优秀' },
+                { label: '年化波动率', value: data.metrics.volatility, suffix: '%', color: 'var(--color-purple)', icon: <BarChartOutlined /> },
+                { label: '胜率', value: data.metrics.winRate, suffix: '%', color: 'var(--primary)', icon: <CheckCircleOutlined /> },
+                { label: '盈亏比', value: data.metrics.profitLossRatio, suffix: ':1', color: 'var(--color-teal)', icon: <PieChartOutlined /> },
                 { label: '平均持仓天数', value: data.metrics.avgHoldingDays, suffix: '天', color: isDark ? '#a0a0a0' : '#666', icon: <StarOutlined /> },
               ].map((item, i) => (
                 <Col xs={12} sm={8} key={i}>
                   <Tooltip title={item.tip}>
                     <div style={{ background: isDark ? '#1a1a1a' : '#fff', borderRadius: 8, padding: '10px 12px', border: `1px solid ${isDark ? '#262626' : '#f0f0f0'}`, textAlign: 'center', cursor: item.tip ? 'help' : 'default' }}>
-                      <div style={{ fontSize: 11, color: '#999', marginBottom: 4 }}>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>
                         <span style={{ marginRight: 4 }}>{item.icon}</span>{item.label}
                       </div>
                       <div style={{ fontSize: 20, fontWeight: 700, color: item.color }}>
-                        {typeof item.value === 'number' ? `${item.value >= 0 ? '+' : ''}${item.suffix === '天' ? Math.round(item.value) : item.value.toFixed(2)}` : '--'}{item.suffix}
+                        {item.value !== undefined && item.value !== null ? `${Number(item.value) >= 0 ? '+' : ''}${item.suffix === '天' ? Math.round(Number(item.value)) : Number(item.value).toFixed(2)}` : '--'}{item.suffix}
                       </div>
                     </div>
                   </Tooltip>
@@ -286,17 +337,17 @@ export default function VIPInsights() {
       {/* 2. 收益归因 + 月度表现 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} lg={12}>
-          <Card title={<><PieChartOutlined style={{ marginRight: 8, color: '#722ed1' }} />收益归因分析</>} bodyStyle={{ padding: '8px 16px' }}>
+          <Card title={<><PieChartOutlined style={{ marginRight: 8, color: 'var(--color-purple)' }} />收益归因分析</>} bodyStyle={{ padding: '8px 16px' }}>
             {data.attribution.length > 0 ? (
               <>
-                <ReactECharts option={attributionOption} style={{ height: Math.max(data.attribution.length * 44, 160) }} />
+                <ReactECharts theme={getEchartsTheme(isDark)} option={attributionOption} style={{ height: Math.max(data.attribution.length * 44, 160) }} />
                 <Divider style={{ margin: '8px 0' }} />
                 <Row gutter={8}>
                   {data.attribution.map((a, i) => (
                     <Col span={Math.floor(24 / Math.min(data.attribution.length, 4))} key={i} style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 11, color: '#999' }}>{a.category}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{a.category}</div>
                       <div style={{ fontSize: 14, fontWeight: 600, color: pnlColor(a.pnl) }}>{pnlSign(a.pnl)}¥{Math.abs(a.pnl).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                      <div style={{ fontSize: 10, color: '#bbb' }}>占比 {a.weight}%</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-quaternary)' }}>占比 {a.weight}%</div>
                     </Col>
                   ))}
                 </Row>
@@ -305,22 +356,22 @@ export default function VIPInsights() {
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title={<><BarChartOutlined style={{ marginRight: 8, color: '#1890ff' }} />月度收益表现</>} bodyStyle={{ padding: '8px 16px' }}>
+          <Card title={<><BarChartOutlined style={{ marginRight: 8, color: 'var(--primary)' }} />月度收益表现</>} bodyStyle={{ padding: '8px 16px' }}>
             {data.monthlyReturns.length > 0 ? (
               <>
-                <ReactECharts option={monthlyOption} style={{ height: 200 }} />
+                <ReactECharts theme={getEchartsTheme(isDark)} option={monthlyOption} style={{ height: 200 }} />
                 <Row gutter={8} style={{ textAlign: 'center', borderTop: `1px solid ${isDark ? '#262626' : '#f0f0f0'}`, paddingTop: 8 }}>
                   <Col span={8}>
-                    <div style={{ fontSize: 11, color: '#999' }}>盈利月</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>盈利月</div>
                     <div style={{ fontSize: 16, fontWeight: 600, color: '#cf1322' }}>{data.monthlyReturns.filter(m => m.return > 0).length}</div>
                   </Col>
                   <Col span={8}>
-                    <div style={{ fontSize: 11, color: '#999' }}>亏损月</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>亏损月</div>
                     <div style={{ fontSize: 16, fontWeight: 600, color: '#3f8600' }}>{data.monthlyReturns.filter(m => m.return < 0).length}</div>
                   </Col>
                   <Col span={8}>
-                    <div style={{ fontSize: 11, color: '#999' }}>月胜率</div>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: '#1890ff' }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>月胜率</div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--primary)' }}>
                       {data.monthlyReturns.length > 0 ? Math.round(data.monthlyReturns.filter(m => m.return > 0).length / data.monthlyReturns.length * 100) : 0}%
                     </div>
                   </Col>
@@ -334,20 +385,20 @@ export default function VIPInsights() {
       {/* 3. 风险雷达 + 智能预警 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} lg={10}>
-          <Card title={<><FundOutlined style={{ marginRight: 8, color: '#13c2c2' }} />风险能力雷达</>} bodyStyle={{ padding: '8px 16px' }}>
+          <Card title={<><FundOutlined style={{ marginRight: 8, color: 'var(--color-teal)' }} />风险能力雷达</>} bodyStyle={{ padding: '8px 16px' }}>
             {data.riskMetrics.length > 0 ? (
               <>
-                <ReactECharts option={radarOption} style={{ height: 260 }} />
+                <ReactECharts theme={getEchartsTheme(isDark)} option={radarOption} style={{ height: 260 }} />
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 24, fontSize: 12, color: isDark ? '#a0a0a0' : '#666' }}>
-                  <span><span style={{ display: 'inline-block', width: 12, height: 3, background: '#1677ff', marginRight: 4, verticalAlign: 'middle' }} />我的组合</span>
-                  <span><span style={{ display: 'inline-block', width: 12, height: 3, background: '#999', marginRight: 4, verticalAlign: 'middle', borderTop: '1px dashed #999' }} />市场基准</span>
+                  <span><span style={{ display: 'inline-block', width: 12, height: 3, background: 'var(--primary)', marginRight: 4, verticalAlign: 'middle' }} />我的组合</span>
+                  <span><span style={{ display: 'inline-block', width: 12, height: 3, background: 'var(--color-text-muted)', marginRight: 4, verticalAlign: 'middle', borderTop: '1px dashed var(--color-text-muted)' }} />市场基准</span>
                 </div>
                 <Divider style={{ margin: '8px 0' }} />
                 {data.riskMetrics.map((r, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 0', fontSize: 12 }}>
                     <span style={{ color: isDark ? '#a0a0a0' : '#666', width: 60 }}>{r.name}</span>
-                    <Progress percent={r.value} size="small" style={{ flex: 1, margin: '0 8px' }} strokeColor={r.status === 'good' ? '#52c41a' : '#faad14'} showInfo={false} />
-                    <span style={{ fontWeight: 600, color: r.status === 'good' ? '#52c41a' : '#faad14', width: 36, textAlign: 'right' }}>{r.value}</span>
+                    <Progress percent={r.value} size="small" style={{ flex: 1, margin: '0 8px' }} strokeColor={r.status === 'good' ? 'var(--success)' : 'var(--warning)'} showInfo={false} />
+                    <span style={{ fontWeight: 600, color: r.status === 'good' ? 'var(--success)' : 'var(--warning)', width: 36, textAlign: 'right' }}>{r.value}</span>
                   </div>
                 ))}
               </>
@@ -356,8 +407,8 @@ export default function VIPInsights() {
         </Col>
         <Col xs={24} lg={14}>
           <Card
-            title={<><ExclamationCircleOutlined style={{ marginRight: 8, color: '#faad14' }} />智能预警</>}
-            extra={data.alerts.length > 0 && data.alerts[0].type !== 'success' ? <Badge count={data.alerts.length} style={{ backgroundColor: '#ff4d4f' }} /> : null}
+            title={<><ExclamationCircleOutlined style={{ marginRight: 8, color: 'var(--warning)' }} />智能预警</>}
+            extra={data.alerts.length > 0 && data.alerts[0].type !== 'success' ? <Badge count={data.alerts.length} style={{ backgroundColor: 'var(--danger)' }} /> : null}
             bodyStyle={{ padding: '8px 16px' }}
           >
             <Space direction="vertical" style={{ width: '100%' }} size={8}>
@@ -379,9 +430,9 @@ export default function VIPInsights() {
 
       {/* 4. AI 投资顾问 */}
       <Card
-        title={<><RocketOutlined style={{ marginRight: 8, color: '#722ed1' }} />AI 投资顾问</>}
+        title={<><RocketOutlined style={{ marginRight: 8, color: 'var(--color-purple)' }} />AI 投资顾问</>}
         extra={<Tag color="purple">基于您的真实持仓分析</Tag>}
-        style={{ marginBottom: 0 }}
+        style={{ marginBottom: 16 }}
       >
         <Row gutter={[12, 12]}>
           {data.aiAdvice.map((advice, i) => (
@@ -398,7 +449,7 @@ export default function VIPInsights() {
                 </div>
                 <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', lineHeight: 1.8 }}>{advice.detail}</div>
                 {advice.impact && (
-                  <div style={{ marginTop: 6, fontSize: 11, color: '#1677ff', background: '#f0f5ff', padding: '4px 8px', borderRadius: 4 }}>
+                  <div style={{ marginTop: 6, fontSize: 11, color: 'var(--primary)', background: isDark ? 'rgba(22,119,255,0.1)' : '#f0f5ff', padding: '4px 8px', borderRadius: 4 }}>
                     预期影响: {advice.impact}
                   </div>
                 )}
@@ -407,6 +458,206 @@ export default function VIPInsights() {
           ))}
         </Row>
       </Card>
+
+      {/* 5. 亏损诊断 + 盈利分析 + 费用影响 */}
+      {(data.lossDiagnosis || data.profitAnalysis || data.feeImpact) && (
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          {data.lossDiagnosis && (
+            <Col xs={24} lg={8}>
+              <Card
+                title={<><FallOutlined style={{ marginRight: 8, color: 'var(--danger)' }} />亏损诊断</>}
+                size="small"
+                style={{ height: '100%' }}
+              >
+                <Row gutter={[8, 8]} style={{ marginBottom: 12 }}>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>总亏损</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: '#3f8600' }}>¥{Math.abs(Number(data.lossDiagnosis.totalLoss) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>亏损基金数</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>{Number(data.lossDiagnosis.fundCount) || 0}</div>
+                  </Col>
+                </Row>
+                {data.lossDiagnosis.worstFund && (
+                  <div style={{ marginBottom: 8, padding: '6px 10px', background: isDark ? 'rgba(255,77,79,0.08)' : '#fff2f0', borderRadius: 6, fontSize: 12 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>最大亏损：{data.lossDiagnosis.worstFund.fundName}</div>
+                    <div style={{ color: 'var(--color-text-muted)' }}>
+                      亏损 ¥{Math.abs(Number(data.lossDiagnosis.worstFund.pnl) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      （{Number(data.lossDiagnosis.worstFund.pnlPercent) || 0}%）
+                    </div>
+                  </div>
+                )}
+                {data.lossDiagnosis.analysis?.map((a, i) => (
+                  <div key={i} style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginBottom: 4 }}>
+                    {a.type === 'concentration' ? <InfoCircleOutlined style={{ marginRight: 4 }} /> :
+                     a.type === 'sector' ? <BarChartOutlined style={{ marginRight: 4 }} /> :
+                     <WarningOutlined style={{ marginRight: 4 }} />}
+                    {a.detail}
+                  </div>
+                ))}
+              </Card>
+            </Col>
+          )}
+          {data.profitAnalysis && (
+            <Col xs={24} lg={8}>
+              <Card
+                title={<><RiseOutlined style={{ marginRight: 8, color: 'var(--success)' }} />盈利分析</>}
+                size="small"
+                style={{ height: '100%' }}
+              >
+                <Row gutter={[8, 8]} style={{ marginBottom: 12 }}>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>总盈利</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: '#cf1322' }}>+¥{Number(data.profitAnalysis.totalProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>盈利基金数</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--success)' }}>{Number(data.profitAnalysis.fundCount) || 0}</div>
+                  </Col>
+                </Row>
+                {data.profitAnalysis.bestFund && (
+                  <div style={{ marginBottom: 8, padding: '6px 10px', background: isDark ? 'rgba(82,196,26,0.08)' : '#f6ffed', borderRadius: 6, fontSize: 12 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>最大盈利：{data.profitAnalysis.bestFund.fundName}</div>
+                    <div style={{ color: 'var(--color-text-muted)' }}>
+                      盈利 +¥{Number(data.profitAnalysis.bestFund.pnl || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      （+{Number(data.profitAnalysis.bestFund.pnlPercent) || 0}%）
+                    </div>
+                  </div>
+                )}
+                {data.profitAnalysis.analysis?.map((a, i) => (
+                  <div key={i} style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#666', marginBottom: 4 }}>
+                    {a.type === 'sector' ? <BulbOutlined style={{ marginRight: 4 }} /> :
+                     a.type === 'timing' ? <DashboardOutlined style={{ marginRight: 4 }} /> :
+                     <CheckCircleOutlined style={{ marginRight: 4 }} />}
+                    {a.detail}
+                  </div>
+                ))}
+              </Card>
+            </Col>
+          )}
+          {data.feeImpact && (
+            <Col xs={24} lg={8}>
+              <Card
+                title={<><InfoCircleOutlined style={{ marginRight: 8, color: 'var(--color-purple)' }} />费用影响</>}
+                size="small"
+                style={{ height: '100%' }}
+              >
+                <Row gutter={[8, 8]} style={{ marginBottom: 12 }}>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>累计手续费</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--warning)' }}>¥{Number(data.feeImpact.totalFees || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>费率水平</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-purple)' }}>{Number(data.feeImpact.feeRate || 0).toFixed(2)}%</div>
+                  </Col>
+                </Row>
+                <div style={{ padding: '8px 12px', background: isDark ? 'rgba(114,46,209,0.08)' : '#f9f0ff', borderRadius: 6, fontSize: 12 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>对收益的影响</div>
+                  <Progress
+                    percent={Math.min(Math.abs(Number(data.feeImpact.impactOnReturn) || 0) * 10, 100)}
+                    strokeColor={Math.abs(Number(data.feeImpact.impactOnReturn) || 0) > 2 ? 'var(--danger)' : 'var(--warning)'}
+                    format={() => `${Number(data.feeImpact!.impactOnReturn || 0).toFixed(2)}%`}
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                    {Math.abs(Number(data.feeImpact.impactOnReturn) || 0) > 2 ? '费率偏高，建议关注低费率产品' : '费率控制良好'}
+                  </div>
+                </div>
+              </Card>
+            </Col>
+          )}
+        </Row>
+      )}
+
+      {/* 6. 基准对比 */}
+      {data.benchmarkComparison && (
+        <Card
+          title={<><BarChartOutlined style={{ marginRight: 8, color: 'var(--primary)' }} />基准对比</>}
+          size="small"
+          style={{ marginBottom: 16 }}
+        >
+          <Row gutter={16} style={{ textAlign: 'center' }}>
+            <Col span={6}>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>我的持仓收益</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: pnlColor(Number(data.benchmarkComparison.portfolioReturn)) }}>
+                {pnlSign(Number(data.benchmarkComparison.portfolioReturn))}{Math.abs(Number(data.benchmarkComparison.portfolioReturn) || 0).toFixed(2)}%
+              </div>
+            </Col>
+            <Col span={6}>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{data.benchmarkComparison.benchmarkName}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: pnlColor(Number(data.benchmarkComparison.benchmarkReturn)) }}>
+                {pnlSign(Number(data.benchmarkComparison.benchmarkReturn))}{Math.abs(Number(data.benchmarkComparison.benchmarkReturn) || 0).toFixed(2)}%
+              </div>
+            </Col>
+            <Col span={6}>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>超额收益 (Alpha)</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-purple)' }}>
+                {Number(data.benchmarkComparison.alpha) >= 0 ? '+' : ''}{Number(data.benchmarkComparison.alpha || 0).toFixed(2)}%
+              </div>
+            </Col>
+            <Col span={6}>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>是否跑赢</div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>
+                {data.benchmarkComparison.outperformed
+                  ? <Tag color="success" style={{ fontSize: 14, padding: '2px 12px' }}>跑赢</Tag>
+                  : <Tag color="error" style={{ fontSize: 14, padding: '2px 12px' }}>跑输</Tag>
+                }
+              </div>
+            </Col>
+          </Row>
+        </Card>
+      )}
+
+      {/* 7. 持仓基金诊断 */}
+      {data.fundDetails && data.fundDetails.length > 0 && (
+        <Card
+          title={<><FundOutlined style={{ marginRight: 8, color: 'var(--color-teal)' }} />持仓基金诊断</>}
+          size="small"
+          style={{ marginBottom: 0 }}
+        >
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${isDark ? '#333' : '#e8e8e8'}` }}>
+                  {['基金名称', '行业', '持仓占比', '持仓天数', '盈亏', '买入时机', '风险等级', '诊断建议'].map(h => (
+                    <th key={h} style={{ padding: '8px 6px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.fundDetails.map((f, i) => (
+                  <tr key={i} style={{ borderBottom: `1px solid ${isDark ? '#262626' : '#f0f0f0'}` }}>
+                    <td style={{ padding: '8px 6px', fontWeight: 500 }}>
+                      <a href={`/web/funds/${f.code}`} style={{ color: 'var(--primary)' }}>{f.name}</a>
+                    </td>
+                    <td style={{ padding: '8px 6px', color: isDark ? '#a0a0a0' : '#666' }}>{f.industry}</td>
+                    <td style={{ padding: '8px 6px' }}>{Number(f.weight || 0).toFixed(1)}%</td>
+                    <td style={{ padding: '8px 6px' }}>{f.holdingDays}天</td>
+                    <td style={{ padding: '8px 6px' }}>
+                      <span style={{ color: pnlColor(Number(f.pnl)), fontWeight: 600 }}>
+                        {pnlSign(Number(f.pnl))}¥{Math.abs(Number(f.pnl) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        <span style={{ fontSize: 10, marginLeft: 2 }}>({Number(f.pnlPercent) >= 0 ? '+' : ''}{Number(f.pnlPercent || 0).toFixed(2)}%)</span>
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 6px' }}>
+                      <Tag color={f.buyTimingScore >= 70 ? 'green' : f.buyTimingScore >= 40 ? 'blue' : 'orange'} style={{ fontSize: 10 }}>
+                        {f.buyTimingScore}分
+                      </Tag>
+                    </td>
+                    <td style={{ padding: '8px 6px' }}>
+                      <Tag color={f.riskLevel === '低' ? 'green' : f.riskLevel === '中低' ? 'lime' : f.riskLevel === '中' ? 'blue' : f.riskLevel === '中高' ? 'orange' : 'red'} style={{ fontSize: 10 }}>
+                        {f.riskLevel}
+                      </Tag>
+                    </td>
+                    <td style={{ padding: '8px 6px', color: isDark ? '#a0a0a0' : '#666', maxWidth: 200 }}>{f.diagnosis}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

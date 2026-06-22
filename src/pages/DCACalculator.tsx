@@ -252,16 +252,16 @@ export default function DCACalculator() {
                 <Statistic title="总投入" value={result.totalInvestment} precision={2} prefix="¥" />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="总资产" value={result.totalValue} precision={2} prefix="¥" valueStyle={{ color: '#1677ff' }} />
+                <Statistic title="总资产" value={result.totalValue} precision={2} prefix="¥" valueStyle={{ color: 'var(--primary)' }} />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="总收益" value={result.totalValue - result.totalInvestment} precision={2} prefix="¥" valueStyle={{ color: '#ff4d4f' }} />
+                <Statistic title="总收益" value={result.totalValue - result.totalInvestment} precision={2} prefix="¥" valueStyle={{ color: 'var(--danger)' }} />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="总收益率" value={result.totalReturn} precision={2} suffix="%" valueStyle={{ color: '#ff4d4f' }} />
+                <Statistic title="总收益率" value={result.totalReturn} precision={2} suffix="%" valueStyle={{ color: 'var(--danger)' }} />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="年化收益率" value={result.annualizedReturn} precision={2} suffix="%" valueStyle={{ color: '#ff4d4f' }} />
+                <Statistic title="年化收益率" value={result.annualizedReturn} precision={2} suffix="%" valueStyle={{ color: 'var(--danger)' }} />
               </Col>
               <Col xs={12} sm={6}>
                 <Statistic title="定投期数" value={result.totalPeriods} suffix={frequency === 'daily' ? '天' : frequency === 'weekly' ? '周' : '个月'} />

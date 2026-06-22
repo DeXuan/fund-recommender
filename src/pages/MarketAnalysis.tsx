@@ -329,12 +329,12 @@ export default function MarketAnalysis() {
               </Card>
             ))
           ) : (
-            <Card style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+            <Card style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-muted)' }}>
               暂无估值趋势数据
             </Card>
           )}
-          <Card size="small" style={{ marginTop: 16, background: isDark ? '#111a2c' : '#e6f4ff', border: '1px solid #91caff' }}>
-            <strong style={{ color: '#1677ff' }}>估值趋势说明</strong>
+          <Card size="small" style={{ marginTop: 16, background: isDark ? '#111a2c' : '#e6f4ff', border: '1px solid var(--primary-border)' }}>
+            <strong style={{ color: 'var(--primary)' }}>估值趋势说明</strong>
             <ul style={{ margin: '8px 0 0', paddingLeft: 16, lineHeight: 2, fontSize: 13 }}>
               <li>PE分位越低，表示当前估值越便宜，投资价值越高</li>
               <li>绿色区域（20%以下）为极度低估，适合重仓布局</li>

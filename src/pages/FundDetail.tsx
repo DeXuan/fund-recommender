@@ -95,8 +95,7 @@ export default function FundDetail() {
         setIsWatched(true);
         message.success('已添加自选');
       }
-    } catch (e) {
-      console.error('自选操作失败:', e);
+    } catch {
       message.error('操作失败');
     }
   };
@@ -213,7 +212,7 @@ export default function FundDetail() {
                 <Descriptions.Item label="机构持有">{fund.institutionHold}%</Descriptions.Item>
                 <Descriptions.Item label="个人持有">{fund.individualHold}%</Descriptions.Item>
                 <Descriptions.Item label="推荐评级">
-                  <span style={{ color: '#faad14' }}>{'★'.repeat(fund.rating)}</span>
+                  <span style={{ color: 'var(--warning)' }}>{'★'.repeat(fund.rating)}</span>
                 </Descriptions.Item>
                 <Descriptions.Item label="风险等级">{getRiskTag(fund.riskLevel)}</Descriptions.Item>
               </Descriptions>
@@ -243,8 +242,8 @@ export default function FundDetail() {
                 <Descriptions.Item label="管理费">{fund.managementFee?.toFixed(2)}%/年</Descriptions.Item>
                 <Descriptions.Item label="托管费">{fund.custodyFee?.toFixed(2)}%/年</Descriptions.Item>
                 <Descriptions.Item label="销售服务费">{fund.serviceFee?.toFixed(2)}%/年</Descriptions.Item>
-                <Descriptions.Item label={<span style={{ color: '#52c41a', fontWeight: 600 }}>综合费率</span>}>
-                  <span style={{ color: '#52c41a', fontWeight: 700, fontSize: 16 }}>{fund.totalFee?.toFixed(2)}%/年</span>
+                <Descriptions.Item label={<span style={{ color: 'var(--success)', fontWeight: 600 }}>综合费率</span>}>
+                  <span style={{ color: 'var(--success)', fontWeight: 700, fontSize: 16 }}>{fund.totalFee?.toFixed(2)}%/年</span>
                 </Descriptions.Item>
               </Descriptions>
             </Col>
@@ -252,8 +251,8 @@ export default function FundDetail() {
               <h4 style={{ marginBottom: 16 }}>申购费率</h4>
               <Descriptions column={1} size="small" bordered>
                 <Descriptions.Item label="原申购费">{fund.purchaseFee?.toFixed(2)}%</Descriptions.Item>
-                <Descriptions.Item label={<span style={{ color: '#52c41a', fontWeight: 600 }}>支付宝1折</span>}>
-                  <span style={{ color: '#52c41a', fontWeight: 700, fontSize: 16 }}>{fund.purchaseFeeDiscount?.toFixed(2)}%</span>
+                <Descriptions.Item label={<span style={{ color: 'var(--success)', fontWeight: 600 }}>支付宝1折</span>}>
+                  <span style={{ color: 'var(--success)', fontWeight: 700, fontSize: 16 }}>{fund.purchaseFeeDiscount?.toFixed(2)}%</span>
                 </Descriptions.Item>
               </Descriptions>
 
@@ -322,7 +321,7 @@ export default function FundDetail() {
               <div style={{
                 fontSize: 24, fontWeight: 700,
                 color: getValuationColor(fund.valuation),
-                padding: '8px 20px', background: 'white', borderRadius: 8,
+                padding: '8px 20px', background: isDark ? 'var(--bg-secondary)' : 'white', borderRadius: 8,
                 border: `2px solid ${getValuationColor(fund.valuation)}`,
               }}>
                 {getValuationText(fund.valuation)}
@@ -355,7 +354,7 @@ export default function FundDetail() {
                 }}>
                   <Tag color={index < 3 ? 'blue' : 'default'} style={{ marginRight: 12 }}>{index + 1}</Tag>
                   <span style={{ flex: 1, fontWeight: 500 }}>{holding.name}</span>
-                  <span style={{ width: 80, textAlign: 'right', fontWeight: 600, color: '#1677ff' }}>
+                  <span style={{ width: 80, textAlign: 'right', fontWeight: 600, color: 'var(--primary)' }}>
                     {holding.percentage?.toFixed(2)}%
                   </span>
                   <Progress percent={holding.percentage * 5} showInfo={false} size="small" style={{ width: 120, marginLeft: 16 }} />
@@ -407,7 +406,7 @@ export default function FundDetail() {
               <h1 style={{ fontSize: 24, margin: 0, color: '#fff' }}>{fund.name}</h1>
               <span onClick={toggleWatch} style={{ cursor: 'pointer', fontSize: 22 }}>
                 {isWatched
-                  ? <StarFilled style={{ color: '#faad14' }} />
+                  ? <StarFilled style={{ color: 'var(--warning)' }} />
                   : <StarOutlined style={{ color: 'rgba(255,255,255,0.5)' }} />}
               </span>
             </div>
@@ -425,7 +424,7 @@ export default function FundDetail() {
             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>最新净值 ({fund.navDate})</div>
             <div style={{ fontSize: 36, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{fund.nav?.toFixed(4)}</div>
             <div style={{ marginTop: 4 }}>
-              <span style={{ color: '#faad14', fontSize: 18 }}>{'★'.repeat(fund.rating)}</span>
+              <span style={{ color: 'var(--warning)', fontSize: 18 }}>{'★'.repeat(fund.rating)}</span>
             </div>
           </Col>
         </Row>
@@ -442,7 +441,7 @@ export default function FundDetail() {
             <Col xs={12} sm={8} md={4} key={item.label}>
               <Card size="small" style={{ textAlign: 'center', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, backdropFilter: 'blur(10px)' }} styles={{ body: { padding: '12px 8px' } }}>
                 <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, marginBottom: 4 }}>{item.label}</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: item.value >= 0 ? '#ff4d4f' : '#52c41a' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: item.value >= 0 ? 'var(--danger)' : 'var(--success)' }}>
                   {formatReturn(item.value)}
                 </div>
               </Card>
@@ -454,7 +453,7 @@ export default function FundDetail() {
         <Row gutter={16} style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
           <Col xs={12} sm={6}>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>综合费率</div>
-            <div style={{ fontWeight: 600, color: '#52c41a', fontSize: 15 }}>{fund.totalFee?.toFixed(2)}%/年</div>
+            <div style={{ fontWeight: 600, color: 'var(--success)', fontSize: 15 }}>{fund.totalFee?.toFixed(2)}%/年</div>
           </Col>
           <Col xs={12} sm={6}>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>基金规模</div>
@@ -468,7 +467,7 @@ export default function FundDetail() {
           </Col>
           <Col xs={12} sm={6}>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>每日限额</div>
-            <div style={{ fontWeight: 600, color: fund.dailyLimit > 0 ? '#ff4d4f' : 'rgba(255,255,255,0.8)', fontSize: 15 }}>
+            <div style={{ fontWeight: 600, color: fund.dailyLimit > 0 ? 'var(--danger)' : 'rgba(255,255,255,0.8)', fontSize: 15 }}>
               {fund.dailyLimit > 0 ? `${fund.dailyLimit}元` : '无限额'}
             </div>
           </Col>
@@ -476,7 +475,7 @@ export default function FundDetail() {
       </Card>
 
       {/* 投资建议 */}
-      <Card style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', marginBottom: 16, border: 'none' }}>
+      <Card style={{ background: isDark ? 'linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%)' : 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', marginBottom: 16, border: 'none' }}>
         <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>投资建议</h3>
         <Row gutter={20}>
           <Col xs={24} md={12}>
@@ -488,7 +487,7 @@ export default function FundDetail() {
             <p style={{ lineHeight: 1.6 }}>{fund.suitableFor}</p>
           </Col>
         </Row>
-        <Card size="small" style={{ marginTop: 12, background: 'rgba(255,255,255,0.7)' }}>
+        <Card size="small" style={{ marginTop: 12, background: isDark ? 'rgba(26,26,26,0.7)' : 'rgba(255,255,255,0.7)' }}>
           <div style={{ color: isDark ? '#a0a0a0' : '#666', fontSize: 13, marginBottom: 4 }}>操作建议</div>
           <p style={{ lineHeight: 1.6, margin: 0 }}>{fund.investmentAdvice}</p>
         </Card>
@@ -540,9 +539,8 @@ export default function FundDetail() {
             message.success('已添加到持仓');
             setAddToPortfolioOpen(false);
             navigate('/portfolio');
-          } catch (e) {
+          } catch {
             // validation error
-            console.error('添加到持仓失败:', e);
           }
         }}
         onCancel={() => setAddToPortfolioOpen(false)}

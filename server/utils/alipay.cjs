@@ -103,7 +103,8 @@ function isAlipayConfigured() {
 async function createPayment(outTradeNo, totalAmount, subject) {
   const sdk = getAlipaySdk();
   if (!sdk) throw new Error('支付宝SDK未配置');
-  const notifyUrl = process.env.ALIPAY_NOTIFY_URL || 'http://47.116.77.67:8688/api/subscription/notify';
+  const notifyUrl = process.env.ALIPAY_NOTIFY_URL;
+  if (!notifyUrl) throw new Error('ALIPAY_NOTIFY_URL 环境变量未配置');
   const result = await sdk.exec('alipay.trade.precreate', {
     bizContent: {
       outTradeNo,

@@ -330,13 +330,13 @@ export function FundComparePanel({
       fixed: 'left' as const,
       render: (text: string, record: any) => {
         if (record.key.startsWith('_group')) {
-          return <span style={{ fontWeight: 700, fontSize: 14, color: '#1677ff' }}>{text}</span>;
+          return <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--primary)' }}>{text}</span>;
         }
         return <span style={{ fontWeight: 500 }}>{text}</span>;
       },
     },
     ...compareData.map(fund => ({
-      title: <Link to={`/funds/${fund.code}`} style={{ color: '#1677ff' }}>{fund.name}<div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999', fontWeight: 400 }}>{fund.code}</div></Link>,
+      title: <Link to={`/funds/${fund.code}`} style={{ color: 'var(--primary)' }}>{fund.name}<div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>{fund.code}</div></Link>,
       dataIndex: fund.code,
       key: fund.code,
       render: (val: any, record: any) => {
@@ -350,19 +350,19 @@ export function FundComparePanel({
 
         if (record.key === 'valuation') return getValuationText(val);
 
-        if (record.key === 'rating') return <span style={{ color: '#faad14' }}>{'★'.repeat(Number(val) || 0)}</span>;
+        if (record.key === 'rating') return <span style={{ color: 'var(--warning)' }}>{'★'.repeat(Number(val) || 0)}</span>;
 
         if (['managementFee', 'custodyFee', 'serviceFee', 'totalFee'].includes(record.key)) {
           const num = Number(val);
           if (isNaN(num)) return val;
           const isHigh = record.key === 'totalFee' && num > 0.8;
-          return <span style={{ fontWeight: isHigh ? 700 : 500, color: isHigh ? '#ff4d4f' : undefined }}>{num.toFixed(2)}%</span>;
+          return <span style={{ fontWeight: isHigh ? 700 : 500, color: isHigh ? 'var(--danger)' : undefined }}>{num.toFixed(2)}%</span>;
         }
 
         if (['pePercentile', 'pbPercentile'].includes(record.key)) {
           const num = Number(val);
           if (isNaN(num)) return val;
-          const color = num < 30 ? '#52c41a' : num > 70 ? '#ff4d4f' : '#1677ff';
+          const color = num < 30 ? '#52c41a' : num > 70 ? 'var(--danger)' : 'var(--primary)';
           return <span style={{ color, fontWeight: 600 }}>{num.toFixed(1)}%</span>;
         }
 
@@ -389,17 +389,17 @@ export function FundComparePanel({
         if (record.key === 'shareChange') {
           const num = Number(val);
           if (isNaN(num)) return val;
-          return <span style={{ color: num > 0 ? '#52c41a' : '#ff4d4f', fontWeight: 600 }}>{num > 0 ? '+' : ''}{num}%</span>;
+          return <span style={{ color: num > 0 ? '#52c41a' : 'var(--danger)', fontWeight: 600 }}>{num > 0 ? '+' : ''}{num}%</span>;
         }
 
         if (record.key === 'institutionHold') {
           const num = Number(val);
           if (isNaN(num)) return val;
-          return <span style={{ fontWeight: num >= 10 ? 700 : 400, color: num >= 10 ? '#faad14' : undefined }}>{num}%</span>;
+          return <span style={{ fontWeight: num >= 10 ? 700 : 400, color: num >= 10 ? 'var(--warning)' : undefined }}>{num}%</span>;
         }
 
         if (record.key === 'dailyLimit') {
-          return <span style={{ fontWeight: 600, color: val === '暂停' ? '#ff4d4f' : isDark ? '#e8e8e8' : '#333' }}>{val}</span>;
+          return <span style={{ fontWeight: 600, color: val === '暂停' ? 'var(--danger)' : isDark ? '#e8e8e8' : '#333' }}>{val}</span>;
         }
 
         if (['recommendation', 'investmentAdvice'].includes(record.key)) {
@@ -419,7 +419,7 @@ export function FundComparePanel({
       <Card
         title={
           <Space>
-            <SwapOutlined style={{ color: '#1677ff' }} />
+            <SwapOutlined style={{ color: 'var(--primary)' }} />
             <span style={{ fontWeight: 600, fontSize: 16 }}>基金对比</span>
           </Space>
         }
@@ -485,7 +485,7 @@ export function FundComparePanel({
       {compareLoading ? (
         <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
       ) : compareData.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+        <Card style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-muted)' }}>
           <p style={{ fontSize: 16 }}>请添加基金开始对比</p>
           <p style={{ marginTop: 8, fontSize: 13 }}>支持同时对比最多5只基金</p>
         </Card>
@@ -565,8 +565,8 @@ export function FundComparePanel({
                   columns={[
                     { title: '基金', dataIndex: 'name' },
                     { title: '年化波动率', render: (_: any, r: any) => `${r.riskMetrics.volatility}%` },
-                    { title: '最大回撤', render: (_: any, r: any) => <span style={{ color: '#ff4d4f' }}>{r.riskMetrics.maxDrawdown}%</span> },
-                    { title: '夏普比率', render: (_: any, r: any) => <span style={{ color: r.riskMetrics.sharpeRatio > 0 ? '#52c41a' : '#ff4d4f' }}>{r.riskMetrics.sharpeRatio}</span> },
+                    { title: '最大回撤', render: (_: any, r: any) => <span style={{ color: 'var(--danger)' }}>{r.riskMetrics.maxDrawdown}%</span> },
+                    { title: '夏普比率', render: (_: any, r: any) => <span style={{ color: r.riskMetrics.sharpeRatio > 0 ? '#52c41a' : 'var(--danger)' }}>{r.riskMetrics.sharpeRatio}</span> },
                     { title: '卡玛比率', render: (_: any, r: any) => r.riskMetrics.calmarRatio },
                     { title: '3年持有成本', render: (_: any, r: any) => `${r.feeComparison.cost3y}%` },
                   ]}

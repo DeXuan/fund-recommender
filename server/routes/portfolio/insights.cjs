@@ -426,9 +426,9 @@ router.get('/vip-insights', subscriptionMiddleware, async (req, res) => {
       const riskFreeDaily = 0.02 / 252;
       const downSide = dailyReturns.filter(r => r < riskFreeDaily);
       const downVar = downSide.length > 0 ? downSide.reduce((s, r) => s + (r - riskFreeDaily) ** 2, 0) / downSide.length : 0;
-      const downDev = Math.sqrt(downVar) * Math.sqrt(252) * 100;
-      const annRet = annualizedReturn || 0;
-      sortinoRatio = downDev > 0 ? parseFloat(Math.max(-10, Math.min(20, (annRet - 2) / downDev)).toFixed(2)) : 0;
+      const downDev = Math.sqrt(downVar) * Math.sqrt(252);
+      const annRet = (annualizedReturn || 0) / 100;
+      sortinoRatio = downDev > 0 ? parseFloat(Math.max(-10, Math.min(20, (annRet - 0.02) / downDev)).toFixed(2)) : 0;
     }
 
     // 回撤恢复天数
@@ -694,7 +694,7 @@ router.get('/vip-insights', subscriptionMiddleware, async (req, res) => {
         profitAnalysis.analysis.push({
           type: 'source',
           title: '主要盈利来源',
-          detail: `${sortedCategories[0][0]}板块贡献盈利¥${sortedCategories[0][1].profit.toFixed(0)}，占比${Math.round(sortedCategories[0][1].profit / profitAnalysis.totalProfit * 100)}%`,
+          detail: `${sortedCategories[0][0]}板块贡献盈利¥${sortedCategories[0][1].profit.toFixed(0)}，占比${profitAnalysis.totalProfit !== 0 ? Math.round(sortedCategories[0][1].profit / profitAnalysis.totalProfit * 100) : 0}%`,
           funds: winners.filter(f => f.category === sortedCategories[0][0]).map(f => f.fundName),
         });
       }

@@ -6,19 +6,24 @@ const axios = require('axios');
 const iconv = require('iconv-lite');
 const { getPool } = require('./db.cjs');
 const fundService = require('./fund-service.cjs');
-const { DEFAULT_INDICES, PE_RANGES, PB_RANGES, getValuationByPercentile, API_URLS, REQUEST_DEFAULTS } = require('./config/index.cjs');
 
 // 默认市场指数配置
-const defaultIndices = DEFAULT_INDICES;
+const defaultIndices = [
+  { code: '000300', name: '沪深300', valuation: '合理偏低', suggestion: '适合定投' },
+  { code: '000905', name: '中证500', valuation: '合理偏低', suggestion: '适合定投' },
+  { code: '399006', name: '创业板指', valuation: '合理', suggestion: '适合小额定投' },
+  { code: '000688', name: '科创50', valuation: '合理偏高', suggestion: '建议观望' },
+  { code: '000001', name: '上证指数', valuation: '合理', suggestion: '适合定投' },
+];
 
 // 从腾讯行情API批量获取基金净值（每次最多50只）
 async function fetchFundNavBatch(codes) {
   const results = new Map();
   try {
     const symbols = codes.map(c => 'jj' + c).join(',');
-    const response = await axios.get(`${API_URLS.TENCENT_QUOTE}${symbols}`, {
+    const response = await axios.get(`https://qt.gtimg.cn/q=${symbols}`, {
       timeout: 10000,
-      headers: { 'User-Agent': REQUEST_DEFAULTS.USER_AGENT },
+      headers: { 'User-Agent': 'Mozilla/5.0' },
     });
 
     if (!response.data) return results;
@@ -119,9 +124,9 @@ async function fetchIndexValuation() {
 
   try {
     const listStr = symbols.map(s => s.symbol).join(',');
-    const response = await axios.get(`${API_URLS.TENCENT_QUOTE}${listStr}`, {
+    const response = await axios.get(`https://qt.gtimg.cn/q=${listStr}`, {
       timeout: 8000,
-      headers: { 'User-Agent': REQUEST_DEFAULTS.USER_AGENT },
+      headers: { 'User-Agent': 'Mozilla/5.0' },
     });
 
     if (!response.data) return 0;
@@ -167,19 +172,36 @@ async function fetchIndexValuation() {
   }
 }
 
-// 根据指数历史PE/PB区间估算分位数（0-100）- 使用集中配置
+// 根据指数历史PE/PB区间估算分位数（0-100）
 function estimatePercentile(code, value, type) {
-  const ranges = type === 'pb' ? PB_RANGES : PE_RANGES;
+  const peRanges = {
+    '000300': [9, 20], '000905': [18, 50], '399006': [30, 90],
+    '000688': [40, 160], '000001': [11, 25],
+  };
+  const pbRanges = {
+    '000300': [0.9, 1.8], '000905': [0.8, 2.0], '399006': [1.2, 4.5],
+    '000688': [0.8, 4.0], '000001': [0.9, 1.8],
+  };
+  const ranges = type === 'pb' ? pbRanges : peRanges;
   const r = ranges[code];
   if (!r) return 50;
   return Math.min(100, Math.max(0, Math.round(((value - r[0]) / (r[1] - r[0])) * 100)));
+}
+
+// 根据PE分位数判断估值水平和投资建议
+function getValuationByPercentile(p) {
+  if (p < 20) return { valuation: '极度低估', suggestion: '适合加大定投' };
+  if (p < 40) return { valuation: '偏低估', suggestion: '适合定投' };
+  if (p < 60) return { valuation: '合理', suggestion: '适合小额定投' };
+  if (p < 80) return { valuation: '偏高估', suggestion: '建议观望' };
+  return { valuation: '极度高估', suggestion: '建议减仓' };
 }
 
 // 获取板块轮动数据
 async function fetchSectorData() {
   try {
     const response = await axios.get(
-      API_URLS.SINA_SECTOR,
+      'https://vip.stock.finance.sina.com.cn/q/view/newSinaHy.php',
       { timeout: 8000, responseType: 'arraybuffer', headers: { Referer: 'https://finance.sina.com.cn/' } }
     );
 
@@ -210,11 +232,11 @@ async function fetchSectorData() {
 async function fetchFundReturns(code) {
   try {
     const response = await axios.get(
-      `${API_URLS.EASTMONEY_FUND_DETAIL}${code}.js`,
+      `https://fund.eastmoney.com/pingzhongdata/${code}.js`,
       {
         timeout: 10000,
         headers: {
-          'User-Agent': REQUEST_DEFAULTS.USER_AGENT,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           Referer: 'https://fund.eastmoney.com/',
           Range: 'bytes=0-5000',
         },
@@ -243,8 +265,8 @@ async function fetchFundReturns(code) {
 async function fetchReturn1w(code) {
   try {
     const response = await axios.get(
-      `${API_URLS.EASTMONEY_NAV_HISTORY}?fundCode=${code}&pageIndex=1&pageSize=10`,
-      { timeout: 6000, headers: { Referer: REQUEST_DEFAULTS.REFERER_EASTMONEY, 'User-Agent': REQUEST_DEFAULTS.USER_AGENT } }
+      `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=10`,
+      { timeout: 6000, headers: { Referer: 'https://fund.eastmoney.com/', 'User-Agent': 'Mozilla/5.0' } }
     );
     const list = response.data?.Data?.LSJZList;
     if (!list || list.length < 2) return null;
@@ -272,7 +294,7 @@ async function fetchSingleQDIIData(code) {
     let dailyLimit = 0;
     try {
       const infoRes = await axios.get(
-        API_URLS.EASTMONEY_FUND_BASIC,
+        'https://fundmobapi.eastmoney.com/FundMApi/FundBasicInformation.ashx',
         { params: { FCODE: code, deviceid: 'wap', plat: 'Wap', product: 'EFund', version: '2.0.0' }, timeout: 8000 }
       );
       const infoData = infoRes.data?.Datas;
@@ -287,14 +309,14 @@ async function fetchSingleQDIIData(code) {
           dailyLimit = isNaN(maxsg) ? 10 : maxsg;
         }
       }
-    } catch (e) { /* 忽略 */ }
+    } catch (e) { console.warn('[data-fetcher] 数据解析跳过:', e.message); }
 
     let nav = null, navDate = null;
     let return1m = null, return3m = null, return6m = null, return1y = null;
     try {
       const lsjzRes = await axios.get(
-        `${API_URLS.EASTMONEY_NAV_HISTORY}?fundCode=${code}&pageIndex=1&pageSize=260`,
-        { timeout: 8000, headers: { Referer: REQUEST_DEFAULTS.REFERER_EASTMONEY, 'User-Agent': REQUEST_DEFAULTS.USER_AGENT } }
+        `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=260`,
+        { timeout: 8000, headers: { Referer: 'https://fund.eastmoney.com/', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
       );
       const list = lsjzRes.data?.Data?.LSJZList;
       if (list && list.length > 0) {
@@ -317,7 +339,7 @@ async function fetchSingleQDIIData(code) {
         return6m = calcReturn(findNav(180));
         return1y = calcReturn(findNav(365));
       }
-    } catch (e) { /* 忽略 */ }
+    } catch (e) { console.warn('[data-fetcher] 数据解析跳过:', e.message); }
 
     return { nav, navDate, return1m, return3m, return6m, return1y, buySuggestion, dailyLimit };
   } catch (error) {
@@ -363,7 +385,7 @@ async function fetchQDIIData(allFunds) {
             'UPDATE funds SET buy_suggestion = $1, daily_limit = $2, updated_at = NOW() WHERE code = $3',
             [data.buySuggestion, data.dailyLimit, fund.code]
           );
-        } catch (e) { /* 忽略 */ }
+        } catch (e) { console.warn('[data-fetcher] 数据解析跳过:', e.message); }
 
         if (data.nav) {
           fund.nav = data.nav;
@@ -397,7 +419,7 @@ async function fetchSingleHS300FundDetail(fund, benchmarkReturn1y, navData) {
 
   try {
     const infoRes = await axios.get(
-      API_URLS.EASTMONEY_FUND_BASIC,
+      'https://fundmobapi.eastmoney.com/FundMApi/FundBasicInformation.ashx',
       { params: { FCODE: fund.code, deviceid: 'wap', plat: 'Wap', product: 'EFund', version: '2.0.0' }, timeout: 8000 }
     );
     const infoData = infoRes.data?.Datas;
@@ -497,7 +519,7 @@ async function fetchCapitalFlow() {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const northRes = await axios.get(
-        API_URLS.EASTMONEY_DATA_CENTER,
+        'https://datacenter-web.eastmoney.com/api/data/v1/get',
         {
           params: {
             reportName: 'RPT_MUTUAL_DEAL_HISTORY',
@@ -543,7 +565,7 @@ async function fetchCapitalFlow() {
       let mainFlow = [];
       try {
         const mainRes = await axios.get(
-          `${API_URLS.EASTMONEY_CLIST}?pn=1&pz=10&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:90+t:2&fields=f12,f14,f62,f184`,
+          'https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=10&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:90+t:2&fields=f12,f14,f62,f184',
           { timeout: 5000, headers: { Referer: 'https://data.eastmoney.com/' } }
         );
         if (mainRes.data?.data?.diff) {
@@ -982,7 +1004,7 @@ async function fetchSingleFundFromAlipay(code) {
   // A. 从支付宝基金基本信息API获取基金经理、规模、申购状态
   try {
     const infoRes = await axios.get(
-      API_URLS.EASTMONEY_FUND_BASIC,
+      'https://fundmobapi.eastmoney.com/FundMApi/FundBasicInformation.ashx',
       { params: { FCODE: code, deviceid: 'wap', plat: 'Wap', product: 'EFund', version: '2.0.0' }, timeout: 8000 }
     );
     const info = infoRes.data?.Datas;
@@ -1008,7 +1030,7 @@ async function fetchSingleFundFromAlipay(code) {
   try {
     const lsjzRes = await axios.get(
       'https://api.fund.eastmoney.com/f10/lsjz',
-      { params: { fundCode: code, pageIndex: 1, pageSize: 20 }, timeout: 8000, headers: { Referer: REQUEST_DEFAULTS.REFERER_EASTMONEY, 'User-Agent': REQUEST_DEFAULTS.USER_AGENT } }
+      { params: { fundCode: code, pageIndex: 1, pageSize: 20 }, timeout: 8000, headers: { Referer: 'https://fund.eastmoney.com/', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
     );
     const list = lsjzRes.data?.Data?.LSJZList;
     if (list && list.length > 0) {
@@ -1041,8 +1063,8 @@ async function fetchSingleFundFromAlipay(code) {
   if (!manager) {
     try {
       const detailRes = await axios.get(
-        `${API_URLS.EASTMONEY_FUND_DETAIL}${code}.js`,
-        { timeout: 8000, headers: { 'User-Agent': REQUEST_DEFAULTS.USER_AGENT, Referer: REQUEST_DEFAULTS.REFERER_EASTMONEY, Range: 'bytes=0-8000' } }
+        `https://fund.eastmoney.com/pingzhongdata/${code}.js`,
+        { timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://fund.eastmoney.com/', Range: 'bytes=0-8000' } }
       );
       const text = detailRes.data || '';
       const mgrMatch = text.match(/Data_currentFundManager\s*=\s*\[([^\]]+)\]/);
@@ -1053,7 +1075,7 @@ async function fetchSingleFundFromAlipay(code) {
         while ((m = nameRegex.exec(mgrMatch[1])) !== null) names.push(m[1]);
         if (names.length > 0) manager = names.join(',');
       }
-    } catch (e) { /* 忽略 */ }
+    } catch (e) { console.warn('[data-fetcher] 数据解析跳过:', e.message); }
   }
 
   if (!nav) return null;

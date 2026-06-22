@@ -164,16 +164,16 @@ export function DCACalculatorTab({ isDark }: Props) {
                 <Statistic title="总投入" value={dcaResult.totalInvestment} precision={2} prefix="¥" />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="总资产" value={dcaResult.totalValue} precision={2} prefix="¥" valueStyle={{ color: '#1677ff' }} />
+                <Statistic title="总资产" value={dcaResult.totalValue} precision={2} prefix="¥" valueStyle={{ color: 'var(--primary)' }} />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="总收益" value={dcaResult.totalValue - dcaResult.totalInvestment} precision={2} prefix="¥" valueStyle={{ color: '#ff4d4f' }} />
+                <Statistic title="总收益" value={dcaResult.totalValue - dcaResult.totalInvestment} precision={2} prefix="¥" valueStyle={{ color: 'var(--danger)' }} />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="总收益率" value={dcaResult.totalReturn} precision={2} suffix="%" valueStyle={{ color: '#ff4d4f' }} />
+                <Statistic title="总收益率" value={dcaResult.totalReturn} precision={2} suffix="%" valueStyle={{ color: 'var(--danger)' }} />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="年化收益率" value={dcaResult.annualizedReturn} precision={2} suffix="%" valueStyle={{ color: '#ff4d4f' }} />
+                <Statistic title="年化收益率" value={dcaResult.annualizedReturn} precision={2} suffix="%" valueStyle={{ color: 'var(--danger)' }} />
               </Col>
               <Col xs={12} sm={6}>
                 <Statistic title="定投期数" value={dcaResult.totalPeriods} suffix={dcaFrequency === 'daily' ? '天' : dcaFrequency === 'weekly' ? '周' : '个月'} />

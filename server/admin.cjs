@@ -336,6 +336,9 @@ router.post('/users/batch', async (req, res) => {
           await client.query('DELETE FROM dca_plans WHERE user_id = $1', [id]);
           await client.query('DELETE FROM risk_profiles WHERE user_id = $1', [id]);
           await client.query('DELETE FROM oauth_accounts WHERE user_id = $1', [id]);
+          await client.query('DELETE FROM subscription_orders WHERE user_id = $1', [id]);
+          await client.query('DELETE FROM login_logs WHERE user_id = $1', [id]);
+          await client.query('DELETE FROM chat_history WHERE user_id = $1', [id]);
           await client.query('DELETE FROM users WHERE id = $1', [id]);
           if (u.rows.length > 0) {
             await auditLog(req.user.id, req.user.username, 'batch_delete', id, u.rows[0].username, '', req.ip);
@@ -412,6 +415,9 @@ router.delete('/users/:id', async (req, res) => {
     await pool.query('DELETE FROM dca_plans WHERE user_id = $1', [id]);
     await pool.query('DELETE FROM risk_profiles WHERE user_id = $1', [id]);
     await pool.query('DELETE FROM oauth_accounts WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM subscription_orders WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM login_logs WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM chat_history WHERE user_id = $1', [id]);
     await pool.query('DELETE FROM user_notes WHERE user_id = $1', [id]);
     await pool.query('DELETE FROM users WHERE id = $1', [id]);
     await auditLog(req.user.id, req.user.username, 'delete_user', parseInt(id), user.rows[0].username, '', req.ip);

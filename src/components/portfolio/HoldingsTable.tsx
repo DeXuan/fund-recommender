@@ -44,8 +44,8 @@ export function HoldingsTable({
       title: '基金名称', dataIndex: 'fund_name', key: 'fund_name', width: 180,
       sorter: (a: PortfolioHolding, b: PortfolioHolding) => a.fund_name.localeCompare(b.fund_name, 'zh-CN'),
       render: (name: string, record: PortfolioHolding) => (
-        <Link to={`/funds/${record.fund_code}`} style={{ fontWeight: 500, color: '#1677ff' }}>
-          {name} <LinkOutlined style={{ fontSize: 11, color: '#1677ff' }} />
+        <Link to={`/funds/${record.fund_code}`} style={{ fontWeight: 500, color: 'var(--primary)' }}>
+          {name} <LinkOutlined style={{ fontSize: 11, color: 'var(--primary)' }} />
         </Link>
       ),
     },
@@ -116,7 +116,7 @@ export function HoldingsTable({
       title: '操作', key: 'action', width: 180, fixed: 'right' as const,
       render: (_: any, holding: PortfolioHolding) => (
         <Space>
-          <Button type="link" size="small" icon={<SwapOutlined />} style={{ color: '#faad14' }}
+          <Button type="link" size="small" icon={<SwapOutlined />} style={{ color: 'var(--warning)' }}
             onClick={() => onSell(holding)}>
             赎回
           </Button>

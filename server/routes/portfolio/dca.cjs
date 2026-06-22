@@ -27,8 +27,23 @@ router.post('/dca-plans', async (req, res) => {
     if (!fund_code || !fund_name || !amount || !frequency || !start_date) {
       return res.status(400).json({ error: '请填写完整的定投计划信息' });
     }
+    if (!/^\d{6}$/.test(fund_code)) {
+      return res.status(400).json({ error: '基金代码格式不正确，应为6位数字' });
+    }
+    if (typeof amount !== 'number' || amount <= 0 || amount > 10000000) {
+      return res.status(400).json({ error: '定投金额必须在0~1000万之间' });
+    }
     if (!['weekly', 'biweekly', 'monthly', 'quarterly'].includes(frequency)) {
       return res.status(400).json({ error: '定投频率不正确' });
+    }
+    if (day_of_month != null && (day_of_month < 1 || day_of_month > 31)) {
+      return res.status(400).json({ error: '每月定投日必须在1-31之间' });
+    }
+    if (day_of_week != null && (day_of_week < 1 || day_of_week > 7)) {
+      return res.status(400).json({ error: '每周定投日必须在1-7之间' });
+    }
+    if (notes && notes.length > 500) {
+      return res.status(400).json({ error: '备注不能超过500个字符' });
     }
 
     const pool = getPool();

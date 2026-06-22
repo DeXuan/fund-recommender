@@ -35,6 +35,22 @@ router.post('/sell', async (req, res) => {
     const pnlPercent = avgCost > 0 ? ((sell_price - avgCost) / avgCost * 100) : 0;
     const fundName = buyRecords.rows[0]?.fund_name || fund_code;
 
+    // FIFO 递减买入记录份额
+    let remaining = shares;
+    for (const rec of buyRecords.rows) {
+      if (remaining <= 0.0001) break;
+      const recShares = parseFloat(rec.shares);
+      if (recShares <= 0) continue;
+      const deduct = Math.min(remaining, recShares);
+      const newShares = recShares - deduct;
+      if (newShares < 0.0001) {
+        await pool.query('UPDATE fund_records SET shares = 0 WHERE id = $1', [rec.id]);
+      } else {
+        await pool.query('UPDATE fund_records SET shares = $1 WHERE id = $2', [newShares, rec.id]);
+      }
+      remaining -= deduct;
+    }
+
     // 插入卖出记录
     const result = await pool.query(
       `INSERT INTO fund_records (user_id, fund_code, fund_name, shares, cost_price, buy_date, buy_fee, notes, record_type,
@@ -400,6 +416,55 @@ router.get('/performance-attribution', async (req, res) => {
   } catch (error) {
     console.error('收益归因失败:', error.message);
     res.status(500).json({ error: '收益归因失败' });
+  }
+});
+
+// GET /api/portfolio/transactions/export — 导出交易流水CSV
+router.get('/transactions/export', async (req, res) => {
+  try {
+    const pool = getPool();
+    const { fund_code, type } = req.query;
+
+    let query = `SELECT fund_code, fund_name, shares, cost_price, buy_date, buy_fee, notes,
+                        record_type, sell_price, sell_date, sell_fee, realized_pnl, created_at
+                 FROM fund_records WHERE user_id = $1`;
+    const params = [req.user.id];
+    let idx = 2;
+
+    if (fund_code) {
+      query += ` AND fund_code = $${idx++}`;
+      params.push(fund_code);
+    }
+    if (type && type !== 'all') {
+      query += ` AND record_type = $${idx++}`;
+      params.push(type);
+    }
+    query += ' ORDER BY created_at DESC';
+
+    const result = await pool.query(query, params);
+
+    const escCsv = (v) => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const header = '类型,基金代码,基金名称,份额,成本价,买入日期,手续费,卖出价,卖出日期,卖出手续费,实现盈亏,备注,创建时间';
+    const rows = result.rows.map(r =>
+      [
+        r.record_type === 'sell' ? '卖出' : '买入',
+        r.fund_code, r.fund_name, r.shares, r.cost_price, r.buy_date,
+        r.buy_fee, r.sell_price || '', r.sell_date || '', r.sell_fee || '',
+        r.realized_pnl || '', r.notes, r.created_at
+      ].map(escCsv).join(',')
+    );
+
+    const csv = '﻿' + header + '\n' + rows.join('\n');
+    res.setHeader('Content-Type', 'text/csv;charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=transactions_${new Date().toISOString().slice(0, 10)}.csv`);
+    res.send(csv);
+  } catch (err) {
+    console.error('导出交易流水失败:', err);
+    res.status(500).json({ error: '导出交易流水失败' });
   }
 });
 

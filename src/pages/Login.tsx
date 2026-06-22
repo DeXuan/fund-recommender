@@ -73,9 +73,8 @@ export default function Login() {
   const initDemoAndRedirect = async () => {
     try {
       await portfolioApi.initDemo();
-    } catch (e) {
+    } catch {
       // ignore - user may already have data
-      console.error('初始化演示数据失败:', e);
     }
     navigate('/portfolio', { replace: true });
   };
@@ -124,9 +123,8 @@ export default function Login() {
           clearTimeout(expireTimer);
           handleAlipayAuthSuccess(data.token, data.user);
         }
-      } catch (e) {
+      } catch {
         // 忽略轮询错误，继续轮询
-        console.error('支付宝授权轮询错误:', e);
       }
     }, 2000);
   };
@@ -186,9 +184,8 @@ export default function Login() {
         // 开始轮询检查授权状态
         startPolling(data.state);
       }
-    } catch (e) {
+    } catch {
       // 网络错误也走模拟模式
-      console.error('支付宝授权请求失败:', e);
       setMockModalOpen(true);
       setMockScanning(false);
       setMockSuccess(false);
@@ -287,7 +284,7 @@ export default function Login() {
     }}>
       <Card style={{ width: 420, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <h2 style={{ margin: 0, color: '#1677ff' }}>基金推荐助手</h2>
+          <h2 style={{ margin: 0, color: 'var(--primary)' }}>基金推荐助手</h2>
           <p style={{ color: isDarkTheme ? '#a0a0a0' : '#666', margin: '8px 0 0' }}>登录后使用理财记账功能</p>
         </div>
 
@@ -311,8 +308,8 @@ export default function Login() {
             loading={alipayLoading}
             onClick={handleAlipayLogin}
             style={{
-              background: '#1677ff',
-              borderColor: '#1677ff',
+              background: 'var(--primary)',
+              borderColor: 'var(--primary)',
               color: '#fff',
             }}
           >
@@ -373,7 +370,7 @@ export default function Login() {
 
           {alipayStatus === 'success' ? (
             <Result
-              icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
+              icon={<CheckCircleOutlined style={{ color: 'var(--success)' }} />}
               title="登录成功"
               subTitle="正在跳转..."
               style={{ padding: '24px 0' }}
@@ -418,7 +415,7 @@ export default function Login() {
 
           {mockSuccess ? (
             <Result
-              icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
+              icon={<CheckCircleOutlined style={{ color: 'var(--success)' }} />}
               title="登录成功"
               subTitle="正在跳转..."
               style={{ padding: '24px 0' }}
@@ -435,7 +432,7 @@ export default function Login() {
                 width: 200,
                 height: 200,
                 margin: '0 auto 16px',
-                background: '#fff',
+                background: isDarkTheme ? 'var(--bg-container)' : '#fff',
                 border: isDarkTheme ? '1px solid #333' : '1px solid #e8e8e8',
                 borderRadius: 8,
                 display: 'flex',

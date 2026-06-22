@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { getPool } = require('../db.cjs');
+const { authMiddleware } = require('../auth.cjs');
 
 // 持仓重叠分析
-router.get('/api/portfolio/overlap', async (req, res) => {
+router.get('/api/portfolio/overlap', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: '请先登录' });
+    const userId = req.user.id;
 
     const pool = getPool();
 
@@ -116,8 +116,14 @@ router.post('/api/goal-planning', async (req, res) => {
     if (!targetAmount || !years) {
       return res.status(400).json({ error: '请填写目标金额和投资年限' });
     }
+    if (targetAmount <= 0) {
+      return res.status(400).json({ error: '目标金额必须大于0' });
+    }
     if (years > 50 || years < 1) {
       return res.status(400).json({ error: '投资年限必须在1-50年之间' });
+    }
+    if (currentAmount < 0 || monthlyContribution < 0) {
+      return res.status(400).json({ error: '当前金额和每月定投不能为负数' });
     }
 
     const rate = Math.min(Math.max((expectedReturn || 8), 0), 30) / 100;

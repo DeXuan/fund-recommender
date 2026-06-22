@@ -7,17 +7,22 @@ import {
   BarChartOutlined, SearchOutlined, DeleteOutlined, HistoryOutlined,
   BulbOutlined, GlobalOutlined, LineChartOutlined, AppstoreOutlined,
   PlusOutlined, RiseOutlined, FallOutlined,
-  ExperimentOutlined, SafetyOutlined, BankOutlined,
+  SafetyOutlined,
   StockOutlined, PercentageOutlined, RocketOutlined,
-  StarOutlined, ThunderboltOutlined, CopyOutlined, CheckOutlined,
+  CopyOutlined, CheckOutlined,
   QuestionCircleOutlined, RightOutlined,
+  CrownOutlined, HeartOutlined,
+  TrophyOutlined, WarningOutlined, DashboardOutlined,
+  SolutionOutlined, AuditOutlined, FileSearchOutlined,
+  CalendarOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { fundApi } from '../services/api';
+import { aiApi } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { parseSlashCommand, SLASH_COMMANDS } from '../utils/slash-commands';
 
 interface Message {
   id: number | string;
@@ -25,6 +30,7 @@ interface Message {
   content: string;
   data?: any;
   timestamp: string;
+  saved?: boolean;
 }
 
 interface Session {
@@ -37,57 +43,85 @@ interface Session {
 
 const PAGE_SIZE = 20;
 
-const quickCategories = [
+// Layered capability categories
+const capabilityCategories = [
   {
-    key: 'portfolio',
-    label: '我的持仓',
-    icon: <FundOutlined />,
-    color: '#fa541c',
-    gradient: 'linear-gradient(135deg, #fa541c 0%, #fa8c16 100%)',
-    questions: [
-      { icon: <RiseOutlined />, text: '我的收益怎么样？', desc: '查看个人持仓收益' },
-      { icon: <FundOutlined />, text: '看看我的持仓情况', desc: '持仓明细与盈亏' },
-      { icon: <BarChartOutlined />, text: '我赚了多少钱？', desc: '总收益与已实现收益' },
-      { icon: <FallOutlined />, text: '哪些基金亏了？', desc: '亏损基金排行' },
-    ],
-  },
-  {
-    key: 'recommend',
-    label: '智能推荐',
-    icon: <BulbOutlined />,
-    color: '#722ed1',
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    questions: [
-      { icon: <FundOutlined />, text: '推荐低费率的沪深300基金', desc: '费率低、跟踪误差小' },
-      { icon: <GlobalOutlined />, text: '哪些QDII基金收益好？', desc: '布局海外市场' },
-      { icon: <StarOutlined />, text: '有哪些金选基金？', desc: '平台精选优质基金' },
-      { icon: <RiseOutlined />, text: '哪些基金收益最高？', desc: '近1年收益排行' },
-    ],
-  },
-  {
-    key: 'analysis',
-    label: '市场分析',
-    icon: <LineChartOutlined />,
+    key: 'basic',
+    label: '通用问答',
+    icon: <QuestionCircleOutlined />,
     color: '#1677ff',
     gradient: 'linear-gradient(135deg, #667eea 0%, #1677ff 100%)',
     questions: [
-      { icon: <StockOutlined />, text: '当前指数估值怎么样？', desc: 'PE分位实时查询' },
-      { icon: <BarChartOutlined />, text: '查看指数行情', desc: '主要指数实时行情' },
-      { icon: <AppstoreOutlined />, text: '有哪些行业分类？', desc: '全市场行业概览' },
-      { icon: <BankOutlined />, text: '大规模基金有哪些？', desc: '规模>50亿的基金' },
+      { icon: <BulbOutlined />, text: '什么是基金定投？', desc: '投资入门知识' },
+      { icon: <FundOutlined />, text: 'ETF和普通基金有什么区别？', desc: '基金类型科普' },
+      { icon: <SafetyOutlined />, text: '基金风险等级怎么看？', desc: '风险评估基础' },
+      { icon: <PercentageOutlined />, text: '基金费率怎么计算？', desc: '费率知识' },
     ],
   },
   {
-    key: 'search',
-    label: '精准搜索',
-    icon: <SearchOutlined />,
+    key: 'diagnosis',
+    label: '基金诊断',
+    icon: <FileSearchOutlined />,
+    color: '#722ed1',
+    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    questions: [
+      { icon: <FundOutlined />, text: '帮我诊断一下持仓基金', desc: '全面诊断分析' },
+      { icon: <BarChartOutlined />, text: '哪些基金回撤控制得好？', desc: '回撤分析' },
+      { icon: <RiseOutlined />, text: '夏普比率最高的基金', desc: '风险调整收益' },
+      { icon: <StockOutlined />, text: '基金经理能力怎么评估？', desc: '经理能力分析' },
+    ],
+  },
+  {
+    key: 'strategy',
+    label: '投资策略',
+    icon: <RocketOutlined />,
+    color: '#fa541c',
+    gradient: 'linear-gradient(135deg, #fa541c 0%, #fa8c16 100%)',
+    questions: [
+      { icon: <LineChartOutlined />, text: '帮我制定定投计划', desc: '定投策略定制' },
+      { icon: <BarChartOutlined />, text: '现在适合止盈吗？', desc: '止盈时机判断' },
+      { icon: <GlobalOutlined />, text: '行业轮动策略怎么操作？', desc: '行业轮动建议' },
+      { icon: <AppstoreOutlined />, text: '资产配置方案推荐', desc: '配置策略' },
+    ],
+  },
+  {
+    key: 'portfolio',
+    label: '持仓分析',
+    icon: <AuditOutlined />,
     color: '#52c41a',
     gradient: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)',
     questions: [
-      { icon: <SearchOutlined />, text: '搜索医药行业基金', desc: '按行业关键词搜索' },
-      { icon: <PercentageOutlined />, text: '费率最低的基金', desc: '综合费率<0.8%' },
-      { icon: <ExperimentOutlined />, text: '搜索半导体基金', desc: '科技赛道布局' },
-      { icon: <SafetyOutlined />, text: '搜索债券基金', desc: '稳健收益之选' },
+      { icon: <FundOutlined />, text: '我的收益怎么样？', desc: '查看个人持仓收益' },
+      { icon: <BarChartOutlined />, text: '帮我分析持仓风险', desc: '风险敞口分析' },
+      { icon: <WarningOutlined />, text: '哪些基金亏了？', desc: '亏损基金排行' },
+      { icon: <TrophyOutlined />, text: '持仓集中度分析', desc: '分散度评估' },
+    ],
+  },
+  {
+    key: 'vip',
+    label: 'VIP专属',
+    icon: <CrownOutlined />,
+    color: '#faad14',
+    gradient: 'linear-gradient(135deg, #ffd700 0%, #faad14 100%)',
+    isVip: true,
+    questions: [
+      { icon: <SolutionOutlined />, text: '定制资产配置方案', desc: '个性化配置建议' },
+      { icon: <CalendarOutlined />, text: '制定月度投资规划', desc: '定期投资计划' },
+      { icon: <FileSearchOutlined />, text: '亏损专项分析报告', desc: '深度亏损诊断' },
+      { icon: <DashboardOutlined />, text: '月度理财复盘', desc: '收益回顾分析' },
+    ],
+  },
+  {
+    key: 'market',
+    label: '市场解读',
+    icon: <GlobalOutlined />,
+    color: '#13c2c2',
+    gradient: 'linear-gradient(135deg, #13c2c2 0%, #096dd9 100%)',
+    questions: [
+      { icon: <StockOutlined />, text: '当前指数估值怎么样？', desc: 'PE分位实时查询' },
+      { icon: <BarChartOutlined />, text: '查看指数行情', desc: '主要指数实时行情' },
+      { icon: <LineChartOutlined />, text: '大盘走势怎么看？', desc: '市场趋势研判' },
+      { icon: <AppstoreOutlined />, text: '有哪些行业分类？', desc: '全市场行业概览' },
     ],
   },
 ];
@@ -105,6 +139,7 @@ export default function AIAssistant() {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
   const [hasMore, setHasMore] = useState(false);
@@ -123,13 +158,17 @@ export default function AIAssistant() {
   const [selectedCategory, setSelectedCategory] = useState('portfolio');
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [copiedId, setCopiedId] = useState<string | number | null>(null);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [welcomeText, setWelcomeText] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [savedMessages, setSavedMessages] = useState<Set<string | number>>(new Set());
+  const [favoritesDrawerOpen, setFavoritesDrawerOpen] = useState(false);
 
-  // 欢迎页打字动画
+  const isVip = user?.subscription_status === 'premium';
+
+  // Welcome screen typing animation
   useEffect(() => {
     if (messages.length > 0) return;
-    const text = '基于 Claude AI 驱动，实时数据分析，智能基金问答';
+    const text = '基于 Claude AI 驱动，七层能力体系，智能投资分析';
     let i = 0;
     const timer = setInterval(() => {
       if (i <= text.length) {
@@ -142,7 +181,7 @@ export default function AIAssistant() {
     return () => clearInterval(timer);
   }, [messages.length]);
 
-  // 追问建议（根据最后一条 AI 回复动态生成）
+  // Dynamic follow-up suggestions
   const getFollowUpSuggestions = (): string[] => {
     if (messages.length < 2) return [];
     const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant');
@@ -152,6 +191,8 @@ export default function AIAssistant() {
     if (content.includes('推荐') || content.includes('基金')) return ['这些基金费率怎么样？', '对比一下这几只基金', '适合定投吗？'];
     if (content.includes('估值') || content.includes('指数')) return ['现在适合买入吗？', '历史估值趋势', '相关行业基金推荐'];
     if (content.includes('行业') || content.includes('板块')) return ['这个行业有哪些基金？', '行业估值怎么样？', '推荐行业配置方案'];
+    if (content.includes('亏损') || content.includes('亏了')) return ['帮我分析亏损原因', '制定解套策略', '止损还是补仓？'];
+    if (content.includes('定投')) return ['定投多少合适？', '定投频率怎么选？', '设置止盈点'];
     return ['继续分析', '换个话题聊聊', '帮我推荐基金'];
   };
 
@@ -170,13 +211,11 @@ export default function AIAssistant() {
     const savedSessionId = localStorage.getItem('ai_chat_session_id');
     if (savedSessionId) {
       setSessionId(savedSessionId);
-      loadHistory(savedSessionId);
     } else {
       const newSid = 'chat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
       setSessionId(newSid);
       localStorage.setItem('ai_chat_session_id', newSid);
     }
-    setTimeout(() => scrollToBottom(), 350);
   }, []);
 
   const scrollToBottom = useCallback(() => {
@@ -189,7 +228,7 @@ export default function AIAssistant() {
       prevScrollHeightRef.current = chatContainerRef.current.scrollHeight;
     }
     try {
-      const result = await fundApi.getAIHistory({ sessionId: sid, limit: PAGE_SIZE, before });
+      const result = await aiApi.getHistory({ sessionId: sid, limit: PAGE_SIZE, before });
       const historyMessages = result.messages || [];
       setHasMore(result.hasMore || false);
       if (before) {
@@ -204,8 +243,8 @@ export default function AIAssistant() {
 
   const loadSessions = useCallback(async () => {
     setLoadingSessions(true);
-    try { const result = await fundApi.getAISessions(); setSessions(result.sessions || []); }
-    catch (e) { /* ignore */ console.error('加载AI会话列表失败:', e); }
+    try { const result = await aiApi.getSessions(); setSessions(result.sessions || []); }
+    catch (e) { console.error('加载AI会话列表失败:', e); }
     setLoadingSessions(false);
   }, []);
 
@@ -241,19 +280,21 @@ export default function AIAssistant() {
     }
   }, [sessionId, hasMore, loadingHistory, loadHistory]);
 
-  // 发送消息（流式）
+  // Send message (streaming)
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
+    const { command, args } = parseSlashCommand(text);
     const userMsg: Message = { id: Date.now(), role: 'user', content: text.trim(), timestamp: new Date().toISOString() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
+    setShowSlashMenu(false);
     setLoading(true);
     scrollToBottom();
 
     const aiMsgId = Date.now() + 1;
     let streamedContent = '';
     try {
-      await fundApi.aiChatStream(text.trim(), sessionId,
+      await aiApi.chatStream(text.trim(), sessionId,
         (chunk) => {
           streamedContent += chunk;
           setMessages(prev => {
@@ -265,6 +306,8 @@ export default function AIAssistant() {
         },
         (sid) => { if (sid && sid !== sessionId) { setSessionId(sid); localStorage.setItem('ai_chat_session_id', sid); } },
         (errMsg) => { if (!streamedContent) setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant' as const, content: errMsg || '网络错误，请稍后重试', timestamp: new Date().toISOString() }]); },
+        command?.name,
+        args,
       );
     } catch (e) {
       console.error('发送AI消息失败:', e);
@@ -278,7 +321,7 @@ export default function AIAssistant() {
 
   const clearHistory = async () => {
     try {
-      await fundApi.clearAIHistory(sessionId);
+      await aiApi.clearHistory(sessionId);
       setMessages([]);
       const newSid = 'chat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
       setSessionId(newSid);
@@ -294,14 +337,28 @@ export default function AIAssistant() {
     });
   };
 
-  // 渲染基金卡片
+  const toggleSaveMessage = (msg: Message) => {
+    setSavedMessages(prev => {
+      const next = new Set(prev);
+      if (next.has(msg.id)) {
+        next.delete(msg.id);
+        message.info('已取消收藏');
+      } else {
+        next.add(msg.id);
+        message.success('已收藏分析内容');
+      }
+      return next;
+    });
+  };
+
+  // Render fund cards
   const renderFundList = (funds: any[]) => {
     if (!funds?.length) return null;
     return (
       <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
         {funds.slice(0, 6).map((f: any) => (
           <Link key={f.code} to={`/funds/${f.code}`} style={{ textDecoration: 'none' }}>
-            <div style={{
+            <div className="ai-fund-card" style={{
               padding: '10px 14px', borderRadius: 10,
               background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(22,119,255,0.04)',
               border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(22,119,255,0.12)'}`,
@@ -379,17 +436,18 @@ export default function AIAssistant() {
     return null;
   };
 
-  // 渲染消息
+  // Render message
   const renderMessage = (msg: Message) => {
     const isUser = msg.role === 'user';
     const time = safeParseTime(msg.timestamp);
+    const isSaved = savedMessages.has(msg.id);
     return (
-      <div key={msg.id} style={{
+      <div key={msg.id} className="ai-message-enter" style={{
         display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start',
-        marginBottom: 16, animation: 'fadeInUp 0.3s ease-out',
+        marginBottom: 16,
       }}>
         {!isUser && (
-          <div style={{
+          <div className="ai-avatar-bot" style={{
             width: 34, height: 34, borderRadius: 11,
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -400,7 +458,7 @@ export default function AIAssistant() {
           </div>
         )}
         <div style={{ maxWidth: '78%', minWidth: 60, position: 'relative' }}>
-          <div style={{
+          <div className={isUser ? 'ai-bubble-user' : 'ai-bubble-bot'} style={{
             padding: '12px 16px',
             borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
             background: isUser
@@ -425,21 +483,31 @@ export default function AIAssistant() {
           }}>
             {time && <span style={{ fontSize: 11, color: isDark ? '#555' : '#bbb' }}>{time}</span>}
             {!isUser && msg.content && (
-              <Tooltip title={copiedId === msg.id ? '已复制' : '复制'}>
-                <span
-                  onClick={() => copyToClipboard(msg.content, msg.id)}
-                  style={{ fontSize: 11, color: isDark ? '#555' : '#bbb', cursor: 'pointer', transition: 'color 0.2s' }}
-                  onMouseEnter={e => { e.currentTarget.style.color = '#1677ff'; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = isDark ? '#555' : '#bbb'; }}
-                >
-                  {copiedId === msg.id ? <CheckOutlined /> : <CopyOutlined />}
-                </span>
-              </Tooltip>
+              <>
+                <Tooltip title={copiedId === msg.id ? '已复制' : '复制'}>
+                  <span
+                    onClick={() => copyToClipboard(msg.content, msg.id)}
+                    style={{ fontSize: 11, color: isDark ? '#555' : '#bbb', cursor: 'pointer', transition: 'color 0.2s' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#1677ff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = isDark ? '#555' : '#bbb'; }}
+                  >
+                    {copiedId === msg.id ? <CheckOutlined /> : <CopyOutlined />}
+                  </span>
+                </Tooltip>
+                <Tooltip title={isSaved ? '取消收藏' : '收藏'}>
+                  <span
+                    onClick={() => toggleSaveMessage(msg)}
+                    style={{ fontSize: 11, color: isSaved ? '#faad14' : (isDark ? '#555' : '#bbb'), cursor: 'pointer', transition: 'color 0.2s' }}
+                  >
+                    <HeartOutlined />
+                  </span>
+                </Tooltip>
+              </>
             )}
           </div>
         </div>
         {isUser && (
-          <div style={{
+          <div className="ai-avatar-user" style={{
             width: 34, height: 34, borderRadius: 11,
             background: 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -453,20 +521,27 @@ export default function AIAssistant() {
     );
   };
 
-  const currentCategory = quickCategories.find(c => c.key === selectedCategory) || quickCategories[0];
+  const currentCategory = capabilityCategories.find(c => c.key === selectedCategory) || capabilityCategories[0];
 
-  // 快捷操作 chips
+  // Quick action chips
   const quickChips = [
     { text: '我的收益怎么样？', icon: <FundOutlined /> },
     { text: '推荐几只优质基金', icon: <BulbOutlined /> },
     { text: '当前指数估值', icon: <LineChartOutlined /> },
-    { text: '市场行情分析', icon: <BarChartOutlined /> },
+    { text: '帮我分析持仓风险', icon: <SafetyOutlined /> },
   ];
 
-  // 追问建议
   const followUps = getFollowUpSuggestions();
 
-  // 会话侧边栏
+  // Sidebar quick functions
+  const sidebarFunctions = [
+    { key: 'new', icon: <PlusOutlined />, label: '新会话', color: '#1677ff', action: newSession },
+    { key: 'history', icon: <HistoryOutlined />, label: '历史记录', color: '#722ed1', action: () => { loadSessions(); setSessionsDrawerOpen(true); } },
+    { key: 'favorites', icon: <HeartOutlined />, label: '我的收藏', color: '#fa541c', action: () => setFavoritesDrawerOpen(true) },
+    { key: 'clear', icon: <DeleteOutlined />, label: '清空对话', color: '#ff4d4f', action: clearHistory, needConfirm: true },
+  ];
+
+  // Sessions drawer
   const renderSessionsDrawer = () => (
     <Drawer
       title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><HistoryOutlined /><span>会话记录</span></div>}
@@ -500,13 +575,86 @@ export default function AIAssistant() {
     </Drawer>
   );
 
+  // Favorites drawer
+  const renderFavoritesDrawer = () => {
+    const savedMsgs = messages.filter(m => m.role === 'assistant' && savedMessages.has(m.id));
+    return (
+      <Drawer
+        title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><HeartOutlined style={{ color: '#fa541c' }} /><span>收藏的分析</span></div>}
+        placement="right" onClose={() => setFavoritesDrawerOpen(false)} open={favoritesDrawerOpen} width={400}
+      >
+        {savedMsgs.length === 0 ? (
+          <Empty description="暂无收藏内容" image={Empty.PRESENTED_IMAGE_SIMPLE}>
+            <p style={{ fontSize: 12, color: isDark ? '#666' : '#999' }}>在对话中点击 <HeartOutlined /> 收藏优质分析内容</p>
+          </Empty>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {savedMsgs.map(msg => (
+              <Card key={msg.id} size="small" style={{ borderRadius: 10 }}>
+                <div className="markdown-body" style={{ fontSize: 13, maxHeight: 200, overflow: 'auto' }}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content.slice(0, 500)}</ReactMarkdown>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}` }}>
+                  <span style={{ fontSize: 11, color: isDark ? '#666' : '#999' }}>{safeParseTime(msg.timestamp)}</span>
+                  <Button size="small" icon={<CopyOutlined />} onClick={() => copyToClipboard(msg.content, msg.id)}>
+                    {copiedId === msg.id ? '已复制' : '复制'}
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </Drawer>
+    );
+  };
+
   return (
-    <div className="fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{`
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 20px rgba(102,126,234,0.2); } 50% { box-shadow: 0 0 30px rgba(102,126,234,0.4); } }
         @keyframes typingDot { 0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1); } }
         @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        @keyframes aiMsgEnter { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .ai-message-enter { animation: aiMsgEnter 0.3s ease-out; }
+        .ai-bubble-user { position: relative; overflow: hidden; }
+        .ai-bubble-user::before {
+          content: ''; position: absolute; inset: 0;
+          background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+          pointer-events: none;
+        }
+        .ai-bubble-bot { transition: background 0.2s; }
+        .ai-bubble-bot:hover { background: ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.02)'} !important; }
+        .ai-fund-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .ai-sidebar-btn {
+          display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px;
+          cursor: pointer; transition: all 0.2s; font-size: 13px;
+          color: ${isDark ? '#aaa' : '#666'};
+        }
+        .ai-sidebar-btn:hover {
+          background: ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'};
+          color: ${isDark ? '#e8e8e8' : '#1f1f1f'};
+        }
+        .ai-category-card {
+          padding: 12px 14px; border-radius: 12px; cursor: pointer;
+          background: ${isDark ? 'rgba(255,255,255,0.04)' : '#fff'};
+          border: 1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0'};
+          transition: all 0.2s; display: flex; align-items: center; gap: 10;
+        }
+        .ai-category-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+        }
+        .ai-quick-chip {
+          display: flex; align-items: center; gap: 4px;
+          padding: 4px 12px; border-radius: 16px; cursor: pointer;
+          background: ${isDark ? 'rgba(255,255,255,0.06)' : '#f5f5f5'};
+          border: 1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e8e8e8'};
+          font-size: 12px; color: ${isDark ? '#aaa' : '#666'};
+          transition: all 0.2s;
+        }
+        .ai-quick-chip:hover { border-color: #1677ff; color: #1677ff; }
         .markdown-body { font-size: 14px; line-height: 1.7; }
         .markdown-body table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; border-radius: 8px; overflow: hidden; }
         .markdown-body th, .markdown-body td { border: 1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e8e8e8'}; padding: 8px 12px; text-align: left; }
@@ -527,295 +675,368 @@ export default function AIAssistant() {
         .markdown-body a:hover { text-decoration: underline; }
       `}</style>
 
-      <Card
-        styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' } }}
-        style={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 0, border: 'none', boxShadow: 'none' }}
-      >
-        {/* 消息列表 */}
-        <div ref={chatContainerRef} onScroll={handleScroll} style={{ flex: 1, overflow: 'auto', padding: '16px 20px', minHeight: 0 }}>
-          {/* 加载更多 */}
-          {hasMore && messages.length > 0 && (
-            <div style={{ textAlign: 'center', padding: '8px 0', marginBottom: 12 }}>
-              {loadingHistory ? <Spin size="small" /> : (
-                <Button type="link" size="small" onClick={() => {
-                  const oldestId = typeof messages[0]?.id === 'number' ? messages[0].id : undefined;
-                  loadHistory(sessionId, oldestId);
-                }}>加载更早的记录</Button>
-              )}
-            </div>
-          )}
-
-          {/* 欢迎页 */}
-          {messages.length === 0 && !loadingHistory && (
-            <div style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              justifyContent: 'center', padding: '32px 16px', minHeight: 400,
-            }}>
-              {/* Logo */}
-              <div style={{
-                width: 72, height: 72, borderRadius: 22,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginBottom: 16,
-                boxShadow: '0 8px 32px rgba(102,126,234,0.3)',
-                animation: 'pulse-glow 3s ease-in-out infinite',
-              }}>
-                <RobotOutlined style={{ color: '#fff', fontSize: 32 }} />
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        {/* Left Sidebar */}
+        <div style={{
+          width: sidebarCollapsed ? 56 : 220, flexShrink: 0,
+          borderRight: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}`,
+          background: isDark ? 'rgba(0,0,0,0.15)' : '#fafafa',
+          display: 'flex', flexDirection: 'column',
+          transition: 'width 0.3s ease',
+          overflow: 'hidden',
+        }}>
+          {/* Sidebar header */}
+          <div style={{ padding: '12px', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}` }}>
+            {!sidebarCollapsed && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8,
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <RobotOutlined style={{ color: '#fff', fontSize: 14 }} />
+                </div>
+                <span style={{ fontWeight: 600, fontSize: 14, color: isDark ? '#e8e8e8' : '#1f1f1f' }}>FinPilot</span>
+                {isVip && <Tag color="gold" style={{ fontSize: 10, lineHeight: '16px' }}>VIP</Tag>}
               </div>
-              <h2 style={{
-                fontSize: 22, fontWeight: 700, margin: '0 0 6px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              }}>
-                AI 投资助手
-              </h2>
-              <p style={{ fontSize: 13, color: isDark ? '#888' : '#999', margin: '0 0 24px', textAlign: 'center', maxWidth: 400, minHeight: 20 }}>
-                {welcomeText}
-                <span style={{
-                  display: 'inline-block', width: 1, height: 14, background: '#1677ff',
-                  marginLeft: 2, verticalAlign: 'text-bottom',
-                  animation: 'typingDot 0.8s infinite',
-                }} />
-              </p>
+            )}
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              block={!sidebarCollapsed}
+              size="small"
+              onClick={newSession}
+              style={{ borderRadius: 8 }}
+            >
+              {!sidebarCollapsed && '新会话'}
+            </Button>
+          </div>
 
-              {/* 功能标签 */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 28 }}>
-                {[
-                  { icon: <FundOutlined />, text: '持仓分析', color: '#fa541c' },
-                  { icon: <BulbOutlined />, text: '智能推荐', color: '#722ed1' },
-                  { icon: <LineChartOutlined />, text: '市场研判', color: '#1677ff' },
-                  { icon: <ThunderboltOutlined />, text: '实时数据', color: '#faad14' },
-                ].map(f => (
-                  <div key={f.text} style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '6px 14px', borderRadius: 20,
-                    background: isDark ? 'rgba(255,255,255,0.06)' : '#fff',
-                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}`,
-                    fontSize: 12, color: isDark ? '#ccc' : '#555',
-                  }}>
-                    <span style={{ color: f.color, fontSize: 14 }}>{f.icon}</span>
-                    {f.text}
+          {/* Quick functions */}
+          <div style={{ flex: 1, overflow: 'auto', padding: '8px 8px' }}>
+            {sidebarFunctions.map(fn => {
+              const btn = (
+                <div
+                  key={fn.key}
+                  className="ai-sidebar-btn"
+                  onClick={() => fn.needConfirm ? undefined : fn.action()}
+                  style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}
+                >
+                  <span style={{ color: fn.color, fontSize: 16 }}>{fn.icon}</span>
+                  {!sidebarCollapsed && <span>{fn.label}</span>}
+                </div>
+              );
+              if (fn.needConfirm) {
+                return (
+                  <Popconfirm key={fn.key} title="确定清空所有对话？" onConfirm={fn.action} okText="确定" cancelText="取消">
+                    {btn}
+                  </Popconfirm>
+                );
+              }
+              return btn;
+            })}
+
+          </div>
+
+          {/* Collapse toggle */}
+          <div
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            style={{
+              padding: '12px', textAlign: 'center', cursor: 'pointer',
+              borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}`,
+              color: isDark ? '#666' : '#999', fontSize: 14,
+              transition: 'color 0.2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#1677ff'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = isDark ? '#666' : '#999'; }}
+          >
+            {sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          </div>
+        </div>
+
+        {/* Main Chat Area */}
+        <Card
+          styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' } }}
+          style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 0, border: 'none', boxShadow: 'none' }}
+        >
+          {/* Messages */}
+          <div ref={chatContainerRef} onScroll={handleScroll} style={{ flex: 1, overflow: 'auto', padding: '16px 20px', minHeight: 0 }}>
+            {/* Load more */}
+            {hasMore && messages.length > 0 && (
+              <div style={{ textAlign: 'center', padding: '8px 0', marginBottom: 12 }}>
+                {loadingHistory ? <Spin size="small" /> : (
+                  <Button type="link" size="small" onClick={() => {
+                    const oldestId = typeof messages[0]?.id === 'number' ? messages[0].id : undefined;
+                    loadHistory(sessionId, oldestId);
+                  }}>加载更早的记录</Button>
+                )}
+              </div>
+            )}
+
+            {/* Welcome screen */}
+            {messages.length === 0 && !loadingHistory && (
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', padding: '32px 16px', minHeight: 400,
+              }}>
+                {/* Logo */}
+                <div className="ai-welcome-logo" style={{
+                  width: 72, height: 72, borderRadius: 22,
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: 16,
+                  boxShadow: '0 8px 32px rgba(102,126,234,0.3)',
+                  animation: 'pulse-glow 3s ease-in-out infinite',
+                }}>
+                  <RobotOutlined style={{ color: '#fff', fontSize: 32 }} />
+                </div>
+                <h2 style={{
+                  fontSize: 22, fontWeight: 700, margin: '0 0 6px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                }}>
+                  FinPilot AI 投资助手
+                </h2>
+                <p style={{ fontSize: 13, color: isDark ? '#888' : '#999', margin: '0 0 8px', textAlign: 'center', maxWidth: 400, minHeight: 20 }}>
+                  {welcomeText}
+                  <span style={{
+                    display: 'inline-block', width: 1, height: 14, background: '#1677ff',
+                    marginLeft: 2, verticalAlign: 'text-bottom',
+                    animation: 'typingDot 0.8s infinite',
+                  }} />
+                </p>
+                <p style={{ fontSize: 12, color: isDark ? '#555' : '#bbb', margin: '0 0 28px' }}>Claude AI 驱动 · 实时数据分析 · 智能投资问答</p>
+
+                {/* Quick questions by category */}
+                <div style={{ width: '100%', maxWidth: 560 }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+                    <Segmented
+                      value={selectedCategory}
+                      onChange={v => setSelectedCategory(v as string)}
+                      size="small"
+                      options={capabilityCategories.filter(c => !c.isVip || isVip).map(c => ({
+                        label: <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>{c.icon} {c.label}</span>,
+                        value: c.key,
+                      }))}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {currentCategory.questions.map((q, i) => (
+                      <div
+                        key={`${selectedCategory}-${i}`}
+                        className="ai-category-card"
+                        onClick={() => sendMessage(q.text)}
+                        style={{
+                          borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.borderColor = currentCategory.color;
+                          e.currentTarget.style.boxShadow = `0 4px 16px ${currentCategory.color}20`;
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          background: currentCategory.gradient,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          flexShrink: 0, fontSize: 14, color: '#fff',
+                        }}>
+                          {q.icon}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: isDark ? '#e8e8e8' : '#1f1f1f' }}>{q.text}</div>
+                          <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999', marginTop: 1 }}>{q.desc}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {loadingHistory && messages.length === 0 && (
+              <div style={{ textAlign: 'center', padding: 60 }}><Spin tip="加载聊天记录..." /></div>
+            )}
+
+            {/* Messages */}
+            {messages.map(renderMessage)}
+
+            {/* Thinking indicator */}
+            {loading && messages.length > 0 && messages[messages.length - 1]?.role === 'user' && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16 }}>
+                <div style={{
+                  width: 34, height: 34, borderRadius: 11,
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginRight: 10, flexShrink: 0,
+                }}>
+                  <RobotOutlined style={{ color: '#fff', fontSize: 15 }} />
+                </div>
+                <div style={{
+                  padding: '12px 16px', borderRadius: '16px 16px 16px 4px',
+                  background: isDark ? 'rgba(255,255,255,0.06)' : '#f7f8fa',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[0, 1, 2].map(i => (
+                      <div key={i} style={{
+                        width: 6, height: 6, borderRadius: '50%', background: '#1677ff',
+                        animation: `typingDot 1.4s ${i * 0.2}s infinite`,
+                      }} />
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 13, color: isDark ? '#888' : '#999' }}>思考中</span>
+                </div>
+              </div>
+            )}
+
+            {/* Follow-up suggestions */}
+            {!loading && followUps.length > 0 && messages.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4, marginBottom: 8 }}>
+                <span style={{ fontSize: 11, color: isDark ? '#666' : '#aaa', lineHeight: '26px' }}>
+                  <QuestionCircleOutlined style={{ marginRight: 4 }} />试试问问：
+                </span>
+                {followUps.map((q, i) => (
+                  <div
+                    key={i}
+                    className="ai-quick-chip"
+                    onClick={() => sendMessage(q)}
+                  >
+                    {q} <RightOutlined style={{ fontSize: 10 }} />
                   </div>
                 ))}
               </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
 
-              {/* 快捷问题 */}
-              <div style={{ width: '100%', maxWidth: 560 }}>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-                  <Segmented
-                    value={selectedCategory}
-                    onChange={v => setSelectedCategory(v as string)}
-                    size="small"
-                    options={quickCategories.map(c => ({
-                      label: <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>{c.icon} {c.label}</span>,
-                      value: c.key,
-                    }))}
-                  />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {currentCategory.questions.map((q, i) => (
-                    <div
-                      key={`${selectedCategory}-${i}`}
-                      onClick={() => sendMessage(q.text)}
-                      style={{
-                        padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
-                        background: isDark ? 'rgba(255,255,255,0.04)' : '#fff',
-                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0'}`,
-                        transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 10,
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.borderColor = currentCategory.color;
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = `0 4px 16px ${currentCategory.color}20`;
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                    >
-                      <div style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        background: currentCategory.gradient,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexShrink: 0, fontSize: 14, color: '#fff',
-                      }}>
-                        {q.icon}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: isDark ? '#e8e8e8' : '#1f1f1f' }}>{q.text}</div>
-                        <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999', marginTop: 1 }}>{q.desc}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          {/* Scroll to bottom */}
+          {showScrollBtn && (
+            <div
+              onClick={() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); setShowScrollBtn(false); }}
+              style={{
+                position: 'absolute', bottom: 120, left: '50%', transform: 'translateX(-50%)',
+                padding: '6px 16px', borderRadius: 20,
+                background: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+                backdropFilter: 'blur(8px)', cursor: 'pointer', fontSize: 12,
+                color: isDark ? '#aaa' : '#666', display: 'flex', alignItems: 'center', gap: 4,
+                zIndex: 10, transition: 'all 0.2s',
+                boxShadow: isDark ? 'none' : '0 2px 8px rgba(0,0,0,0.08)',
+              }}
+            >
+              <FallOutlined style={{ fontSize: 10 }} /> 回到底部
             </div>
           )}
 
-          {loadingHistory && messages.length === 0 && (
-            <div style={{ textAlign: 'center', padding: 60 }}><Spin tip="加载聊天记录..." /></div>
-          )}
-
-          {/* 消息列表 */}
-          {messages.map(renderMessage)}
-
-          {/* 思考中指示器 */}
-          {loading && messages.length > 0 && messages[messages.length - 1]?.role === 'user' && (
-            <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16 }}>
-              <div style={{
-                width: 34, height: 34, borderRadius: 11,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginRight: 10, flexShrink: 0,
-              }}>
-                <RobotOutlined style={{ color: '#fff', fontSize: 15 }} />
-              </div>
-              <div style={{
-                padding: '12px 16px', borderRadius: '16px 16px 16px 4px',
-                background: isDark ? 'rgba(255,255,255,0.06)' : '#f7f8fa',
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {[0, 1, 2].map(i => (
-                    <div key={i} style={{
-                      width: 6, height: 6, borderRadius: '50%', background: '#1677ff',
-                      animation: `typingDot 1.4s ${i * 0.2}s infinite`,
-                    }} />
-                  ))}
-                </div>
-                <span style={{ fontSize: 13, color: isDark ? '#888' : '#999' }}>思考中</span>
-              </div>
-            </div>
-          )}
-          {/* 追问建议 */}
-          {!loading && followUps.length > 0 && messages.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4, marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: isDark ? '#666' : '#aaa', lineHeight: '26px' }}>
-                <QuestionCircleOutlined style={{ marginRight: 4 }} />试试问问：
-              </span>
-              {followUps.map((q, i) => (
+          {/* Input area */}
+          <div style={{
+            padding: '10px 16px 12px',
+            borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}`,
+            background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
+          }}>
+            {/* Quick chips */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8, overflowX: 'auto', whiteSpace: 'nowrap', scrollbarWidth: 'none' }}>
+              {quickChips.map(chip => (
                 <div
-                  key={i}
-                  onClick={() => sendMessage(q)}
-                  style={{
-                    padding: '3px 10px', borderRadius: 14, cursor: 'pointer',
-                    background: isDark ? 'rgba(22,119,255,0.1)' : 'rgba(22,119,255,0.06)',
-                    border: `1px solid ${isDark ? 'rgba(22,119,255,0.2)' : 'rgba(22,119,255,0.15)'}`,
-                    fontSize: 12, color: '#1677ff',
-                    transition: 'all 0.2s',
-                    display: 'flex', alignItems: 'center', gap: 4,
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'rgba(22,119,255,0.15)';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = isDark ? 'rgba(22,119,255,0.1)' : 'rgba(22,119,255,0.06)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
+                  key={chip.text}
+                  className="ai-quick-chip"
+                  onClick={() => sendMessage(chip.text)}
+                  style={{ flexShrink: 0 }}
                 >
-                  {q} <RightOutlined style={{ fontSize: 10 }} />
+                  {chip.icon} {chip.text}
+                </div>
+              ))}
+              {SLASH_COMMANDS.slice(0, 3).map(cmd => (
+                <div
+                  key={cmd.name}
+                  className="ai-quick-chip"
+                  onClick={() => { setInput(cmd.name + ' '); setShowSlashMenu(false); setTimeout(() => inputRef.current?.focus(), 100); }}
+                  style={{ flexShrink: 0, fontSize: 11 }}
+                >
+                  {cmd.icon} {cmd.name}
                 </div>
               ))}
             </div>
-          )}
-          <div ref={chatEndRef} />
-        </div>
 
-        {/* 回到底部 */}
-        {showScrollBtn && (
-          <div
-            onClick={() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); setShowScrollBtn(false); }}
-            style={{
-              position: 'absolute', bottom: 120, left: '50%', transform: 'translateX(-50%)',
-              padding: '6px 16px', borderRadius: 20,
-              background: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
-              backdropFilter: 'blur(8px)', cursor: 'pointer', fontSize: 12,
-              color: isDark ? '#aaa' : '#666', display: 'flex', alignItems: 'center', gap: 4,
-              zIndex: 10, transition: 'all 0.2s',
-              boxShadow: isDark ? 'none' : '0 2px 8px rgba(0,0,0,0.08)',
-            }}
-          >
-            <FallOutlined style={{ fontSize: 10 }} /> 回到底部
-          </div>
-        )}
-
-        {/* 输入区域 */}
-        <div style={{
-          padding: '10px 16px 12px',
-          borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}`,
-          background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
-        }}>
-          {/* 快捷 chips */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-            {quickChips.map(chip => (
-              <div
-                key={chip.text}
-                onClick={() => sendMessage(chip.text)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '4px 12px', borderRadius: 16, cursor: 'pointer',
-                  background: isDark ? 'rgba(255,255,255,0.06)' : '#f5f5f5',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e8e8e8'}`,
-                  fontSize: 12, color: isDark ? '#aaa' : '#666',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = '#1677ff';
-                  e.currentTarget.style.color = '#1677ff';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : '#e8e8e8';
-                  e.currentTarget.style.color = isDark ? '#aaa' : '#666';
-                }}
-              >
-                {chip.icon} {chip.text}
+            {/* Slash command autocomplete */}
+            {showSlashMenu && (
+              <div style={{
+                marginBottom: 8, borderRadius: 10, overflow: 'hidden',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e8e8e8'}`,
+                background: isDark ? '#1a1a1a' : '#fff',
+                boxShadow: isDark ? '0 4px 16px rgba(0,0,0,0.3)' : '0 4px 16px rgba(0,0,0,0.08)',
+              }}>
+                {SLASH_COMMANDS.filter(cmd => {
+                  const q = input.trim().toLowerCase();
+                  return !q || cmd.name.includes(q) || cmd.description.includes(q);
+                }).map(cmd => (
+                  <div
+                    key={cmd.name}
+                    onClick={() => { setInput(cmd.name + ' '); setShowSlashMenu(false); setTimeout(() => inputRef.current?.focus(), 100); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '8px 14px', cursor: 'pointer',
+                      borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : '#f5f5f5'}`,
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(64,150,255,0.08)' : 'rgba(22,119,255,0.04)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <span style={{ fontSize: 16 }}>{cmd.icon}</span>
+                    <span style={{ fontWeight: 500, fontSize: 13, color: isDark ? '#e8e8e8' : '#1f1f1f' }}>{cmd.name}</span>
+                    <span style={{ fontSize: 12, color: isDark ? '#6b6b6b' : '#999', flex: 1 }}>{cmd.description}</span>
+                    <span style={{ fontSize: 11, color: isDark ? '#555' : '#bbb' }}>{cmd.argPlaceholder || ''}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
 
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-            <Input.TextArea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onPressEnter={(e) => {
-                if (!e.shiftKey) { e.preventDefault(); sendMessage(input); }
-              }}
-              placeholder="问我任何投资问题... (Shift+Enter 换行)"
-              autoSize={{ minRows: 1, maxRows: 4 }}
-              disabled={loading}
-              style={{
-                borderRadius: 12, resize: 'none',
-                background: isDark ? 'rgba(255,255,255,0.06)' : '#f7f8fa',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e8e8e8'}`,
-                padding: '8px 12px',
-              }}
-            />
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              size="large"
-              onClick={() => sendMessage(input)}
-              loading={loading}
-              disabled={!input.trim()}
-              style={{
-                borderRadius: 12, width: 44, height: 40, flexShrink: 0,
-                background: input.trim() ? 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)' : undefined,
-                border: 'none',
-                boxShadow: input.trim() ? '0 2px 8px rgba(22,119,255,0.3)' : 'none',
-              }}
-            />
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+              <Input.TextArea
+                ref={inputRef}
+                value={input}
+                onChange={e => { setInput(e.target.value); setShowSlashMenu(e.target.value.startsWith('/')); }}
+                onPressEnter={(e) => {
+                  if (!e.shiftKey) { e.preventDefault(); sendMessage(input); }
+                }}
+                placeholder="问我任何投资问题... (Shift+Enter 换行)"
+                autoSize={{ minRows: 1, maxRows: 4 }}
+                disabled={loading}
+                style={{
+                  borderRadius: 12, resize: 'none',
+                  background: isDark ? 'rgba(255,255,255,0.06)' : '#f7f8fa',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e8e8e8'}`,
+                  padding: '8px 12px',
+                }}
+              />
+              <Button
+                type="primary"
+                icon={<SendOutlined />}
+                size="large"
+                onClick={() => sendMessage(input)}
+                loading={loading}
+                disabled={!input.trim()}
+                style={{
+                  borderRadius: 12, width: 44, height: 40, flexShrink: 0,
+                  background: input.trim() ? 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)' : undefined,
+                  border: 'none',
+                  boxShadow: input.trim() ? '0 2px 8px rgba(22,119,255,0.3)' : 'none',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: isDark ? '#555' : '#ccc' }}>
+              <span>Claude AI 驱动 · 七层能力体系</span>
+              <span>{input.length > 0 ? `${input.length} 字` : 'Enter 发送 · Shift+Enter 换行'}</span>
+            </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: isDark ? '#555' : '#ccc' }}>
-            <span>Claude AI 驱动</span>
-            <span>{input.length > 0 ? `${input.length} 字` : 'Enter 发送 · Shift+Enter 换行'}</span>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       {renderSessionsDrawer()}
+      {renderFavoritesDrawer()}
     </div>
-  );
+ );
 }
