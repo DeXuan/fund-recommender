@@ -131,7 +131,7 @@ export default function FloatingChat() {
         placement="right"
         open={open}
         onClose={() => setOpen(false)}
-        width={480}
+        width={420}
         closable={false}
         mask={false}
         push={false}
@@ -208,7 +208,7 @@ export default function FloatingChat() {
           </div>
         </div>
 
-        <AIAssistant />
+        <AIAssistant isDrawerMode />
       </Drawer>
     </>
   );

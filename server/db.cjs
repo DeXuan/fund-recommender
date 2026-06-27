@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const logger = require('./utils/logger.cjs');
 
 // Fail loudly if required env vars are missing
 const requiredEnvVars = ['PG_HOST', 'PG_PORT', 'PG_DATABASE', 'PG_USER', 'PG_PASSWORD'];
@@ -24,12 +25,7 @@ const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('PostgreSQL 连接池错误:', err.message);
-});
-
-// 防止未处理的Promise rejection导致进程崩溃
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('未处理的Promise rejection:', reason);
+  logger.error(`PostgreSQL 连接池错误: ${err.message}`);
 });
 
 async function initDatabase(retries = 3) {
@@ -514,13 +510,82 @@ async function initDatabase(retries = 3) {
         ('password_min_length', '8', '密码最小长度'),
         ('session_timeout_hours', '168', '会话超时(小时)')
       ON CONFLICT (key) DO NOTHING`,
+      // ========== AI选股引擎表 ==========
+      // SVIP等级字段
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(20) DEFAULT 'free'`,
+      // 用户保存的筛选方案
+      `CREATE TABLE IF NOT EXISTS saved_screeners (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        description TEXT DEFAULT '',
+        filters JSONB NOT NULL DEFAULT '{}',
+        is_default BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_saved_screeners_user ON saved_screeners(user_id)`,
+      // 选股历史记录
+      `CREATE TABLE IF NOT EXISTS stock_pick_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        screener_id INTEGER REFERENCES saved_screeners(id) ON DELETE SET NULL,
+        strategy VARCHAR(30) NOT NULL DEFAULT 'balanced',
+        filters JSONB DEFAULT '{}',
+        results JSONB NOT NULL DEFAULT '[]',
+        result_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_pick_history_user ON stock_pick_history(user_id, created_at DESC)`,
+      // 用户保存的投资组合
+      `CREATE TABLE IF NOT EXISTS saved_portfolios (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        description TEXT DEFAULT '',
+        strategy VARCHAR(30) DEFAULT 'balanced',
+        budget NUMERIC(15,2) DEFAULT 0,
+        allocation JSONB NOT NULL DEFAULT '[]',
+        backtest_summary JSONB,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_saved_portfolios_user ON saved_portfolios(user_id)`,
+      // 用户自定义提醒规则
+      `CREATE TABLE IF NOT EXISTS stock_alert_rules (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        rule_type VARCHAR(30) NOT NULL,
+        conditions JSONB NOT NULL DEFAULT '{}',
+        is_active BOOLEAN DEFAULT true,
+        last_triggered_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_stock_alerts_user ON stock_alert_rules(user_id)`,
+      // 指数估值温度缓存
+      `CREATE TABLE IF NOT EXISTS index_temperature (
+        index_code VARCHAR(20) PRIMARY KEY,
+        temperature NUMERIC(5,1) NOT NULL DEFAULT 50,
+        pe_percentile NUMERIC(5,2),
+        pb_percentile NUMERIC(5,2),
+        history_avg_pe NUMERIC(8,2),
+        history_avg_pb NUMERIC(8,2),
+        signal VARCHAR(20) DEFAULT 'neutral',
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      // SVIP订阅套餐种子数据
+      `INSERT INTO subscription_plans (name, price, duration_days, features)
+        VALUES ('至尊SVIP', 29.90, 30, '["自定义因子权重","A/B/C/D基金评级","指数温度计","自然语言筛选","相关性分析","投资组合优化"]')
+        ON CONFLICT DO NOTHING`,
     ];
 
     for (const sql of createStatements) {
       try {
         await client.query(sql);
       } catch (e) {
-        console.warn('建表警告:', e.message);
+        logger.warn(`建表警告: ${e.message}`);
       }
     }
 
@@ -532,19 +597,19 @@ async function initDatabase(retries = 3) {
         ON CONFLICT DO NOTHING
       `);
     } catch (seedErr) {
-      console.warn('订阅套餐种子数据警告:', seedErr.message);
+      logger.warn(`订阅套餐种子数据警告: ${seedErr.message}`);
     }
 
-    console.log('PostgreSQL 数据库初始化完成');
+    logger.info('PostgreSQL 数据库初始化完成');
       } finally {
         client.release();
       }
       return; // 成功则退出
     } catch (err) {
       lastError = err;
-      console.error(`数据库初始化失败 (第${attempt}次):`, err.message);
+      logger.error(`数据库初始化失败 (第${attempt}次): ${err.message}`);
       if (attempt < retries) {
-        console.log(`等待3秒后重试...`);
+        logger.info('等待3秒后重试...');
         await new Promise(r => setTimeout(r, 3000));
       }
     }

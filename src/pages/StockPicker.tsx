@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Card, Table, Select, Slider, Button, Space, Tag, Typography, Row, Col, Spin, message, Tooltip, Statistic, Segmented, Progress, Modal, InputNumber, Descriptions, Tabs, Empty, Badge } from 'antd';
-import { FundOutlined, TrophyOutlined, ReloadOutlined, RocketOutlined, ThunderboltOutlined, SafetyOutlined, BarChartOutlined, FireOutlined, RiseOutlined, AimOutlined, LineChartOutlined, WalletOutlined, StarOutlined, StarFilled, ExperimentOutlined, GlobalOutlined, BulbOutlined, DashboardOutlined, PieChartOutlined, StockOutlined, FundProjectionScreenOutlined } from '@ant-design/icons';
+import { Card, Table, Select, Slider, Button, Space, Tag, Typography, Row, Col, Spin, message, Tooltip, Statistic, Segmented, Progress, Modal, InputNumber, Descriptions, Tabs, Empty, Badge, Grid } from 'antd';
+import { FundOutlined, TrophyOutlined, ReloadOutlined, RocketOutlined, ThunderboltOutlined, SafetyOutlined, BarChartOutlined, FireOutlined, RiseOutlined, AimOutlined, LineChartOutlined, WalletOutlined, StarOutlined, StarFilled, ExperimentOutlined, GlobalOutlined, BulbOutlined, DashboardOutlined, PieChartOutlined, StockOutlined, FundProjectionScreenOutlined, CrownOutlined, SearchOutlined, HistoryOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { useNavigate } from 'react-router-dom';
 import { stockPickerApi, watchlistApi, fundApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatReturn, getReturnColor } from '../utils/format';
+import { FundRatingBadge, IndexTemperatureCard, NLScreenerInput, CorrelationHeatmap, CustomFactorPanel, PickHistoryTab, ProBadge } from '../components/stock-picker';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -29,6 +30,11 @@ export default function StockPicker() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isDark } = useTheme();
+  const { useBreakpoint } = Grid;
+  const screens = useBreakpoint();
+  const isMobile = !screens.md;
+  const isSVIP = user?.subscription_tier === 'svip' || user?.role === 'admin';
+  const isVIP = user?.subscription_status === 'premium' || user?.subscription_tier === 'premium' || isSVIP;
   const [activeTab, setActiveTab] = useState('rank');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any[]>([]);
@@ -65,6 +71,17 @@ export default function StockPicker() {
   // 量化精选状态
   const [quantData, setQuantData] = useState<any>(null);
   const [quantLoading, setQuantLoading] = useState(false);
+
+  // 指数温度状态
+  const [temperatureData, setTemperatureData] = useState<any[]>([]);
+  const [temperatureLoading, setTemperatureLoading] = useState(false);
+
+  // 相关性分析状态
+  const [correlationData, setCorrelationData] = useState<any>(null);
+  const [correlationLoading, setCorrelationLoading] = useState(false);
+
+  // 自定义因子状态
+  const [customFactors, setCustomFactors] = useState<Record<string, { weight: number }> | null>(null);
 
   useEffect(() => {
     fundApi_getIndustries();
@@ -106,7 +123,7 @@ export default function StockPicker() {
   };
 
   // 多因子排名
-  const handleRank = async (strategyOverride?: string) => {
+  const handleRank = async (strategyOverride?: string, customFactorsOverride?: Record<string, { weight: number }> | null) => {
     setLoading(true);
     setError('');
     try {
@@ -115,7 +132,11 @@ export default function StockPicker() {
       const params: any = { limit: filters.limit };
       if (filters.industry) params.industry = filters.industry;
       if (filters.type) params.type = filters.type;
-      if (stratData) {
+      // 优先使用自定义因子（SVIP），否则使用策略因子
+      const effectiveFactors = customFactorsOverride || customFactors;
+      if (effectiveFactors) {
+        params.factors = effectiveFactors;
+      } else if (stratData) {
         params.factors = {};
         for (const [k, w] of Object.entries(stratData.factors)) params.factors[k] = { weight: w };
       }
@@ -247,17 +268,6 @@ export default function StockPicker() {
     if (key === 'strategy' && !strategyData) loadStrategyCompare();
     if (key === 'quant' && !quantData) loadQuantPicks();
   };
-
-  // 统计数据
-  const stats = useMemo(() => {
-    if (results.length === 0) return null;
-    const top10 = results.slice(0, 10);
-    const avgReturn = top10.reduce((s, r) => s + (Number(r.fund.return1y) || 0), 0) / top10.length;
-    const avgScore = top10.reduce((s, r) => s + (Number(r.score) || 0), 0) / top10.length;
-    const maxReturn = Math.max(...results.map(r => Number(r.fund.return1y) || 0));
-    const industrySet = new Set(results.map(r => r.fund.industry));
-    return { avgReturn: avgReturn.toFixed(1), avgScore: avgScore.toFixed(1), maxReturn: maxReturn.toFixed(1), industries: industrySet.size };
-  }, [results]);
 
   // 风险收益散点图
   const scatterOption = useMemo(() => {
@@ -494,7 +504,12 @@ export default function StockPicker() {
     { title: '基金名称', dataIndex: ['fund', 'name'], width: 170, render: (v: string, r: any) => <a onClick={() => navigate(`/funds/${r.fund.code}`)} style={{ fontWeight: 500 }}>{v}</a> },
     { title: '代码', dataIndex: ['fund', 'code'], width: 70 },
     { title: '行业', dataIndex: ['fund', 'industry'], width: 70 },
-    { title: '评分', dataIndex: 'score', width: 80, sorter: (a: any, b: any) => a.score - b.score, render: (v: number) => <Progress percent={v} size="small" strokeColor={v >= 70 ? '#52c41a' : v >= 50 ? '#1677ff' : '#faad14'} format={() => <b>{v}</b>} /> },
+    { title: <span>评分 {!isSVIP && <ProBadge isSVIP={isSVIP} size="small" />}</span>, dataIndex: 'score', width: 120, sorter: (a: any, b: any) => a.score - b.score, render: (v: number, r: any) => (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <Progress percent={v} size="small" strokeColor={v >= 70 ? '#52c41a' : v >= 50 ? '#1677ff' : '#faad14'} format={() => <b>{v}</b>} />
+        {r.rating && <FundRatingBadge rating={r.rating} size="small" />}
+      </div>
+    ) },
     { title: '近1年', dataIndex: ['fund', 'return1y'], width: 70, sorter: (a: any, b: any) => (a.fund.return1y || 0) - (b.fund.return1y || 0), render: (v: number) => <span style={{ color: getReturnColor(v), fontWeight: 500 }}>{formatReturn(v)}</span> },
     { title: '近6月', dataIndex: ['fund', 'return6m'], width: 65, render: (v: number) => <span style={{ color: getReturnColor(v) }}>{formatReturn(v)}</span> },
     { title: '近3月', dataIndex: ['fund', 'return3m'], width: 65, render: (v: number) => <span style={{ color: getReturnColor(v) }}>{formatReturn(v)}</span> },
@@ -538,29 +553,15 @@ export default function StockPicker() {
         </Space>
       </Card>
 
-      {/* 数据概览 */}
-      {stats && (
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          {[
-            { title: '扫描基金', value: total, suffix: '只', color: '#1677ff', icon: <FundOutlined />, bg: isDark ? 'linear-gradient(135deg, #0d1b3e, #1a2744)' : 'linear-gradient(135deg, #e8f4ff, #f0f7ff)' },
-            { title: 'Top10均分', value: stats.avgScore, suffix: '分', color: '#52c41a', icon: <TrophyOutlined />, bg: isDark ? 'linear-gradient(135deg, #0d2818, #1a3020)' : 'linear-gradient(135deg, #f0fff0, #f6ffed)', precision: 1 },
-            { title: '最高收益', value: stats.maxReturn, suffix: '%', color: '#faad14', icon: <RiseOutlined />, bg: isDark ? 'linear-gradient(135deg, #2d1b00, #1a1a0e)' : 'linear-gradient(135deg, #fffbe6, #fff7e6)', precision: 1 },
-            { title: '覆盖行业', value: stats.industries, suffix: '个', color: '#722ed1', icon: <BarChartOutlined />, bg: isDark ? 'linear-gradient(135deg, #1a0d2e, #221233)' : 'linear-gradient(135deg, #f9f0ff, #f5e6ff)' },
-          ].map((s, i) => (
-            <Col xs={12} sm={6} key={i}>
-              <Card size="small" bordered={false} style={{ background: s.bg, borderRadius: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 6, background: `${s.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ color: s.color, fontSize: 14 }}>{s.icon}</span>
-                  </div>
-                  <Text type="secondary" style={{ fontSize: 12 }}>{s.title}</Text>
-                </div>
-                <Statistic value={s.value} suffix={s.suffix} precision={s.precision} valueStyle={{ color: s.color, fontSize: 22, fontWeight: 700 }} />
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      )}
+      {/* 自定义因子权重面板 (SVIP) */}
+      <div style={{ marginBottom: 16 }}>
+        <CustomFactorPanel
+          isSVIP={isSVIP}
+          isDark={isDark}
+          onApply={(factors) => { setCustomFactors(factors); handleRank(undefined, factors); }}
+          onUpgrade={() => navigate('/subscription')}
+        />
+      </div>
 
       {/* Top 3 精选 */}
       {top3.length > 0 && (
@@ -598,6 +599,7 @@ export default function StockPicker() {
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: 32, fontWeight: 800, color: r.score >= 70 ? '#52c41a' : '#1677ff', lineHeight: 1 }}>{r.score}</div>
                         <Text type="secondary" style={{ fontSize: 11 }}>综合评分</Text>
+                        {r.rating && <div style={{ marginTop: 4 }}><FundRatingBadge rating={r.rating} size="small" /></div>}
                       </div>
                     </div>
                     <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -1184,67 +1186,210 @@ export default function StockPicker() {
     </div>
   );
 
+  // PRO标签样式
+  const proTag = !isSVIP ? (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 2,
+      padding: '1px 5px', borderRadius: 4,
+      background: 'linear-gradient(135deg, #faad14, #fa8c16)',
+      color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: '14px',
+      marginLeft: 4, verticalAlign: 'middle',
+    }}>
+      <CrownOutlined style={{ fontSize: 8 }} />PRO
+    </span>
+  ) : null;
+
   const tabItems = [
     { key: 'rank', label: <span><BarChartOutlined /> 多因子排名</span>, children: rankTab },
+    { key: 'nl', label: <span><SearchOutlined /> AI智能筛选{proTag}</span>, children: (
+      <div style={{ padding: '8px 0' }}>
+        <NLScreenerInput isSVIP={isSVIP} isDark={isDark} onUpgrade={() => navigate('/subscription')} />
+      </div>
+    )},
     { key: 'industry', label: <span><PieChartOutlined /> 行业洞察</span>, children: industryTab },
     { key: 'market', label: <span><GlobalOutlined /> 市场环境</span>, children: marketTab },
     { key: 'strategy', label: <span><FundProjectionScreenOutlined /> 策略对比</span>, children: strategyTab },
     { key: 'deep', label: <span><ExperimentOutlined /> 深度分析</span>, children: deepTab },
     { key: 'quant', label: <span><DashboardOutlined /> 量化精选</span>, children: quantTab },
     { key: 'portfolio', label: <span><WalletOutlined /> 投资组合</span>, children: portfolioTab },
+    { key: 'history', label: <span><HistoryOutlined /> 选股历史</span>, children: <PickHistoryTab isDark={isDark} /> },
   ];
+
+  // 计算统计数据
+  const stats = useMemo(() => {
+    if (results.length === 0) return null;
+    const top10 = results.slice(0, 10);
+    const avgScore = top10.reduce((s, r) => s + r.score, 0) / top10.length;
+    const maxReturn = Math.max(...results.map(r => r.fund?.return1y || 0));
+    const industries = new Set(results.map(r => r.fund?.industry).filter(Boolean)).size;
+    return { avgScore: avgScore.toFixed(1), maxReturn: maxReturn.toFixed(1), industries };
+  }, [results]);
+
+  // 获取市场状态
+  const marketSentiment = useMemo(() => {
+    if (!industryStats) return { label: '未知', color: '#8c8c8c' };
+    const totalIndustries = Object.keys(industryStats).length;
+    const upIndustries = Object.values(industryStats).filter((s: any) => s.avgReturn > 0).length;
+    const ratio = totalIndustries > 0 ? upIndustries / totalIndustries : 0;
+    if (ratio >= 0.7) return { label: '强势', color: '#52c41a' };
+    if (ratio >= 0.5) return { label: '偏强', color: '#73d13d' };
+    if (ratio >= 0.3) return { label: '中性', color: '#faad14' };
+    if (ratio >= 0.1) return { label: '偏弱', color: '#fa8c16' };
+    return { label: '弱势', color: '#f5222d' };
+  }, [industryStats]);
 
   return (
     <div>
-      {/* Hero 头部 */}
+      {/* Hero 头部 - 重新设计 */}
       <Card bordered={false} style={{
         marginBottom: 16,
         background: isDark
-          ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)'
+          ? 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)'
           : 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
-        borderRadius: 12,
+        borderRadius: 16,
         overflow: 'hidden',
         position: 'relative',
       }}>
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
-        <div style={{ position: 'absolute', bottom: -60, left: '30%', width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
-        <Row align="middle" gutter={24}>
-          <Col flex="auto">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+        {/* 装饰性背景元素 */}
+        <div style={{ position: 'absolute', top: -60, right: -60, width: 250, height: 250, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
+        <div style={{ position: 'absolute', bottom: -80, left: '20%', width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.03)' }} />
+        <div style={{ position: 'absolute', top: '50%', right: '10%', width: 100, height: 100, borderRadius: '50%', background: 'rgba(250,173,20,0.06)' }} />
+
+        {/* 顶部行：标题 + 策略选择 */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            {/* 标题行 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
               <div style={{
-                width: 48, height: 48, borderRadius: 12,
-                background: 'rgba(255,255,255,0.15)',
+                width: 44, height: 44, borderRadius: 12,
+                background: isSVIP
+                  ? 'linear-gradient(135deg, #faad14 0%, #fa8c16 100%)'
+                  : 'rgba(255,255,255,0.12)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                backdropFilter: 'blur(10px)',
+                boxShadow: isSVIP ? '0 4px 16px rgba(250,173,20,0.4)' : 'none',
               }}>
-                <RocketOutlined style={{ fontSize: 24, color: '#fff' }} />
+                {isSVIP
+                  ? <CrownOutlined style={{ fontSize: 22, color: '#fff' }} />
+                  : <RocketOutlined style={{ fontSize: 22, color: '#fff' }} />
+                }
               </div>
               <div>
-                <Title level={3} style={{ color: '#fff', margin: 0, lineHeight: 1.2 }}>AI 智能选股引擎</Title>
-                <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13 }}>多因子量化模型 · 策略化筛选 · 回测验证 · 一键建仓</Text>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    fontSize: 22, fontWeight: 800, color: '#fff',
+                    letterSpacing: '0.5px',
+                    textShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  }}>
+                    AI 智能选股引擎
+                  </span>
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 6,
+                    background: isSVIP
+                      ? 'linear-gradient(135deg, #faad14 0%, #fa8c16 100%)'
+                      : 'rgba(255,255,255,0.15)',
+                    color: isSVIP ? '#fff' : 'rgba(255,255,255,0.8)',
+                    fontSize: 10, fontWeight: 700, letterSpacing: '1px',
+                    border: isSVIP ? 'none' : '1px solid rgba(255,255,255,0.2)',
+                  }}>
+                    {isSVIP ? <><CrownOutlined style={{ marginRight: 3, fontSize: 9 }} />SVIP</> : 'PRO'}
+                  </span>
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2, fontWeight: 500, letterSpacing: '0.3px' }}>
+                  七因子量化模型 · 风险调整收益评估 · 行业轮动洞察 · 智能分批建仓 · 回测验证系统
+                </div>
               </div>
             </div>
-          </Col>
-          <Col>
-            <Space size={8}>
-              {STRATEGIES.map(s => (
-                <Button key={s.value} size="small" ghost={strategy !== s.value}
-                  type={strategy === s.value ? 'primary' : 'default'}
-                  icon={s.icon}
-                  onClick={() => handleStrategyChange(s.value)}
-                  style={{
-                    borderColor: strategy === s.value ? '#fff' : 'rgba(255,255,255,0.3)',
-                    color: strategy === s.value ? '#fff' : 'rgba(255,255,255,0.8)',
-                    background: strategy === s.value ? 'rgba(255,255,255,0.15)' : 'transparent',
-                  }}>
-                  {s.label}
-                </Button>
-              ))}
-            </Space>
-          </Col>
-        </Row>
-        <div style={{ marginTop: 12, color: 'rgba(255,255,255,0.65)', fontSize: 12 }}>
-          {STRATEGIES.find(s => s.value === strategy)?.desc}
+          </div>
+
+          {/* 策略选择器 */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {STRATEGIES.map(s => (
+              <Button key={s.value} size="small" ghost={strategy !== s.value}
+                type={strategy === s.value ? 'primary' : 'default'}
+                icon={s.icon}
+                onClick={() => handleStrategyChange(s.value)}
+                style={{
+                  borderColor: strategy === s.value ? '#fff' : 'rgba(255,255,255,0.25)',
+                  color: strategy === s.value ? '#fff' : 'rgba(255,255,255,0.7)',
+                  background: strategy === s.value ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  borderRadius: 8, fontSize: 12, height: 28,
+                }}>
+                {s.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* 中间行：市场状态 + 推荐策略 + 统计数据 */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16, padding: isMobile ? '8px 12px' : '10px 16px',
+          background: 'rgba(0,0,0,0.15)', borderRadius: 10, backdropFilter: 'blur(10px)',
+          flexWrap: 'wrap',
+        }}>
+          {/* 市场状态 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: marketSentiment.color,
+              boxShadow: `0 0 8px ${marketSentiment.color}`,
+            }} />
+            <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 500 }}>
+              市场<span style={{ color: marketSentiment.color, fontWeight: 700, marginLeft: 3 }}>{marketSentiment.label}</span>
+            </span>
+          </div>
+
+          {!isMobile && <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)' }} />}
+
+          {/* 推荐策略 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <BulbOutlined style={{ color: '#ffd666', fontSize: 13 }} />
+            <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 500 }}>
+              推荐：<span style={{ color: '#ffd666', fontWeight: 700 }}>{STRATEGIES.find(s => s.value === strategy)?.label}</span>
+            </span>
+          </div>
+
+          {!isMobile && <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)' }} />}
+
+          {/* 统计数据 */}
+          {[
+            { label: '扫描基金', value: total, suffix: '只', color: '#69c0ff' },
+            { label: 'Top10均分', value: stats?.avgScore || '--', suffix: '分', color: '#95de64' },
+            { label: '最高收益', value: stats?.maxReturn || '--', suffix: '%', color: '#ffd666' },
+            { label: '覆盖行业', value: stats?.industries || '--', suffix: '个', color: '#d3adf7' },
+          ].map((s, i) => (
+            <div key={i} style={{ textAlign: 'center', minWidth: isMobile ? 50 : 70 }}>
+              <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11, marginBottom: 4, fontWeight: 500 }}>{s.label}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 2 }}>
+                <span style={{
+                  color: s.color, fontSize: 20, fontWeight: 800,
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                  textShadow: `0 0 20px ${s.color}40`,
+                  letterSpacing: '-0.5px',
+                }}>{s.value}</span>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 500 }}>{s.suffix}</span>
+              </div>
+            </div>
+          ))}
+
+          {/* 升级引导（非SVIP） */}
+          {!isSVIP && (
+            <>
+              <div style={{ flex: 1 }} />
+              <div
+                onClick={() => navigate('/subscription')}
+                style={{
+                  padding: '4px 12px', borderRadius: 16,
+                  background: 'linear-gradient(135deg, #faad14 0%, #fa8c16 100%)',
+                  color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(250,173,20,0.3)',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <CrownOutlined style={{ fontSize: 10 }} />
+                开通SVIP
+              </div>
+            </>
+          )}
         </div>
       </Card>
 

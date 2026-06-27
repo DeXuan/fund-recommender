@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../../utils/logger.cjs');
 const { getPool } = require('../../db.cjs');
 const { authMiddleware } = require('../../auth.cjs');
 const { fetchAndStoreHistoricalNav, resolveLatestNav } = require('../../utils/portfolio-helpers.cjs');
@@ -54,12 +55,12 @@ router.get('/returns-map', async (req, res) => {
     // Fetch historical NAV from eastmoney for funds with insufficient data
     const fundsToFetch = fundCodes.filter(code => (navCountMap[code] || 0) < 10);
     if (fundsToFetch.length > 0) {
-      console.log(`[收益地图] 需要获取 ${fundsToFetch.length} 只基金的历史净值`);
+      logger.info(`[收益地图] 需要获取 ${fundsToFetch.length} 只基金的历史净值`);
       for (const code of fundsToFetch) {
         try {
           await fetchAndStoreHistoricalNav(pool, code, fundHoldings[code].fund_name, targetYear);
         } catch (e) {
-          console.warn(`[收益地图] 获取 ${code} 历史净值失败:`, e.message);
+          logger.warn(`[收益地图] 获取 ${code} 历史净值失败:`, e.message);
         }
       }
     }
@@ -141,7 +142,7 @@ router.get('/returns-map', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('获取收益地图失败:', error.message);
+    logger.error('获取收益地图失败:', error.message);
     res.status(500).json({ error: '获取收益地图失败' });
   }
 });
@@ -232,7 +233,7 @@ router.get('/summary', async (req, res) => {
       totalReturn: parseFloat(totalReturn.toFixed(2)),
     });
   } catch (error) {
-    console.error('获取汇总失败:', error.message);
+    logger.error('获取汇总失败:', error.message);
     res.status(500).json({ error: '获取汇总失败' });
   }
 });
@@ -269,11 +270,11 @@ router.post('/refresh-nav', async (req, res) => {
                ON CONFLICT (fund_code, nav_date) DO UPDATE SET nav = EXCLUDED.nav`,
               [code, val.nav, val.totalNav || val.nav, val.navDate || new Date().toISOString().split('T')[0]]
             );
-          } catch (e) { console.warn(`[NAV持久化] 写入失败 ${code}: ${e.message}`); }
+          } catch (e) { logger.warn(`[NAV持久化] 写入失败 ${code}: ${e.message}`); }
         }
       }
     } catch (e) {
-      console.warn(`[手动刷新] API获取失败，回退到 fund_nav 表: ${e.message}`);
+      logger.warn(`[手动刷新] API获取失败，回退到 fund_nav 表: ${e.message}`);
     }
 
     // 对API未返回的基金，使用 resolveLatestNav 补充
@@ -321,7 +322,7 @@ router.post('/refresh-nav', async (req, res) => {
     }
 
     if (warnings.length > 0) {
-      console.warn(`[手动刷新] 用户${req.user.id} 校验警告:`, warnings);
+      logger.warn(`[手动刷新] 用户${req.user.id} 校验警告:`, warnings);
     }
 
     res.json({
@@ -331,7 +332,7 @@ router.post('/refresh-nav', async (req, res) => {
       message: `已更新 ${updated} 条持仓记录的净值和盈亏`,
     });
   } catch (error) {
-    console.error('手动刷新净值失败:', error.message);
+    logger.error('手动刷新净值失败:', error.message);
     res.status(500).json({ error: '刷新失败' });
   }
 });

@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../../utils/logger.cjs');
 const { getPool } = require('../../db.cjs');
 const { authMiddleware } = require('../../auth.cjs');
 
@@ -42,7 +43,7 @@ router.post('/init-demo', async (req, res) => {
 
     res.json({ message: '示例数据导入成功', imported: demoRecords.length });
   } catch (error) {
-    console.error('初始化示例数据失败:', error.message);
+    logger.error('初始化示例数据失败:', error.message);
     res.status(500).json({ error: '初始化失败' });
   }
 });
@@ -64,7 +65,7 @@ router.get('/records', async (req, res) => {
     const result = await pool.query(sql, params);
     res.json(result.rows);
   } catch (error) {
-    console.error('获取记录失败:', error.message);
+    logger.error('获取记录失败:', error.message);
     res.status(500).json({ error: '获取记录失败' });
   }
 });
@@ -109,7 +110,7 @@ router.post('/records', async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('添加记录失败:', error.message);
+    logger.error('添加记录失败:', error.message);
     res.status(500).json({ error: '添加记录失败' });
   }
 });
@@ -162,7 +163,7 @@ router.put('/records/:id', async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('更新记录失败:', error.message);
+    logger.error('更新记录失败:', error.message);
     res.status(500).json({ error: '更新记录失败' });
   }
 });
@@ -180,7 +181,7 @@ router.delete('/records/:id', async (req, res) => {
     await pool.query('DELETE FROM fund_records WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (error) {
-    console.error('删除记录失败:', error.message);
+    logger.error('删除记录失败:', error.message);
     res.status(500).json({ error: '删除记录失败' });
   }
 });
@@ -233,7 +234,7 @@ router.post('/records/:id/sell', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('快捷卖出失败:', error.message);
+    logger.error('快捷卖出失败:', error.message);
     res.status(500).json({ error: '快捷卖出失败' });
   }
 });

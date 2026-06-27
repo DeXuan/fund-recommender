@@ -46,21 +46,25 @@ export default function GsapEnhancer() {
       const observer = new IntersectionObserver(
         ([entry]) => {
           if (entry.isIntersecting) {
-            gsap.to(entry.target, {
-              opacity: 1,
-              y: 0,
-              duration: 0.5,
-              delay: index * 0.06,
-              ease: 'power2.out',
-              onComplete() {
-                entry.target.classList.add('gsap-revealed');
-                gsap.set(entry.target, { clearProps: 'opacity,transform' });
-              },
-            });
+            // 轻量动画：只做淡入，不做位移，减少视觉延迟
+            gsap.fromTo(entry.target,
+              { opacity: 0.6, y: 8 },
+              {
+                opacity: 1,
+                y: 0,
+                duration: 0.3,
+                delay: Math.min(index * 0.03, 0.3),
+                ease: 'power2.out',
+                onComplete() {
+                  entry.target.classList.add('gsap-revealed');
+                  gsap.set(entry.target, { clearProps: 'opacity,transform' });
+                },
+              }
+            );
             observer.unobserve(entry.target);
           }
         },
-        { threshold: 0.1 }
+        { threshold: 0.05 }
       );
       observer.observe(card);
       ioSet.add(observer);
@@ -143,8 +147,6 @@ export default function GsapEnhancer() {
           // Reset the "revealed" state so revealCard can run
           revealed.delete(card);
           card.classList.remove('gsap-revealed');
-          // Re-apply hidden state
-          gsap.set(card, { opacity: 0, y: 24 });
           revealCard(card);
           if (card.classList.contains('ant-card-hoverable')) setupTilt(card);
         }

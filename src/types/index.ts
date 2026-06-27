@@ -254,7 +254,8 @@ export interface User {
   nickname: string;
   avatar_url?: string;
   role?: 'admin' | 'user';
-  subscription_status?: 'free' | 'premium';
+  subscription_status?: 'free' | 'premium' | 'svip';
+  subscription_tier?: 'free' | 'premium' | 'svip';
   subscription_end?: string;
   created_at?: string;
 }

@@ -3,6 +3,7 @@
  */
 
 const axios = require('axios');
+const logger = require('./utils/logger.cjs');
 const iconv = require('iconv-lite');
 const { getPool } = require('./db.cjs');
 const fundService = require('./fund-service.cjs');
@@ -41,7 +42,7 @@ async function fetchFundNavBatch(codes) {
       }
     }
   } catch (error) {
-    console.warn(`[净值] 批量获取净值失败: ${error.message}`);
+    logger.warn(`[净值] 批量获取净值失败: ${error.message}`);
   }
   return results;
 }
@@ -96,10 +97,10 @@ async function fetchMarketIndices() {
       updatedCount++;
     }
 
-    console.log(`[指数] 更新了 ${updatedCount}/${symbols.length} 个指数`);
+    logger.info(`[指数] 更新了 ${updatedCount}/${symbols.length} 个指数`);
     return updatedCount;
   } catch (error) {
-    console.warn('[指数] 获取指数数据失败:', error.message);
+    logger.warn('[指数] 获取指数数据失败:', error.message);
     return 0;
   }
 }
@@ -163,11 +164,11 @@ async function fetchIndexValuation() {
     }
 
     if (updatedCount > 0) {
-      console.log(`[估值] 更新了 ${updatedCount}/${symbols.length} 个指数PE/PB估值`);
+      logger.info(`[估值] 更新了 ${updatedCount}/${symbols.length} 个指数PE/PB估值`);
     }
     return updatedCount;
   } catch (error) {
-    console.warn('[估值] 获取估值数据失败:', error.message);
+    logger.warn('[估值] 获取估值数据失败:', error.message);
     return 0;
   }
 }
@@ -220,10 +221,10 @@ async function fetchSectorData() {
     }).sort((a, b) => b.change - a.change);
 
     await fundService.updateSectorData(sectors);
-    console.log(`[板块] 更新了 ${sectors.length} 个行业板块`);
+    logger.info(`[板块] 更新了 ${sectors.length} 个行业板块`);
     return sectors;
   } catch (error) {
-    console.warn('[板块] 获取板块数据失败:', error.message);
+    logger.warn('[板块] 获取板块数据失败:', error.message);
     return [];
   }
 }
@@ -309,7 +310,7 @@ async function fetchSingleQDIIData(code) {
           dailyLimit = isNaN(maxsg) ? 10 : maxsg;
         }
       }
-    } catch (e) { console.warn('[data-fetcher] 数据解析跳过:', e.message); }
+    } catch (e) { logger.warn('[data-fetcher] 数据解析跳过:', e.message); }
 
     let nav = null, navDate = null;
     let return1m = null, return3m = null, return6m = null, return1y = null;
@@ -339,7 +340,7 @@ async function fetchSingleQDIIData(code) {
         return6m = calcReturn(findNav(180));
         return1y = calcReturn(findNav(365));
       }
-    } catch (e) { console.warn('[data-fetcher] 数据解析跳过:', e.message); }
+    } catch (e) { logger.warn('[data-fetcher] 数据解析跳过:', e.message); }
 
     return { nav, navDate, return1m, return3m, return6m, return1y, buySuggestion, dailyLimit };
   } catch (error) {
@@ -352,7 +353,7 @@ async function fetchQDIIData(allFunds) {
   const qdiiFunds = allFunds.filter(f => f.type === 'QDII');
   if (qdiiFunds.length === 0) return 0;
 
-  console.log(`[QDII] 开始更新 ${qdiiFunds.length} 只QDII基金数据...`);
+  logger.info(`[QDII] 开始更新 ${qdiiFunds.length} 只QDII基金数据...`);
   let updatedCount = 0;
 
   for (let i = 0; i < qdiiFunds.length; i += 3) {
@@ -375,7 +376,7 @@ async function fetchQDIIData(allFunds) {
               return6m: data.return6m, return1y: data.return1y,
             });
           } catch (e) {
-            console.warn(`[QDII] 写入 fund_nav 失败 ${fund.code}:`, e.message);
+            logger.warn(`[QDII] 写入 fund_nav 失败 ${fund.code}:`, e.message);
           }
         }
 
@@ -385,7 +386,7 @@ async function fetchQDIIData(allFunds) {
             'UPDATE funds SET buy_suggestion = $1, daily_limit = $2, updated_at = NOW() WHERE code = $3',
             [data.buySuggestion, data.dailyLimit, fund.code]
           );
-        } catch (e) { console.warn('[data-fetcher] 数据解析跳过:', e.message); }
+        } catch (e) { logger.warn('[data-fetcher] 数据解析跳过:', e.message); }
 
         if (data.nav) {
           fund.nav = data.nav;
@@ -407,7 +408,7 @@ async function fetchQDIIData(allFunds) {
     }
   }
 
-  console.log(`[QDII] 更新完成 ${updatedCount}/${qdiiFunds.length} 只基金`);
+  logger.info(`[QDII] 更新完成 ${updatedCount}/${qdiiFunds.length} 只基金`);
   return updatedCount;
 }
 
@@ -462,7 +463,7 @@ async function fetchHS300FundDetails(allFunds) {
   const hs300Funds = allFunds.filter(f => f.industry === '沪深300');
   if (hs300Funds.length === 0) return 0;
 
-  console.log(`[HS300] 开始更新 ${hs300Funds.length} 只沪深300基金详情...`);
+  logger.info(`[HS300] 开始更新 ${hs300Funds.length} 只沪深300基金详情...`);
   let updatedCount = 0;
 
   const allFundsWithNav = await fundService.getAllFundsWithNav();
@@ -482,7 +483,7 @@ async function fetchHS300FundDetails(allFunds) {
       benchmarkReturn1y = returns.reduce((a, b) => a + b, 0) / returns.length;
     }
   }
-  console.log(`[HS300] 基准收益率(非增强型平均): ${benchmarkReturn1y.toFixed(2)}%`);
+  logger.info(`[HS300] 基准收益率(非增强型平均): ${benchmarkReturn1y.toFixed(2)}%`);
 
   for (let i = 0; i < hs300Funds.length; i += 5) {
     const batch = hs300Funds.slice(i, i + 5);
@@ -497,7 +498,7 @@ async function fetchHS300FundDetails(allFunds) {
           await fundService.updateHS300FundDetail(batch[j].code, result.value);
           updatedCount++;
         } catch (e) {
-          console.warn(`[HS300] 写入详情失败 ${batch[j].code}:`, e.message);
+          logger.warn(`[HS300] 写入详情失败 ${batch[j].code}:`, e.message);
         }
       }
     }
@@ -507,7 +508,7 @@ async function fetchHS300FundDetails(allFunds) {
     }
   }
 
-  console.log(`[HS300] 更新完成: ${updatedCount}/${hs300Funds.length} 只基金`);
+  logger.info(`[HS300] 更新完成: ${updatedCount}/${hs300Funds.length} 只基金`);
   return updatedCount;
 }
 
@@ -585,14 +586,14 @@ async function fetchCapitalFlow() {
       }
 
       cachedCapitalFlow = { northbound, mainFlow, lastUpdate: new Date().toISOString() };
-      console.log(`[资金] 更新北向资金: ${northbound.total}亿, 主力资金: ${mainFlow.length}个行业`);
+      logger.info(`[资金] 更新北向资金: ${northbound.total}亿, 主力资金: ${mainFlow.length}个行业`);
       return;
     } catch (error) {
       if (attempt < maxRetries) {
-        console.warn(`[资金] 第${attempt + 1}次获取失败，重试中...`);
+        logger.warn(`[资金] 第${attempt + 1}次获取失败，重试中...`);
         await new Promise(r => setTimeout(r, 3000));
       } else {
-        console.warn('[资金] 获取资金流向数据失败:', error.message);
+        logger.warn('[资金] 获取资金流向数据失败:', error.message);
       }
     }
   }
@@ -605,13 +606,13 @@ function getCachedCapitalFlow() {
 // 批量更新所有基金数据
 async function updateAllFundData(allFunds, dataUpdateStatus, isTradingDay, getNextUpdateTime, updateAllFundReturns) {
   if (dataUpdateStatus.isUpdating) {
-    console.log('数据更新正在进行中，跳过本次更新');
+    logger.info('数据更新正在进行中，跳过本次更新');
     return;
   }
 
   dataUpdateStatus.isUpdating = true;
   dataUpdateStatus.error = null;
-  console.log(`[${new Date().toLocaleString()}] 开始更新基金数据...`);
+  logger.info(`[${new Date().toLocaleString()}] 开始更新基金数据...`);
 
   try {
     let updatedCount = 0;
@@ -628,7 +629,7 @@ async function updateAllFundData(allFunds, dataUpdateStatus, isTradingDay, getNe
             await fundService.updateFundNav(code, navData);
             updatedCount++;
           } catch (e) {
-            console.warn(`保存基金 ${code} 净值失败:`, e.message);
+            logger.warn(`保存基金 ${code} 净值失败:`, e.message);
           }
         }
       }
@@ -646,7 +647,7 @@ async function updateAllFundData(allFunds, dataUpdateStatus, isTradingDay, getNe
 
     const today = new Date().toISOString().split('T')[0];
     if (dataUpdateStatus.lastReturnUpdateDate !== today && isTradingDay()) {
-      console.log('[收益率] 开始更新基金收益率...');
+      logger.info('[收益率] 开始更新基金收益率...');
       await updateAllFundReturns();
       dataUpdateStatus.lastReturnUpdateDate = today;
     }
@@ -654,10 +655,10 @@ async function updateAllFundData(allFunds, dataUpdateStatus, isTradingDay, getNe
     dataUpdateStatus.lastUpdateTime = new Date().toISOString();
     dataUpdateStatus.updateCount++;
     dataUpdateStatus.nextUpdateTime = getNextUpdateTime().toISOString();
-    console.log(`[${new Date().toLocaleString()}] 基金数据更新完成，更新了 ${updatedCount} 只基金`);
+    logger.info(`[${new Date().toLocaleString()}] 基金数据更新完成，更新了 ${updatedCount} 只基金`);
 
   } catch (error) {
-    console.error('数据更新失败:', error.message);
+    logger.error('数据更新失败:', error.message);
     dataUpdateStatus.error = error.message;
   } finally {
     dataUpdateStatus.isUpdating = false;
@@ -667,7 +668,7 @@ async function updateAllFundData(allFunds, dataUpdateStatus, isTradingDay, getNe
 // 批量更新所有基金的收益率（带重试）
 async function updateAllFundReturns(allFunds) {
   if (!allFunds || allFunds.length === 0) {
-    console.log('[收益率] 无基金数据，跳过');
+    logger.info('[收益率] 无基金数据，跳过');
     return 0;
   }
 
@@ -675,7 +676,7 @@ async function updateAllFundReturns(allFunds) {
   let failedCount = 0;
   const total = allFunds.length;
 
-  console.log(`[收益率] 开始更新 ${total} 只基金收益率...`);
+  logger.info(`[收益率] 开始更新 ${total} 只基金收益率...`);
 
   for (let i = 0; i < total; i += 10) {
     const batch = allFunds.slice(i, i + 10);
@@ -693,7 +694,7 @@ async function updateAllFundReturns(allFunds) {
           await fundService.updateFundReturns(batch[j].code, result);
           updatedCount++;
         } catch (e) {
-          console.warn(`[收益率] 保存 ${batch[j].code} 失败:`, e.message);
+          logger.warn(`[收益率] 保存 ${batch[j].code} 失败:`, e.message);
           failedCount++;
         }
       } else {
@@ -703,7 +704,7 @@ async function updateAllFundReturns(allFunds) {
 
     // 进度日志（每50只输出一次）
     if ((i + 10) % 50 === 0 || i + 10 >= total) {
-      console.log(`[收益率] 进度: ${Math.min(i + 10, total)}/${total} (成功${updatedCount}, 失败${failedCount})`);
+      logger.info(`[收益率] 进度: ${Math.min(i + 10, total)}/${total} (成功${updatedCount}, 失败${failedCount})`);
     }
 
     if (i + 10 < total) {
@@ -711,13 +712,13 @@ async function updateAllFundReturns(allFunds) {
     }
   }
 
-  console.log(`[收益率] 更新完成: 成功 ${updatedCount}, 失败 ${failedCount}, 共 ${total} 只`);
+  logger.info(`[收益率] 更新完成: 成功 ${updatedCount}, 失败 ${failedCount}, 共 ${total} 只`);
   return updatedCount;
 }
 
 // 每日9:30执行的完整数据更新任务
 async function runDailyDataUpdate(allFunds) {
-  console.log('========== [每日任务] 开始执行 ==========');
+  logger.info('========== [每日任务] 开始执行 ==========');
   const startTime = Date.now();
 
   try {
@@ -733,13 +734,13 @@ async function runDailyDataUpdate(allFunds) {
     // 4. 更新持仓盈亏（含数值校验）
     const pnlResult = await updatePortfolioPnl(allFunds);
     if (pnlResult.warnings.length > 0) {
-      console.warn(`[每日任务] 持仓校验发现 ${pnlResult.warnings.length} 条警告`);
+      logger.warn(`[每日任务] 持仓校验发现 ${pnlResult.warnings.length} 条警告`);
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`========== [每日任务] 执行完成，耗时 ${elapsed}s ==========`);
+    logger.info(`========== [每日任务] 执行完成，耗时 ${elapsed}s ==========`);
   } catch (error) {
-    console.error('[每日任务] 执行失败:', error.message);
+    logger.error('[每日任务] 执行失败:', error.message);
   }
 }
 
@@ -802,13 +803,13 @@ async function updatePortfolioPnl(allFunds) {
   try {
     const recordsResult = await pool.query('SELECT id, fund_code, fund_name, shares, cost_price, buy_fee FROM fund_records');
     if (recordsResult.rows.length === 0) {
-      console.log('[持仓] 没有持仓记录，跳过更新');
+      logger.info('[持仓] 没有持仓记录，跳过更新');
       return { updated: 0, validated: 0, warnings: [] };
     }
 
     // 持仓中涉及的所有基金代码（去重）
     const heldCodes = [...new Set(recordsResult.rows.map(r => r.fund_code))];
-    console.log(`[持仓] 需要更新 ${heldCodes.length} 只基金的 ${recordsResult.rows.length} 条持仓记录`);
+    logger.info(`[持仓] 需要更新 ${heldCodes.length} 只基金的 ${recordsResult.rows.length} 条持仓记录`);
 
     // 第1优先级: 从 fund_nav 表获取最新净值
     const navResult = await pool.query(
@@ -822,7 +823,7 @@ async function updatePortfolioPnl(allFunds) {
       navMap.set(row.fund_code, parseFloat(row.nav));
       navDateMap.set(row.fund_code, row.nav_date);
     });
-    console.log(`[持仓] fund_nav 表命中 ${navMap.size}/${heldCodes.length} 只基金`);
+    logger.info(`[持仓] fund_nav 表命中 ${navMap.size}/${heldCodes.length} 只基金`);
 
     // 第2优先级: 从种子数据补充
     allFunds.forEach(f => {
@@ -832,7 +833,7 @@ async function updatePortfolioPnl(allFunds) {
     // 第3优先级: 从API实时获取缺失的净值，并写回 fund_nav 表持久化
     const missingCodes = heldCodes.filter(code => !navMap.has(code));
     if (missingCodes.length > 0) {
-      console.log(`[持仓] 从API获取 ${missingCodes.length} 只基金净值: ${missingCodes.join(',')}`);
+      logger.info(`[持仓] 从API获取 ${missingCodes.length} 只基金净值: ${missingCodes.join(',')}`);
       try {
         const batchNav = await fetchFundNavBatch(missingCodes);
         for (const [code, val] of batchNav) {
@@ -851,9 +852,9 @@ async function updatePortfolioPnl(allFunds) {
             }
           }
         }
-        console.log(`[持仓] API获取成功 ${batchNav.size} 只，最终覆盖 ${navMap.size}/${heldCodes.length} 只基金`);
+        logger.info(`[持仓] API获取成功 ${batchNav.size} 只，最终覆盖 ${navMap.size}/${heldCodes.length} 只基金`);
       } catch (e) {
-        console.warn(`[持仓] API批量获取失败: ${e.message}`);
+        logger.warn(`[持仓] API批量获取失败: ${e.message}`);
       }
     }
 
@@ -892,14 +893,14 @@ async function updatePortfolioPnl(allFunds) {
     }
 
     if (warnings.length > 0) {
-      console.warn(`[持仓] 校验警告 (${warnings.length}):`);
-      warnings.forEach(w => console.warn(`  - ${w}`));
+      logger.warn(`[持仓] 校验警告 (${warnings.length}):`);
+      warnings.forEach(w => logger.warn(`  - ${w}`));
     }
 
-    console.log(`[持仓] 更新完成: ${updated}/${recordsResult.rows.length} 条记录, 校验 ${validated} 条, ${warnings.length} 条警告`);
+    logger.info(`[持仓] 更新完成: ${updated}/${recordsResult.rows.length} 条记录, 校验 ${validated} 条, ${warnings.length} 条警告`);
     return { updated, validated, warnings };
   } catch (error) {
-    console.warn('[持仓] 更新失败:', error.message);
+    logger.warn('[持仓] 更新失败:', error.message);
     return { updated: 0, validated: 0, warnings: [error.message] };
   }
 }
@@ -914,10 +915,10 @@ async function fetchYiFangDaFundData() {
     );
     const funds = fundResult.rows;
     if (funds.length === 0) {
-      console.log('[易方达] 数据库中无易方达基金');
+      logger.info('[易方达] 数据库中无易方达基金');
       return { fetched: 0, updated: 0 };
     }
-    console.log(`[易方达] 开始更新 ${funds.length} 只易方达基金数据...`);
+    logger.info(`[易方达] 开始更新 ${funds.length} 只易方达基金数据...`);
 
     let navUpdated = 0;
     let detailUpdated = 0;
@@ -982,14 +983,14 @@ async function fetchYiFangDaFundData() {
     }
 
     if (errors.length > 0) {
-      console.warn(`[易方达] 错误 (${errors.length}):`);
-      errors.forEach(e => console.warn(`  - ${e}`));
+      logger.warn(`[易方达] 错误 (${errors.length}):`);
+      errors.forEach(e => logger.warn(`  - ${e}`));
     }
 
-    console.log(`[易方达] 更新完成: 净值 ${navUpdated}/${funds.length}, 详情 ${detailUpdated}/${funds.length}`);
+    logger.info(`[易方达] 更新完成: 净值 ${navUpdated}/${funds.length}, 详情 ${detailUpdated}/${funds.length}`);
     return { fetched: funds.length, navUpdated, detailUpdated, errors };
   } catch (error) {
-    console.error('[易方达] 更新失败:', error.message);
+    logger.error('[易方达] 更新失败:', error.message);
     return { fetched: 0, navUpdated: 0, detailUpdated: 0, errors: [error.message] };
   }
 }
@@ -1075,7 +1076,7 @@ async function fetchSingleFundFromAlipay(code) {
         while ((m = nameRegex.exec(mgrMatch[1])) !== null) names.push(m[1]);
         if (names.length > 0) manager = names.join(',');
       }
-    } catch (e) { console.warn('[data-fetcher] 数据解析跳过:', e.message); }
+    } catch (e) { logger.warn('[data-fetcher] 数据解析跳过:', e.message); }
   }
 
   if (!nav) return null;
@@ -1228,13 +1229,13 @@ function estimateRating(totalFee, return1y, scale) {
 // 抓取金选基金完整数据并写入数据库
 async function fetchGoldFundData() {
   const pool = getPool();
-  console.log(`[金选基金] 开始抓取 ${GOLD_FUND_CODES.length} 只金选基金...`);
+  logger.info(`[金选基金] 开始抓取 ${GOLD_FUND_CODES.length} 只金选基金...`);
 
   // 重置所有金选标记
   try {
     await pool.query("UPDATE funds SET is_gold_selected = false WHERE is_gold_selected = true");
   } catch (e) {
-    console.warn('[金选基金] 重置金选标记失败:', e.message);
+    logger.warn('[金选基金] 重置金选标记失败:', e.message);
   }
 
   let successCount = 0;
@@ -1334,16 +1335,16 @@ async function fetchGoldFundData() {
 
     // 进度日志
     if ((i + 3) % 30 === 0 || i + 3 >= GOLD_FUND_CODES.length) {
-      console.log(`[金选基金] 进度: ${Math.min(i + 3, GOLD_FUND_CODES.length)}/${GOLD_FUND_CODES.length} (成功${successCount})`);
+      logger.info(`[金选基金] 进度: ${Math.min(i + 3, GOLD_FUND_CODES.length)}/${GOLD_FUND_CODES.length} (成功${successCount})`);
     }
   }
 
   if (errors.length > 0) {
-    console.warn(`[金选基金] 错误 (${errors.length}):`);
-    errors.slice(0, 10).forEach(e => console.warn(`  - ${e}`));
+    logger.warn(`[金选基金] 错误 (${errors.length}):`);
+    errors.slice(0, 10).forEach(e => logger.warn(`  - ${e}`));
   }
 
-  console.log(`[金选基金] 抓取完成: 成功 ${successCount}/${GOLD_FUND_CODES.length}, 净值 ${navCount}, 错误 ${errors.length}`);
+  logger.info(`[金选基金] 抓取完成: 成功 ${successCount}/${GOLD_FUND_CODES.length}, 净值 ${navCount}, 错误 ${errors.length}`);
   return { total: GOLD_FUND_CODES.length, success: successCount, navUpdated: navCount, errors, results };
 }
 

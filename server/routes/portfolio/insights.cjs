@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../../utils/logger.cjs');
 const { getPool } = require('../../db.cjs');
 const { authMiddleware, subscriptionMiddleware } = require('../../auth.cjs');
 const { classifyAsset, generateSuggestions, fetchAndStoreHistoricalNav, resolveLatestNav } = require('../../utils/portfolio-helpers.cjs');
@@ -27,7 +28,7 @@ router.post('/risk-profile', async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('保存风险评估失败:', error.message);
+    logger.error('保存风险评估失败:', error.message);
     res.status(500).json({ error: '保存失败' });
   }
 });
@@ -49,7 +50,7 @@ router.get('/risk-profile', async (req, res) => {
       allocation: typeof row.allocation === 'string' ? JSON.parse(row.allocation) : row.allocation,
     });
   } catch (error) {
-    console.error('获取风险评估失败:', error.message);
+    logger.error('获取风险评估失败:', error.message);
     res.status(500).json({ error: '获取失败' });
   }
 });
@@ -157,7 +158,7 @@ router.get('/insights', async (req, res) => {
 
     res.json({ holdings, categories, market, riskProfile, suggestions, totalValue: parseFloat(totalValue.toFixed(2)) });
   } catch (error) {
-    console.error('获取组合洞察失败:', error.message);
+    logger.error('获取组合洞察失败:', error.message);
     res.status(500).json({ error: '获取组合洞察失败' });
   }
 });
@@ -304,13 +305,13 @@ router.get('/vip-insights', subscriptionMiddleware, async (req, res) => {
     // 对数据不足的基金自动获取历史净值（API返回最近365天，每只基金调一次即可）
     const fundsToFetch = fundCodes.filter(code => (navCountMap[code] || 0) < 10);
     if (fundsToFetch.length > 0) {
-      console.log(`[VIP分析] 自动获取 ${fundsToFetch.length} 只基金的历史净值`);
+      logger.info(`[VIP分析] 自动获取 ${fundsToFetch.length} 只基金的历史净值`);
       for (const code of fundsToFetch) {
         try {
           const fundName = grouped[code].fund_name;
           await fetchAndStoreHistoricalNav(pool, code, fundName, new Date().getFullYear());
         } catch (e) {
-          console.warn(`[VIP分析] 获取 ${code} 历史净值失败:`, e.message);
+          logger.warn(`[VIP分析] 获取 ${code} 历史净值失败:`, e.message);
         }
       }
     }
@@ -834,7 +835,7 @@ router.get('/vip-insights', subscriptionMiddleware, async (req, res) => {
       benchmarkComparison,
     });
   } catch (error) {
-    console.error('VIP分析失败:', error.message, error.stack);
+    logger.error('VIP分析失败:', error.message, error.stack);
     res.status(500).json({ error: 'VIP分析失败，请稍后重试' });
   }
 });

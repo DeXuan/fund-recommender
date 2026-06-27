@@ -3,6 +3,7 @@
  */
 
 const express = require('express');
+const logger = require('../utils/logger.cjs');
 const { getPool } = require('../db.cjs');
 const { authMiddleware, adminMiddleware } = require('../auth.cjs');
 const { createHandler } = require('../utils/route-handler.cjs');
@@ -93,23 +94,23 @@ router.post('/api/cmb-products/update', authMiddleware, adminMiddleware, async (
     const proc1 = spawn('python', [scriptPath, 'weekly'], {
       env: { ...process.env }, cwd: path.join(__dirname, '..', '..'), stdio: 'pipe',
     });
-    proc1.stdout.on('data', (data) => console.log(`[CMB-WEEKLY] ${data.toString().trim()}`));
-    proc1.stderr.on('data', (data) => console.error(`[CMB-WEEKLY] ${data.toString().trim()}`));
+    proc1.stdout.on('data', (data) => logger.info(`[CMB-WEEKLY] ${data.toString().trim()}`));
+    proc1.stderr.on('data', (data) => logger.error(`[CMB-WEEKLY] ${data.toString().trim()}`));
     proc1.on('close', (code) => {
-      console.log(`[CMB-WEEKLY] 完成，退出码: ${code}`);
+      logger.info(`[CMB-WEEKLY] 完成，退出码: ${code}`);
       const proc2 = spawn('python', [scriptPath, 'target'], {
         env: { ...process.env }, cwd: path.join(__dirname, '..', '..'), stdio: 'pipe',
       });
-      proc2.stdout.on('data', (data) => console.log(`[CMB-TARGET] ${data.toString().trim()}`));
-      proc2.stderr.on('data', (data) => console.error(`[CMB-TARGET] ${data.toString().trim()}`));
-      proc2.on('close', (code2) => console.log(`[CMB-TARGET] 完成，退出码: ${code2}`));
-      proc2.on('error', (err) => console.error('[CMB-TARGET] 启动失败:', err.message));
+      proc2.stdout.on('data', (data) => logger.info(`[CMB-TARGET] ${data.toString().trim()}`));
+      proc2.stderr.on('data', (data) => logger.error(`[CMB-TARGET] ${data.toString().trim()}`));
+      proc2.on('close', (code2) => logger.info(`[CMB-TARGET] 完成，退出码: ${code2}`));
+      proc2.on('error', (err) => logger.error('[CMB-TARGET] 启动失败:', err.message));
     });
-    proc1.on('error', (err) => console.error('[CMB-WEEKLY] 启动失败:', err.message));
+    proc1.on('error', (err) => logger.error('[CMB-WEEKLY] 启动失败:', err.message));
 
     res.json({ success: true, message: '招行理财产品数据更新已启动（全量+目标产品）' });
   } catch (error) {
-    console.error('触发招行理财产品更新失败:', error.message);
+    logger.error('触发招行理财产品更新失败:', error.message);
     res.status(500).json({ error: '触发更新失败' });
   }
 });
@@ -224,10 +225,10 @@ router.post('/api/cmb-zhaoyin-nav/update', authMiddleware, adminMiddleware, asyn
     let output = '';
     python.stdout.on('data', (data) => { output += data.toString(); });
     python.stderr.on('data', (data) => { output += data.toString(); });
-    python.on('close', (code) => { console.log(`[招银理财NAV] 爬取脚本退出，code=${code}`); });
+    python.on('close', (code) => { logger.info(`[招银理财NAV] 爬取脚本退出，code=${code}`); });
     res.json({ success: true, message: '招银理财净值数据更新已启动' });
   } catch (error) {
-    console.error('触发招银理财净值更新失败:', error.message);
+    logger.error('触发招银理财净值更新失败:', error.message);
     res.status(500).json({ error: '触发更新失败' });
   }
 });

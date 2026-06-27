@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../../utils/logger.cjs');
 const { getPool } = require('../../db.cjs');
 const { authMiddleware } = require('../../auth.cjs');
 const fundService = require('../../fund-service.cjs');
@@ -14,7 +15,7 @@ router.get('/dca-plans', async (req, res) => {
     const result = await pool.query('SELECT * FROM dca_plans WHERE user_id = $1 ORDER BY created_at DESC', [req.user.id]);
     res.json(result.rows);
   } catch (error) {
-    console.error('获取定投计划失败:', error.message);
+    logger.error('获取定投计划失败:', error.message);
     res.status(500).json({ error: '获取定投计划失败' });
   }
 });
@@ -55,7 +56,7 @@ router.post('/dca-plans', async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('创建定投计划失败:', error.message);
+    logger.error('创建定投计划失败:', error.message);
     res.status(500).json({ error: '创建定投计划失败' });
   }
 });
@@ -88,7 +89,7 @@ router.put('/dca-plans/:id', async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('更新定投计划失败:', error.message);
+    logger.error('更新定投计划失败:', error.message);
     res.status(500).json({ error: '更新定投计划失败' });
   }
 });
@@ -106,7 +107,7 @@ router.delete('/dca-plans/:id', async (req, res) => {
     await pool.query('DELETE FROM dca_plans WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (error) {
-    console.error('删除定投计划失败:', error.message);
+    logger.error('删除定投计划失败:', error.message);
     res.status(500).json({ error: '删除定投计划失败' });
   }
 });
@@ -163,7 +164,7 @@ router.post('/dca-plans/sync', async (req, res) => {
 
     res.json({ synced: totalSynced, details, message: `同步完成，共生成 ${totalSynced} 条定投记录` });
   } catch (error) {
-    console.error('同步定投失败:', error.message);
+    logger.error('同步定投失败:', error.message);
     res.status(500).json({ error: '同步定投失败' });
   }
 });

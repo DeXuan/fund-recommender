@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../../utils/logger.cjs');
 const { getPool } = require('../../db.cjs');
 const { authMiddleware } = require('../../auth.cjs');
 
@@ -72,7 +73,7 @@ router.post('/sell', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('卖出记录失败:', error.message);
+    logger.error('卖出记录失败:', error.message);
     res.status(500).json({ error: '卖出记录失败' });
   }
 });
@@ -120,7 +121,7 @@ router.get('/transactions', async (req, res) => {
       stats: statsRes.rows[0],
     });
   } catch (error) {
-    console.error('获取交易流水失败:', error.message);
+    logger.error('获取交易流水失败:', error.message);
     res.status(500).json({ error: '获取交易流水失败' });
   }
 });
@@ -187,7 +188,7 @@ router.get('/fee-analysis', async (req, res) => {
       fundFees: fundFeeList,
     });
   } catch (error) {
-    console.error('费用分析失败:', error.message);
+    logger.error('费用分析失败:', error.message);
     res.status(500).json({ error: '费用分析失败' });
   }
 });
@@ -266,7 +267,7 @@ router.get('/holdings-risk', async (req, res) => {
 
     res.json({ holdings: results });
   } catch (error) {
-    console.error('持仓风险分析失败:', error.message);
+    logger.error('持仓风险分析失败:', error.message);
     res.status(500).json({ error: '持仓风险分析失败' });
   }
 });
@@ -350,7 +351,7 @@ router.get('/industry-allocation', async (req, res) => {
       suggestions,
     });
   } catch (error) {
-    console.error('行业配置分析失败:', error.message);
+    logger.error('行业配置分析失败:', error.message);
     res.status(500).json({ error: '行业配置分析失败' });
   }
 });
@@ -414,7 +415,7 @@ router.get('/performance-attribution', async (req, res) => {
       worstContributor: worst ? { name: worst.fundName, contribution: worst.contribution } : null,
     });
   } catch (error) {
-    console.error('收益归因失败:', error.message);
+    logger.error('收益归因失败:', error.message);
     res.status(500).json({ error: '收益归因失败' });
   }
 });
@@ -463,7 +464,7 @@ router.get('/transactions/export', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=transactions_${new Date().toISOString().slice(0, 10)}.csv`);
     res.send(csv);
   } catch (err) {
-    console.error('导出交易流水失败:', err);
+    logger.error('导出交易流水失败:', err);
     res.status(500).json({ error: '导出交易流水失败' });
   }
 });

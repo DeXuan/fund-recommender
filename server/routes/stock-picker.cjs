@@ -4,6 +4,7 @@ const express = require('express');
 const { authMiddleware, subscriptionMiddleware } = require('../auth.cjs');
 const { getPool } = require('../db.cjs');
 const { queryFundsForScoring } = require('../fund-service.cjs');
+const logger = require('../utils/logger.cjs');
 
 const router = express.Router();
 
@@ -56,12 +57,28 @@ function scoreFund(fund, factors) {
   return { score: total, breakdown, reasoning };
 }
 
+// 基金综合评级 (A/B+/B/C/D)
+function calculateRating(score, breakdown) {
+  const grade = score >= 75 ? 'A' : score >= 65 ? 'B+' : score >= 55 ? 'B' : score >= 45 ? 'C' : 'D';
+  const label = { 'A': '优秀', 'B+': '良好', 'B': '中等', 'C': '较差', 'D': '风险' }[grade];
+  const strengths = [];
+  const weaknesses = [];
+  if (breakdown.return1y >= 70) strengths.push('收益能力突出'); else if (breakdown.return1y < 40) weaknesses.push('收益偏低');
+  if (breakdown.fee >= 70) strengths.push('费率优势明显'); else if (breakdown.fee < 40) weaknesses.push('费率偏高');
+  if (breakdown.scale >= 70) strengths.push('规模稳定性好'); else if (breakdown.scale < 40) weaknesses.push('规模偏小');
+  if (breakdown.momentum >= 70) strengths.push('动量势头强劲'); else if (breakdown.momentum < 40) weaknesses.push('动量偏弱');
+  if (breakdown.valuation >= 70) strengths.push('估值具有吸引力'); else if (breakdown.valuation < 40) weaknesses.push('估值偏高');
+  if (strengths.length === 0) strengths.push('各项指标均衡');
+  if (weaknesses.length === 0) weaknesses.push('无明显短板');
+  return { grade, label, strengths, weaknesses };
+}
+
 // GET /api/stock-picker/factors
 router.get('/api/stock-picker/factors', authMiddleware, subscriptionMiddleware, (req, res) => {
   try {
     res.json({ factors: DEFAULT_FACTORS });
   } catch (e) {
-    console.error('获取因子配置失败:', e.message);
+    logger.error(`获取因子配置失败: ${e.message}`);
     res.status(500).json({ error: '获取因子配置失败' });
   }
 });
@@ -77,6 +94,14 @@ router.post('/api/stock-picker/rank', authMiddleware, subscriptionMiddleware, as
     // 评分排序（使用共享评分函数）
     const ranked = funds.map(fund => {
       const { score, breakdown, reasoning } = scoreFund(fund, factors);
+      const scoreNum = Math.round(score * 1000) / 10;
+      const breakdownPct = {
+        return1y: Math.round(breakdown.return1y * 100),
+        fee: Math.round(breakdown.fee * 100),
+        scale: Math.round(breakdown.scale * 100),
+        momentum: Math.round(breakdown.momentum * 100),
+        valuation: Math.round(breakdown.valuation * 100),
+      };
       return {
         fund: {
           code: fund.code,
@@ -96,14 +121,9 @@ router.post('/api/stock-picker/rank', authMiddleware, subscriptionMiddleware, as
           rating: fund.rating,
           manager: fund.manager || '',
         },
-        score: Math.round(score * 1000) / 10,
-        breakdown: {
-          return1y: Math.round(breakdown.return1y * 100),
-          fee: Math.round(breakdown.fee * 100),
-          scale: Math.round(breakdown.scale * 100),
-          momentum: Math.round(breakdown.momentum * 100),
-          valuation: Math.round(breakdown.valuation * 100),
-        },
+        score: scoreNum,
+        breakdown: breakdownPct,
+        rating: calculateRating(scoreNum, breakdownPct),
         reasoning,
       };
     }).sort((a, b) => b.score - a.score).slice(0, limit);
@@ -124,7 +144,7 @@ router.post('/api/stock-picker/rank', authMiddleware, subscriptionMiddleware, as
 
     res.json({ ranked, total: funds.length, factors, industryStats });
   } catch (e) {
-    console.error('AI选股失败:', e.message);
+    logger.error(`AI选股失败: ${e.message}`);
     res.status(500).json({ error: '选股失败' });
   }
 });
@@ -132,12 +152,19 @@ router.post('/api/stock-picker/rank', authMiddleware, subscriptionMiddleware, as
 // POST /api/stock-picker/backtest — 回测模拟（top N 等权组合 vs 沪深300）
 router.post('/api/stock-picker/backtest', authMiddleware, subscriptionMiddleware, async (req, res) => {
   try {
-    const { codes, days = 180 } = req.body;
+    const { codes, days = 180, benchmarkCode } = req.body;
     if (!codes || !Array.isArray(codes) || codes.length === 0) {
       return res.status(400).json({ error: '请提供基金代码' });
     }
     const pool = getPool();
     const limit = Math.min(days, 365);
+
+    // 可配置基准：默认沪深300
+    const BENCHMARKS = {
+      '110020': '沪深300', '161017': '中证500', '006165': '中证1000',
+      '161725': '创业板指', '510050': '上证50', '512880': '证券ETF'
+    };
+    const benchmarkFundCode = benchmarkCode && BENCHMARKS[benchmarkCode] ? benchmarkCode : '110020';
 
     // 获取每只基金的净值历史
     const fundHistories = {};
@@ -149,10 +176,10 @@ router.post('/api/stock-picker/backtest', authMiddleware, subscriptionMiddleware
       fundHistories[code] = navRes.rows.reverse();
     }
 
-    // 获取沪深300基准（用 market_indices 里最近的价格，或从基金净值推算）
+    // 获取基准净值
     const hs300NavRes = await pool.query(
       'SELECT nav, nav_date FROM fund_nav WHERE fund_code = $1 ORDER BY nav_date DESC LIMIT $2',
-      ['110020', limit] // 易方达沪深300ETF联接A
+      [benchmarkFundCode, limit]
     );
     const hs300History = hs300NavRes.rows.reverse();
 
@@ -238,9 +265,12 @@ router.post('/api/stock-picker/backtest', authMiddleware, subscriptionMiddleware
         days: portfolio.length,
         funds: validCodes.length,
       },
+      benchmarkCode: benchmarkFundCode,
+      benchmarkName: BENCHMARKS[benchmarkFundCode] || '沪深300',
+      availableBenchmarks: Object.entries(BENCHMARKS).map(([code, name]) => ({ code, name })),
     });
   } catch (e) {
-    console.error('回测失败:', e.message);
+    logger.error(`回测失败: ${e.message}`);
     res.status(500).json({ error: '回测失败' });
   }
 });
@@ -290,7 +320,7 @@ router.post('/api/stock-picker/portfolio', authMiddleware, subscriptionMiddlewar
 
     res.json({ allocation, totalBudget: budget, perFund, strategy, factors });
   } catch (e) {
-    console.error('建仓建议失败:', e.message);
+    logger.error('建仓建议失败:', e.message);
     res.status(500).json({ error: '建仓建议失败' });
   }
 });
@@ -316,7 +346,7 @@ router.get('/api/stock-picker/market-overview', authMiddleware, subscriptionMidd
       const { getCachedCapitalFlow } = require('../data-fetcher.cjs');
       capitalFlow = getCachedCapitalFlow();
     } catch (e) {
-      console.error('获取资金流向数据失败:', e.message);
+      logger.error('获取资金流向数据失败:', e.message);
     }
 
     // 行业估值分布
@@ -379,7 +409,7 @@ router.get('/api/stock-picker/market-overview', authMiddleware, subscriptionMidd
       },
     });
   } catch (e) {
-    console.error('市场环境数据获取失败:', e.message);
+    logger.error('市场环境数据获取失败:', e.message);
     res.status(500).json({ error: '市场环境数据获取失败' });
   }
 });
@@ -443,7 +473,7 @@ router.post('/api/stock-picker/strategy-compare', authMiddleware, subscriptionMi
 
     res.json({ strategies: strategyResults, overlap, totalFunds: funds.length });
   } catch (e) {
-    console.error('策略对比失败:', e.message);
+    logger.error('策略对比失败:', e.message);
     res.status(500).json({ error: '策略对比失败' });
   }
 });
@@ -585,7 +615,7 @@ router.post('/api/stock-picker/deep-analysis', authMiddleware, subscriptionMiddl
 
     res.json({ results });
   } catch (e) {
-    console.error('深度分析失败:', e.message);
+    logger.error('深度分析失败:', e.message);
     res.status(500).json({ error: '深度分析失败' });
   }
 });
@@ -711,7 +741,7 @@ router.post('/api/stock-picker/quant-picks', authMiddleware, subscriptionMiddlew
       },
     });
   } catch (e) {
-    console.error('量化精选失败:', e.message);
+    logger.error('量化精选失败:', e.message);
     res.status(500).json({ error: '量化精选失败' });
   }
 });

@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const logger = require('../utils/logger.cjs');
 const { authMiddleware } = require('../auth.cjs');
 const { getPool } = require('../db.cjs');
 
@@ -43,7 +44,7 @@ router.get('/api/watchlist', authMiddleware, async (req, res) => {
       return1w: r.return_1w ? parseFloat(r.return_1w) : null,
     })));
   } catch (error) {
-    console.error('获取自选列表失败:', error.message);
+    logger.error('获取自选列表失败:', error.message);
     res.status(500).json({ error: '获取自选列表失败' });
   }
 });
@@ -65,7 +66,7 @@ router.post('/api/watchlist', authMiddleware, async (req, res) => {
     );
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('添加自选失败:', error.message);
+    logger.error('添加自选失败:', error.message);
     res.status(500).json({ error: '添加自选失败' });
   }
 });
@@ -81,7 +82,7 @@ router.delete('/api/watchlist/:fundCode', authMiddleware, async (req, res) => {
     await pool.query('DELETE FROM watchlist WHERE user_id = $1 AND fund_code = $2', [req.user.id, fundCode]);
     res.json({ success: true });
   } catch (error) {
-    console.error('删除自选失败:', error.message);
+    logger.error('删除自选失败:', error.message);
     res.status(500).json({ error: '删除自选失败' });
   }
 });

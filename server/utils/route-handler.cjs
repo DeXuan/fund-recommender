@@ -1,5 +1,7 @@
 'use strict';
 
+const logger = require('./logger.cjs');
+
 /**
  * 统一的路由处理器
  * 隐藏 try/catch、错误日志、响应格式化等重复逻辑
@@ -21,7 +23,7 @@ function handler(bizFn, { errorMessage = '请求失败', logLabel = '' } = {}) {
       const msg = status === 500 ? errorMessage : e.message;
       const label = logLabel || errorMessage;
       if (status === 500) {
-        console.error(`[${label}]`, e.message);
+        logger.error(`[${label}] ${e.message}`);
       }
       if (!res.headersSent) {
         res.status(status).json({ error: msg });

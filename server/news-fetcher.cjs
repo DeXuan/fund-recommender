@@ -5,6 +5,7 @@
  */
 
 const axios = require('axios');
+const logger = require('./utils/logger.cjs');
 
 // 内存缓存
 let newsCache = [];
@@ -93,7 +94,7 @@ async function fetchCLSNews() {
     });
 
     if (!response.data || !response.data.data || !response.data.data.roll_data) {
-      console.warn('[新闻] 财联社返回数据格式异常');
+      logger.warn('[新闻] 财联社返回数据格式异常');
       return [];
     }
 
@@ -119,7 +120,7 @@ async function fetchCLSNews() {
       };
     });
   } catch (error) {
-    console.warn('[新闻] 财联社抓取失败:', error.message);
+    logger.warn('[新闻] 财联社抓取失败:', error.message);
     return [];
   }
 }
@@ -169,7 +170,7 @@ async function fetchEastmoneyNews() {
       };
     });
   } catch (error) {
-    console.warn('[新闻] 东方财富抓取失败:', error.message);
+    logger.warn('[新闻] 东方财富抓取失败:', error.message);
     return [];
   }
 }
@@ -374,7 +375,7 @@ function generateMockNews() {
 // 主抓取函数
 async function fetchAllNews() {
   const startTime = Date.now();
-  console.log('[新闻] 开始抓取...');
+  logger.info('[新闻] 开始抓取...');
 
   const [clsNews, emNews] = await Promise.all([
     fetchCLSNews(),
@@ -395,11 +396,11 @@ async function fetchAllNews() {
   lastFetchTime = new Date().toISOString();
 
   const elapsed = Date.now() - startTime;
-  console.log(`[新闻] 抓取完成: 财联社${clsNews.length}条 + 东方财富${emNews.length}条, 去重后${newItems.length}条, 耗时${elapsed}ms`);
+  logger.info(`[新闻] 抓取完成: 财联社${clsNews.length}条 + 东方财富${emNews.length}条, 去重后${newItems.length}条, 耗时${elapsed}ms`);
 
   // 推送突发高影响新闻
   if (breakingNews.length > 0) {
-    console.log(`[新闻] 发现${breakingNews.length}条高影响新闻，推送给${sseClients.size}个客户端`);
+    logger.info(`[新闻] 发现${breakingNews.length}条高影响新闻，推送给${sseClients.size}个客户端`);
     broadcastNews(breakingNews);
   }
 
@@ -461,12 +462,12 @@ function handleSSEConnection(req, res) {
   }
 
   sseClients.add(res);
-  console.log(`[新闻] SSE客户端连接, 当前${sseClients.size}个`);
+  logger.info(`[新闻] SSE客户端连接, 当前${sseClients.size}个`);
 
   req.on('close', () => {
     sseClients.delete(res);
     clearInterval(heartbeat);
-    console.log(`[新闻] SSE客户端断开, 当前${sseClients.size}个`);
+    logger.info(`[新闻] SSE客户端断开, 当前${sseClients.size}个`);
   });
 }
 

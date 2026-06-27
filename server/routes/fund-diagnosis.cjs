@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../utils/logger.cjs');
 const router = express.Router();
 const { getPool } = require('../db.cjs');
 const fundService = require('../fund-service.cjs');
@@ -80,7 +81,7 @@ router.get('/api/fund-diagnosis/:code', async (req, res) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('基金诊断失败:', error.message);
+    logger.error('基金诊断失败:', error.message);
     res.status(500).json({ error: '基金诊断失败' });
   }
 });

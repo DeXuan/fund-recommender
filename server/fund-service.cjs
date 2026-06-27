@@ -1,4 +1,5 @@
 const { getPool } = require('./db.cjs');
+const logger = require('./utils/logger.cjs');
 
 // ========== 内存缓存 ==========
 const _cache = new Map();
@@ -521,13 +522,13 @@ async function seedFunds(funds) {
   for (const fund of funds) {
     // 检查超时
     if (Date.now() - startTime > TIMEOUT_MS) {
-      console.warn(`[种子数据] 超时（${TIMEOUT_MS}ms），停止插入`);
+      logger.warn(`[种子数据] 超时（${TIMEOUT_MS}ms），停止插入`);
       break;
     }
 
     // 如果连续失败太多次，停止插入
     if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-      console.warn(`[种子数据] 连续失败 ${MAX_CONSECUTIVE_FAILURES} 次，停止插入`);
+      logger.warn(`[种子数据] 连续失败 ${MAX_CONSECUTIVE_FAILURES} 次，停止插入`);
       break;
     }
 
@@ -589,7 +590,7 @@ async function seedFunds(funds) {
     }
   }
 
-  console.log(`[种子数据] 尝试插入 ${funds.length} 只基金，成功 ${insertedCount} 只${failedCount > 0 ? `，失败 ${failedCount} 只` : ''}`);
+  logger.info(`[种子数据] 尝试插入 ${funds.length} 只基金，成功 ${insertedCount} 只${failedCount > 0 ? `，失败 ${failedCount} 只` : ''}`);
 }
 
 // 批量更新基金经理
@@ -604,10 +605,10 @@ async function updateFundManagers(managerMap) {
       );
       if (result.rowCount > 0) updatedCount++;
     } catch (e) {
-      console.warn(`更新基金经理失败 ${code}:`, e.message);
+      logger.warn(`更新基金经理失败 ${code}:`, e.message);
     }
   }
-  console.log(`[基金经理] 更新 ${updatedCount} 只基金的经理信息`);
+  logger.info(`[基金经理] 更新 ${updatedCount} 只基金的经理信息`);
 }
 
 // 更新单只基金的详情（经理、费率、规模等）
@@ -715,7 +716,7 @@ async function batchUpdateHS300FundDetails(funds) {
       await updateHS300FundDetail(fund.code, fund);
       updatedCount++;
     } catch (e) {
-      console.warn(`[HS300] 更新基金 ${fund.code} 详情失败:`, e.message);
+      logger.warn(`[HS300] 更新基金 ${fund.code} 详情失败:`, e.message);
     }
   }
   return updatedCount;

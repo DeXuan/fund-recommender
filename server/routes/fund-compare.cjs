@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const logger = require('../utils/logger.cjs');
 const { authMiddleware, subscriptionMiddleware } = require('../auth.cjs');
 const { getPool } = require('../db.cjs');
 
@@ -41,7 +42,7 @@ router.post('/api/fund-compare/analyze', async (req, res) => {
 
     res.json({ funds, navHistories });
   } catch (e) {
-    console.error('基金对比失败:', e.message);
+    logger.error('基金对比失败:', e.message);
     res.status(500).json({ error: '对比失败' });
   }
 });
@@ -166,7 +167,7 @@ router.post('/api/fund-compare/premium', authMiddleware, subscriptionMiddleware,
       },
     });
   } catch (e) {
-    console.error('深度对比失败:', e.message);
+    logger.error('深度对比失败:', e.message);
     res.status(500).json({ error: '深度对比失败' });
   }
 });

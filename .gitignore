@@ -60,3 +60,4 @@ scripts/*.json
 scripts/*.csv
 test_*.py
 *.tmp
+finpilot/

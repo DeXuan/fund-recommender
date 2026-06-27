@@ -3,6 +3,7 @@
  */
 
 const express = require('express');
+const logger = require('../utils/logger.cjs');
 const fundService = require('../fund-service.cjs');
 const { handler } = require('../utils/route-handler.cjs');
 
@@ -202,7 +203,7 @@ router.get('/api/hs300/analysis', handler(async () => {
     const details = await fundService.getHS300FundDetails();
     details.forEach(d => { hs300DetailsMap[d.code] = d; });
   } catch (e) {
-    console.warn('[HS300] 获取基金详情失败，使用默认值:', e.message);
+    logger.warn('[HS300] 获取基金详情失败，使用默认值:', e.message);
   }
 
   const hs300Funds = hs300Data.map(f => {

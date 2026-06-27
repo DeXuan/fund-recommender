@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../../utils/logger.cjs');
 const multer = require('multer');
 const iconv = require('iconv-lite');
 const { getPool } = require('../../db.cjs');
@@ -156,7 +157,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
     res.json({ imported, errors, total: lines.length - 1 });
   } catch (error) {
-    console.error('导入失败:', error.message);
+    logger.error('导入失败:', error.message);
     res.status(500).json({ error: '导入失败' });
   }
 });
@@ -268,7 +269,7 @@ router.post('/import-alipay', upload.single('file'), async (req, res) => {
 
     res.json({ imported, errors, skipped, total: dataLines.length });
   } catch (error) {
-    console.error('支付宝导入失败:', error.message);
+    logger.error('支付宝导入失败:', error.message);
     res.status(500).json({ error: '导入失败，请检查文件格式是否正确' });
   }
 });

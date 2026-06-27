@@ -688,8 +688,8 @@ export const stockPickerApi = {
   rankFunds: (params: { industry?: string; type?: string; limit?: number; factors?: Record<string, { weight: number }> }) =>
     fetchApi<{ ranked: any[]; total: number; factors: any; industryStats: any }>('/stock-picker/rank', { method: 'POST', body: JSON.stringify(params) }),
   getFactors: () => fetchApi<{ factors: any }>('/stock-picker/factors'),
-  backtest: (codes: string[], days?: number) =>
-    fetchApi<{ dates: string[]; portfolio: number[]; benchmark: number[]; summary: any }>('/stock-picker/backtest', { method: 'POST', body: JSON.stringify({ codes, days }) }),
+  backtest: (codes: string[], days?: number, benchmarkCode?: string) =>
+    fetchApi<{ dates: string[]; portfolio: number[]; benchmark: number[]; summary: any; benchmarkCode: string; benchmarkName: string; availableBenchmarks: any[] }>('/stock-picker/backtest', { method: 'POST', body: JSON.stringify({ codes, days, benchmarkCode }) }),
   buildPortfolio: (params: { topN?: number; budget?: number; strategy?: string; factors?: Record<string, { weight: number }>; industry?: string; type?: string }) =>
     fetchApi<{ allocation: any[]; totalBudget: number; perFund: number; strategy: string; factors: any }>('/stock-picker/portfolio', { method: 'POST', body: JSON.stringify(params) }),
   getMarketOverview: () =>
@@ -700,6 +700,35 @@ export const stockPickerApi = {
     fetchApi<{ results: any[] }>('/stock-picker/deep-analysis', { method: 'POST', body: JSON.stringify({ codes }) }),
   quantPicks: () =>
     fetchApi<{ picks: any[]; totalScanned: number; passedFilter: number; industryStats: any; criteria: any }>('/stock-picker/quant-picks', { method: 'POST' }),
+  // 用户持久化
+  getScreeners: () => fetchApi<any[]>('/stock-picker/screeners'),
+  saveScreener: (data: { name: string; description?: string; filters: any; is_default?: boolean }) =>
+    fetchApi<any>('/stock-picker/screeners', { method: 'POST', body: JSON.stringify(data) }),
+  deleteScreener: (id: number) => fetchApi<any>(`/stock-picker/screeners/${id}`, { method: 'DELETE' }),
+  getHistory: (params?: { page?: number; pageSize?: number }) => {
+    const q = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v) q.append(k, String(v)); });
+    return fetchApi<any>(`/stock-picker/history?${q.toString()}`);
+  },
+  savePickHistory: (data: { strategy: string; filters: any; results: any[] }) =>
+    fetchApi<any>('/stock-picker/history', { method: 'POST', body: JSON.stringify(data) }),
+  getPortfolios: () => fetchApi<any[]>('/stock-picker/portfolios'),
+  savePortfolio: (data: { name: string; strategy: string; budget: number; allocation: any[]; backtest_summary?: any }) =>
+    fetchApi<any>('/stock-picker/portfolios', { method: 'POST', body: JSON.stringify(data) }),
+  deletePortfolio: (id: number) => fetchApi<any>(`/stock-picker/portfolios/${id}`, { method: 'DELETE' }),
+  // 指数温度
+  getTemperature: () => fetchApi<any[]>('/stock-picker/temperature'),
+  // 自然语言筛选 (SVIP)
+  nlScreen: (query: string) =>
+    fetchApi<{ parsed: any; results: any[]; total: number; suggestion?: string }>('/stock-picker/nl-screen', { method: 'POST', body: JSON.stringify({ query }) }),
+  // 相关性分析
+  correlation: (codes: string[]) =>
+    fetchApi<any>('/stock-picker/correlation', { method: 'POST', body: JSON.stringify({ codes }) }),
+  // 提醒规则
+  getAlerts: () => fetchApi<any[]>('/stock-picker/alerts'),
+  saveAlert: (data: { name: string; rule_type: string; conditions: any }) =>
+    fetchApi<any>('/stock-picker/alerts', { method: 'POST', body: JSON.stringify(data) }),
+  deleteAlert: (id: number) => fetchApi<any>(`/stock-picker/alerts/${id}`, { method: 'DELETE' }),
 };
 
 export const fundCompareApi = {

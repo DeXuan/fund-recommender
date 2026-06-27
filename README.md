@@ -1,6 +1,6 @@
 # 基金推荐助手
 
-> 基于 React + Node.js + PostgreSQL 的公募基金分析与推荐平台，覆盖 200+ 只主流基金（含 69 只支付宝金选基金），支持 14 大行业深度分析、指数研究、基金对比、风险评估、定投模拟、持仓管理、AI 助手等功能。支持 Web 端 + Android APK 双端使用。
+> 基于 React + Node.js + PostgreSQL 的公募基金分析与推荐平台，覆盖 14000+ 只基金（含 69 只支付宝金选基金），支持 14 大行业深度分析、AI 智能选股引擎（七因子量化模型）、指数研究、基金对比、风险评估、定投模拟、持仓管理、AI 助手等功能。支持 Web 端 + Android APK 双端使用。三档会员体系（免费/会员/至尊SVIP）。
 
 ---
 
@@ -38,7 +38,7 @@
                     │  └───────────┘  │
                     │  ┌───────────┐  │    ┌──────────────────┐
                     │  │ 服务层     │──│───→│  PostgreSQL       │
-                    │  │ fund-svc   │  │    │  (30+ 张表)       │
+                    │  │ fund-svc   │  │    │  (31 张表)        │
                     │  └───────────┘  │    └──────────────────┘
                     │  ┌───────────┐  │
                     │  │ 定时任务   │  │    每 15 分钟自动更新净值
@@ -67,19 +67,30 @@
 | 用户登录 | `/web/login` | 用户名密码登录、支付宝扫码登录（新用户自动注册） |
 | 关于 | `/web/about` | 应用版本信息、技术栈、版权归属 |
 
-### VIP 功能（需登录）
+### 会员功能（需登录）
 
 | 模块 | 路由 | 说明 |
 |------|------|------|
 | 持仓管理 | `/web/portfolio` | 持仓记录、盈亏统计、定投计划、基准对比、收益地图、组合洞察、交易行为分析、目标规划、智能定投、深度分析 |
 | 自选基金 | `/web/watchlist` | 收藏基金、实时行情、一键跳转详情 |
-| AI 选股 | `/web/stock-picker` | 多因子量化选股模型，支持回测和组合构建 |
+| AI 选股引擎 | `/web/stock-picker` | 七因子量化模型、4 种策略、回测验证、一键建仓、行业洞察、量化精选、选股历史 |
 | 基金诊断 | `/web/fund-diagnosis` | AI 驱动的基金深度诊断（盈利能力、风险抵抗、费率分析、同类对比） |
 | 持仓重叠 | `/web/portfolio-overlap` | 持仓基金重叠度分析 |
 | 估值中心 | `/web/valuation-center` | 全市场估值概览与历史分位 |
 | 个人中心 | `/web/profile` | 个人信息编辑、账户安全、登录历史、会员状态 |
-| 订阅会员 | `/web/subscription` | VIP 会员开通与管理（支付宝扫码支付） |
+| 订阅会员 | `/web/subscription` | 三档会员开通与管理（支付宝扫码支付） |
 | AI 助手 | `/web/ai-assistant` | 智能问答助手（支持斜杠命令：/diagnose, /portfolio, /market, /stockpick, /risk, /dca） |
+
+### 至尊 SVIP 专属功能
+
+| 功能 | 说明 |
+|------|------|
+| AI 智能筛选 | 自然语言描述需求，AI 解析并筛选基金（如"近1年收益>20%的低费率沪深300基金"） |
+| 自定义因子权重 | 5 大因子（收益/费率/规模/动量/估值）自由调节权重，打造个性化选股模型 |
+| A/B/C/D 基金评级 | 五因子综合评分，自动标注优势与风险 |
+| 指数温度计 | PE/PB 分位加权估值温度（0-100），五档信号（极寒/偏冷/适中/偏热/极热） |
+| 相关性分析 | Pearson 相关矩阵热力图，分散化评分，高相关组合预警 |
+| 投资组合优化 | 等权分配 + 回测验证 + 可配置基准（沪深300/中证500/中证1000/创业板） |
 
 ## 技术栈
 
@@ -106,7 +117,7 @@
 - 自适应图标 + 启动屏（全分辨率覆盖）
 - 支持 HTTP 明文请求（cleartext traffic）
 
-**数据库（25 张表）**
+**数据库（31 张表）**
 
 | 表名 | 说明 |
 |------|------|
@@ -114,7 +125,7 @@
 | `fund_nav` | 基金净值历史表 |
 | `market_indices` | 市场指数表 |
 | `sector_data` | 板块轮动表 |
-| `users` | 用户表（含角色、状态、订阅、登录锁定） |
+| `users` | 用户表（含角色、状态、订阅、会员等级、登录锁定） |
 | `fund_records` | 持仓记录表（含定投功能 + 盈亏预计算 + 卖出记录） |
 | `dca_plans` | 定投计划表（兼容旧数据） |
 | `watchlist` | 自选基金表（含分组和排序） |
@@ -123,7 +134,7 @@
 | `hs300_fund_details` | 沪深 300 基金详情表 |
 | `cmb_products` | 招行理财产品表 |
 | `cmb_zhaoyin_nav` | 招银理财净值表 |
-| `subscription_plans` | 订阅套餐表 |
+| `subscription_plans` | 订阅套餐表（含 SVIP 套餐） |
 | `subscription_orders` | 订阅订单表 |
 | `login_logs` | 登录审计日志表 |
 | `admin_audit_logs` | 管理员操作审计表 |
@@ -136,6 +147,11 @@
 | `chat_history` | AI 聊天历史表（会话追踪、角色、内容、JSONB 数据） |
 | `asset_accounts` | 多账户资产台账（账户类型、余额、成本、币种、图标、颜色） |
 | `budget_rules` | 预算控制规则表（分类月度限额、告警阈值） |
+| `saved_screeners` | 用户保存的筛选方案 |
+| `stock_pick_history` | 选股历史记录 |
+| `saved_portfolios` | 用户保存的投资组合 |
+| `stock_alert_rules` | 选股提醒规则 |
+| `index_temperature` | 指数估值温度缓存 |
 
 ## 环境要求
 
@@ -340,7 +356,12 @@ fund-recommender/
 │   │   ├── fund-compare.cjs   # 基金对比路由
 │   │   ├── fund-diagnosis.cjs # 基金诊断路由（AI 驱动）
 │   │   ├── ai-assistant.cjs   # AI 助手路由（Claude API + 斜杠命令）
-│   │   ├── stock-picker.cjs   # AI 选股路由（多因子量化模型）
+│   │   ├── stock-picker.cjs   # AI 选股路由（多因子量化模型，750 行）
+│   │   ├── stock-picker-user.cjs # 选股用户数据路由（筛选器/历史/组合/CSV导出）
+│   │   ├── stock-picker-temperature.cjs # 指数温度计路由
+│   │   ├── stock-picker-nl.cjs # 自然语言筛选路由（SVIP 专属）
+│   │   ├── stock-picker-corr.cjs # 相关性分析路由
+│   │   ├── stock-picker-alerts.cjs # 选股提醒规则路由
 │   │   ├── subscription.cjs   # 订阅支付路由（支付宝扫码）
 │   │   ├── watchlist.cjs      # 自选基金路由
 │   │   └── portfolio/         # 持仓子路由
@@ -411,7 +432,16 @@ fund-recommender/
 │   │       ├── DeepAnalysisTab.tsx
 │   │       ├── AddEditRecordModal.tsx
 │   │       ├── DCAModal.tsx
-│   │       └── SellModal.tsx
+│   │       ├── SellModal.tsx
+│   │       └── import.cjs    # CSV 导入子路由
+│   ├── stock-picker/          # AI 选股子组件
+│   │   ├── FundRatingBadge.tsx    # A/B/C/D 基金评级徽章
+│   │   ├── IndexTemperatureCard.tsx # 指数温度计卡片
+│   │   ├── NLScreenerInput.tsx    # 自然语言筛选输入框
+│   │   ├── CustomFactorPanel.tsx  # 自定义因子权重面板
+│   │   ├── CorrelationHeatmap.tsx # 相关性热力图
+│   │   ├── PickHistoryTab.tsx     # 选股历史标签页
+│   │   └── ProBadge.tsx          # PRO/SVIP 徽章
 │   ├── pages/                 # 页面组件（懒加载）
 │   │   ├── Home.tsx           # 首页看板
 │   │   ├── FundList.tsx       # 基金列表
@@ -584,13 +614,33 @@ fund-recommender/
 |------|------|------|
 | GET | `/api/fund-diagnosis/:code` | AI 基金深度诊断（盈利能力、风险抵抗、费率分析、同类对比） |
 
-### AI 选股
+### AI 选股引擎
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/stock-picker/rank` | 多因子量化选股排名 |
-| POST | `/api/stock-picker/backtest` | 选股策略回测 |
-| POST | `/api/stock-picker/build-portfolio` | 组合构建 |
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/api/stock-picker/factors` | 获取因子配置 | 会员 |
+| POST | `/api/stock-picker/rank` | 多因子量化选股排名（支持自定义因子权重） | 会员 |
+| POST | `/api/stock-picker/backtest` | 选股策略回测（可配置基准） | 会员 |
+| POST | `/api/stock-picker/portfolio` | 一键组合构建 | 会员 |
+| GET | `/api/stock-picker/market-overview` | 市场环境概览 | 会员 |
+| POST | `/api/stock-picker/strategy-compare` | 策略对比分析 | 会员 |
+| POST | `/api/stock-picker/deep-analysis` | 基金深度风险分析 | 会员 |
+| POST | `/api/stock-picker/quant-picks` | 量化精选（6因子筛选） | 会员 |
+| GET | `/api/stock-picker/screeners` | 获取保存的筛选方案 | 会员 |
+| POST | `/api/stock-picker/screeners` | 保存筛选方案 | 会员 |
+| DELETE | `/api/stock-picker/screeners/:id` | 删除筛选方案 | 会员 |
+| GET | `/api/stock-picker/history` | 选股历史记录 | 会员 |
+| POST | `/api/stock-picker/history` | 保存选股历史 | 会员 |
+| GET | `/api/stock-picker/portfolios` | 获取保存的投资组合 | 会员 |
+| POST | `/api/stock-picker/portfolios` | 保存投资组合 | 会员 |
+| DELETE | `/api/stock-picker/portfolios/:id` | 删除投资组合 | 会员 |
+| POST | `/api/stock-picker/export/csv` | CSV 导出选股结果 | 会员 |
+| GET | `/api/stock-picker/temperature` | 指数估值温度计 | 会员 |
+| POST | `/api/stock-picker/nl-screen` | 自然语言筛选 | SVIP |
+| POST | `/api/stock-picker/correlation` | 相关性分析 | 会员 |
+| GET | `/api/stock-picker/alerts` | 获取提醒规则 | 会员 |
+| POST | `/api/stock-picker/alerts` | 创建提醒规则 | 会员 |
+| DELETE | `/api/stock-picker/alerts/:id` | 删除提醒规则 | 会员 |
 
 ### 订阅支付
 
@@ -679,6 +729,48 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 > 详细的安全漏洞修复记录请参阅 [SECURITY_FIX_LOG.md](./SECURITY_FIX_LOG.md)。
 
 ## 版本更新记录
+
+### v1.1.0 (2026-06-28) — AI 选股引擎深度优化 + 安全加固
+
+**AI 选股引擎（全新升级）**
+- 三档会员体系：免费 → 会员（9.9元/月）→ 至尊SVIP（29.9元/月）
+- 自然语言筛选（SVIP）：中文语义解析，支持"近1年收益>20%的低费率沪深300基金"
+- 基金评级系统（SVIP）：A/B+/B/C/D 五档评级，自动标注优势与风险
+- 指数温度计（SVIP）：PE/PB 分位加权估值温度（0-100），五档信号
+- 自定义因子权重（SVIP）：5 大因子自由调节，实时饼图预览
+- 相关性分析：Pearson 相关矩阵热力图，分散化评分
+- 用户数据持久化：保存筛选器、选股历史、投资组合
+- CSV 导出：选股结果一键导出
+- 可配置回测基准：沪深300/中证500/中证1000/创业板/上证50/证券ETF
+- 提醒规则：4 种规则类型，CRUD 管理
+- 前端组件化：7 个独立组件（FundRatingBadge、IndexTemperatureCard、NLScreenerInput 等）
+- Hero 头部重新设计：市场状态栏、统计数据、策略选择器、PRO/SVIP 徽章
+- 移动端响应式适配
+
+**安全加固（11 项修复）**
+- .env.termux 弱 JWT 密钥替换为 64 字符随机密钥
+- ENABLE_MOCK_AUTH 默认关闭 + NODE_ENV=production 强制设置
+- Guest 登录数据隔离：独立 guest_visitor 账户，不再与 test01 共享
+- unhandledRejection 处理器改为延迟退出 + PM2 重启
+- AI 助手 HTML sanitizer 从正则替换改为 HTML 实体转义
+- CORS 白名单补充 localhost:3003
+- capacitor.config.ts 硬编码 IP 改为环境变量
+- .env.example 补充 NODE_ENV 文档
+- subscription-service 支持 svip tier 字段
+- 50 处 console.* 迁移到 Winston 日志
+- GSAP fallback 超时从 3 秒降为 0.5 秒
+
+**前端优化**
+- 页面加载速度优化：卡片默认可见，GSAP 动画变为可选增强
+- AI 助手浮动窗口优化：抽屉模式隐藏侧边栏，聊天区域全宽显示
+- Portfolio 页复用 ProBadge 组件
+- StockPicker Hero 头部移动端响应式
+
+**项目规模**
+- 前端：97 个 .tsx/.ts 文件，27,498 行代码
+- 后端：54 个 .cjs 文件，18,579 行代码
+- 总计：46,077 行代码
+- 119 个 API 端点，31 张数据库表，46 个 React 组件，23 个页面
 
 ### v1.0.0 (2026-06-22) — Android APK 发布
 

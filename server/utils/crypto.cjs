@@ -3,6 +3,7 @@
  */
 
 const crypto = require('crypto');
+const logger = require('./logger.cjs');
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -68,7 +69,7 @@ function decrypt(encryptedData) {
 
     return decrypted;
   } catch (error) {
-    console.warn('[加密] 解密失败:', error.message);
+    logger.warn(`[加密] 解密失败: ${error.message}`);
     return '';
   }
 }

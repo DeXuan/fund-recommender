@@ -3,6 +3,7 @@
  */
 
 const express = require('express');
+const logger = require('../utils/logger.cjs');
 const { getPool } = require('../db.cjs');
 const { authMiddleware, adminMiddleware } = require('../auth.cjs');
 const { createHandler } = require('../utils/route-handler.cjs');
@@ -140,7 +141,7 @@ function createNewsRefreshRoute(fetchAllNews) {
       const result = await fetchAllNews();
       res.json({ success: true, ...result });
     } catch (error) {
-      console.error('刷新新闻失败:', error.message);
+      logger.error('刷新新闻失败:', error.message);
       res.status(500).json({ error: '刷新新闻失败' });
     }
   });

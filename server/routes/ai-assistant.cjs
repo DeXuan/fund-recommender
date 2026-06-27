@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../utils/logger.cjs');
 const router = express.Router();
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
@@ -7,6 +8,17 @@ const { getPool } = require('../db.cjs');
 const fundService = require('../fund-service.cjs');
 const { getClient } = require('../utils/anthropicClient.cjs');
 const { buildContext } = require('../services/aiContextProvider.cjs');
+
+// 安全的 HTML 清理：转义 HTML 实体而非简单剥离标签（防止 XSS 变体绕过）
+function sanitizeHtml(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
 
 // AI 聊天专用限流：每 IP 每分钟 30 次
 const aiLimiter = rateLimit({
@@ -27,7 +39,7 @@ function optionalAuth(req, res, next) {
       const token = authHeader.slice(7);
       const decoded = jwt.verify(token, JWT_SECRET);
       req.user = { id: decoded.id, username: decoded.username, nickname: decoded.nickname, role: decoded.role || 'user' };
-    } catch (e) { console.error('JWT token验证失败:', e.message); }
+    } catch (e) { logger.error('JWT token验证失败:', e.message); }
   }
   next();
 }
@@ -504,7 +516,7 @@ router.post('/api/ai/chat/stream', aiLimiter, async (req, res) => {
     });
 
     stream.on('error', async (err) => {
-      console.warn('[AI Stream] 错误:', err.message);
+      logger.warn('[AI Stream] 错误:', err.message);
       // 规则引擎兜底
       try {
         const fallback = await ruleEngineFallback(message.trim(), userId);
@@ -529,7 +541,7 @@ router.post('/api/ai/chat/stream', aiLimiter, async (req, res) => {
     });
 
     stream.on('end', async () => {
-      fullReply = fullReply.replace(/<[^>]*>/g, '');
+      fullReply = sanitizeHtml(fullReply);
       try {
         await pool.query(
           `INSERT INTO chat_history (user_id, session_id, role, content, data) VALUES ($1, $2, 'user', $3, $4)`,
@@ -540,7 +552,7 @@ router.post('/api/ai/chat/stream', aiLimiter, async (req, res) => {
           [userId, sid, fullReply, null]
         );
       } catch (e) {
-        console.warn('[AI Stream] 保存记录失败:', e.message);
+        logger.warn('[AI Stream] 保存记录失败:', e.message);
       }
       res.write(`data: ${JSON.stringify({ type: 'done', sessionId: sid })}\n\n`);
       res.end();
@@ -551,7 +563,7 @@ router.post('/api/ai/chat/stream', aiLimiter, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[AI Stream] 错误:', error.message);
+    logger.error('[AI Stream] 错误:', error.message);
     if (!res.headersSent) {
       res.status(500).json({ error: '处理请求失败' });
     } else {
@@ -591,7 +603,7 @@ router.post('/api/ai/chat', aiLimiter, async (req, res) => {
             `SELECT role, content FROM chat_history WHERE session_id = $1 ORDER BY id DESC LIMIT 10`, [sid]
           );
           historyMessages = historyResult.rows.reverse().map(r => ({ role: r.role, content: r.content }));
-        } catch (e) { console.error('查询聊天历史记录失败:', e.message); }
+        } catch (e) { logger.error('查询聊天历史记录失败:', e.message); }
 
         let commandPrompt = '';
         if (command && COMMAND_PROMPTS[command]) {
@@ -608,9 +620,9 @@ router.post('/api/ai/chat', aiLimiter, async (req, res) => {
           messages,
         });
 
-        reply = response.content[0].text.replace(/<[^>]*>/g, '');
+        reply = sanitizeHtml(response.content[0].text);
       } catch (claudeErr) {
-        console.warn('[AI] Claude API 调用失败，回退到规则引擎:', claudeErr.message);
+        logger.warn('[AI] Claude API 调用失败，回退到规则引擎:', claudeErr.message);
         useClaude = false;
       }
     }
@@ -633,12 +645,12 @@ router.post('/api/ai/chat', aiLimiter, async (req, res) => {
         [userId, sid, reply, data ? JSON.stringify(data) : null]
       );
     } catch (e) {
-      console.warn('保存聊天记录失败:', e.message);
+      logger.warn('保存聊天记录失败:', e.message);
     }
 
     res.json({ reply, data, sessionId: sid, timestamp: new Date().toISOString() });
   } catch (error) {
-    console.error('AI助手错误:', error.message);
+    logger.error('AI助手错误:', error.message);
     res.status(500).json({ error: '处理请求失败，请稍后重试' });
   }
 });
@@ -691,7 +703,7 @@ router.get('/api/ai/history', async (req, res) => {
       hasMore,
     });
   } catch (error) {
-    console.error('获取聊天历史失败:', error.message);
+    logger.error('获取聊天历史失败:', error.message);
     res.status(500).json({ error: '获取历史记录失败' });
   }
 });
@@ -724,8 +736,114 @@ router.get('/api/ai/sessions', async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('获取会话列表失败:', error.message);
+    logger.error('获取会话列表失败:', error.message);
     res.status(500).json({ error: '获取会话列表失败' });
+  }
+});
+
+// 消息反馈（点赞/点踩）
+router.post('/api/ai/feedback', async (req, res) => {
+  try {
+    const pool = getPool();
+    const userId = getUserId(req);
+    const { messageId, sessionId, rating } = req.body; // rating: 'up' | 'down'
+
+    if (!messageId || !['up', 'down'].includes(rating)) {
+      return res.status(400).json({ error: '参数无效' });
+    }
+
+    // 存储到 chat_history 的 data 字段中（通过更新）
+    await pool.query(
+      `UPDATE chat_history SET data = COALESCE(data, '{}')::jsonb || $1 WHERE id = $2`,
+      [JSON.stringify({ feedback: rating }), messageId]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('保存反馈失败:', error.message);
+    res.status(500).json({ error: '保存反馈失败' });
+  }
+});
+
+// 收藏消息
+router.post('/api/ai/favorites', async (req, res) => {
+  try {
+    const pool = getPool();
+    const userId = getUserId(req);
+    const { messageId, sessionId, content } = req.body;
+
+    if (!userId) return res.status(401).json({ error: '请先登录' });
+    if (!messageId) return res.status(400).json({ error: '参数无效' });
+
+    await pool.query(
+      `INSERT INTO ai_favorites (user_id, message_id, session_id, content) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, message_id) DO NOTHING`,
+      [userId, messageId, sessionId || '', content || '']
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('收藏失败:', error.message);
+    // 如果表不存在，尝试创建
+    if (error.message.includes('relation') && error.message.includes('does not exist')) {
+      try {
+        const pool = getPool();
+        await pool.query(`CREATE TABLE IF NOT EXISTS ai_favorites (
+          id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, message_id BIGINT NOT NULL,
+          session_id TEXT, content TEXT, created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(user_id, message_id)
+        )`);
+        await pool.query(
+          `INSERT INTO ai_favorites (user_id, message_id, session_id, content) VALUES ($1, $2, $3, $4)`,
+          [userId, messageId, sessionId || '', content || '']
+        );
+        return res.json({ success: true });
+      } catch (e2) {
+        logger.error('创建收藏表失败:', e2.message);
+      }
+    }
+    res.status(500).json({ error: '收藏失败' });
+  }
+});
+
+// 获取收藏列表
+router.get('/api/ai/favorites', async (req, res) => {
+  try {
+    const pool = getPool();
+    const userId = getUserId(req);
+    if (!userId) return res.json({ favorites: [] });
+
+    // 先检查表是否存在
+    const tableCheck = await pool.query(
+      `SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'ai_favorites')`
+    );
+    if (!tableCheck.rows[0].exists) return res.json({ favorites: [] });
+
+    const result = await pool.query(
+      `SELECT id, message_id, session_id, content, created_at FROM ai_favorites WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+      [userId]
+    );
+    res.json({ favorites: result.rows });
+  } catch (error) {
+    logger.error('获取收藏失败:', error.message);
+    res.json({ favorites: [] });
+  }
+});
+
+// 取消收藏
+router.delete('/api/ai/favorites/:messageId', async (req, res) => {
+  try {
+    const pool = getPool();
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: '请先登录' });
+
+    await pool.query(
+      `DELETE FROM ai_favorites WHERE user_id = $1 AND message_id = $2`,
+      [userId, req.params.messageId]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('取消收藏失败:', error.message);
+    res.status(500).json({ error: '取消收藏失败' });
   }
 });
 
@@ -744,7 +862,7 @@ router.delete('/api/ai/history', async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('清空聊天记录失败:', error.message);
+    logger.error('清空聊天记录失败:', error.message);
     res.status(500).json({ error: '清空失败' });
   }
 });

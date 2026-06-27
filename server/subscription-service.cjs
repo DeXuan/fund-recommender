@@ -29,12 +29,16 @@ async function getActiveSubscription(userId, role) {
   // 管理员直接返回会员状态
   if (role === 'admin') return { isPremium: true, expiresAt: '2099-12-31', planName: '管理员', daysRemaining: 9999 };
   const result = await pool.query(
-    `SELECT subscription_status, subscription_end, subscription_plan_id FROM users WHERE id = $1`,
+    `SELECT subscription_status, subscription_end, subscription_plan_id, subscription_tier FROM users WHERE id = $1`,
     [userId]
   );
-  if (result.rows.length === 0) return { isPremium: false };
-  const { subscription_status, subscription_end, subscription_plan_id } = result.rows[0];
-  const isPremium = subscription_status === 'premium' && subscription_end && new Date(subscription_end) > new Date();
+  if (result.rows.length === 0) return { isPremium: false, tier: 'free' };
+  const { subscription_status, subscription_end, subscription_plan_id, subscription_tier } = result.rows[0];
+  const tier = subscription_tier || 'free';
+  // 兼容旧版 premium 状态 + 新版 tier 字段
+  const hasLegacyPremium = subscription_status === 'premium' && subscription_end && new Date(subscription_end) > new Date();
+  const hasTierPremium = tier === 'premium' || tier === 'svip';
+  const isPremium = hasLegacyPremium || hasTierPremium;
   let planName = null;
   if (isPremium && subscription_plan_id) {
     const plan = await pool.query('SELECT name FROM subscription_plans WHERE id = $1', [subscription_plan_id]);
@@ -42,6 +46,7 @@ async function getActiveSubscription(userId, role) {
   }
   return {
     isPremium,
+    tier,
     expiresAt: subscription_end,
     planName,
     daysRemaining: isPremium ? Math.ceil((new Date(subscription_end) - new Date()) / 86400000) : 0,

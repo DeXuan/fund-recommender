@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const logger = require('../utils/logger.cjs');
 const QRCode = require('qrcode');
 const { authMiddleware } = require('../auth.cjs');
 const subService = require('../subscription-service.cjs');
@@ -14,7 +15,7 @@ router.get('/api/subscription/plans', async (req, res) => {
     const plans = await subService.getPlans();
     res.json({ plans });
   } catch (e) {
-    console.error('获取套餐失败:', e.message);
+    logger.error('获取套餐失败:', e.message);
     res.status(500).json({ error: '获取套餐失败' });
   }
 });
@@ -49,7 +50,7 @@ router.post('/api/subscription/create-order', authMiddleware, async (req, res) =
         qrCodeBase64 = await QRCode.toDataURL(qrCodeUrl, { width: 280, margin: 1 });
       }
     } catch (payErr) {
-      console.warn('支付宝预创建失败:', payErr.message);
+      logger.warn('支付宝预创建失败:', payErr.message);
     }
 
     res.json({
@@ -61,7 +62,7 @@ router.post('/api/subscription/create-order', authMiddleware, async (req, res) =
       qrCodeBase64,
     });
   } catch (e) {
-    console.error('创建订单失败:', e.message);
+    logger.error('创建订单失败:', e.message);
     res.status(500).json({ error: e.message || '创建订单失败' });
   }
 });
@@ -72,7 +73,7 @@ router.get('/api/subscription/status', authMiddleware, async (req, res) => {
     const status = await subService.getActiveSubscription(req.user.id, req.user.role);
     res.json(status);
   } catch (e) {
-    console.error('获取订阅状态失败:', e.message);
+    logger.error('获取订阅状态失败:', e.message);
     res.status(500).json({ error: '获取订阅状态失败' });
   }
 });
@@ -115,12 +116,12 @@ router.post('/api/subscription/check-order', authMiddleware, async (req, res) =>
         }
       }
     } catch (queryErr) {
-      console.warn('支付宝查询失败:', queryErr.message);
+      logger.warn('支付宝查询失败:', queryErr.message);
     }
 
     res.json({ paid: false });
   } catch (e) {
-    console.error('查询订单失败:', e.message);
+    logger.error('查询订单失败:', e.message);
     res.status(500).json({ error: '查询订单失败' });
   }
 });
@@ -141,22 +142,22 @@ setInterval(() => { const now = Date.now(); for (const [ip, r] of notifyRateLimi
 router.post('/api/subscription/notify', express.urlencoded({ extended: false }), async (req, res) => {
   const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
   if (!checkNotifyRateLimit(clientIp)) {
-    console.warn('[支付宝回调] 速率限制触发:', clientIp);
+    logger.warn('[支付宝回调] 速率限制触发:', clientIp);
     return res.send('failure');
   }
   try {
     const params = req.body;
     if (!verifyNotification(params)) {
-      console.warn('[支付宝回调] 签名验证失败');
+      logger.warn('[支付宝回调] 签名验证失败');
       return res.send('failure');
     }
     if (params.trade_status === 'TRADE_SUCCESS' || params.trade_status === 'TRADE_FINISHED') {
       await subService.activateByTradeNo(params.out_trade_no, params.trade_no || '');
-      console.log(`[支付宝回调] 订单 ${params.out_trade_no} 支付成功`);
+      logger.info(`[支付宝回调] 订单 ${params.out_trade_no} 支付成功`);
     }
     res.send('success');
   } catch (e) {
-    console.error('[支付宝回调] 处理失败:', e.message);
+    logger.error('[支付宝回调] 处理失败:', e.message);
     res.send('failure');
   }
 });
@@ -167,7 +168,7 @@ router.get('/api/subscription/orders', authMiddleware, async (req, res) => {
     const orders = await subService.getOrdersByUser(req.user.id);
     res.json({ orders });
   } catch (e) {
-    console.error('获取订单失败:', e.message);
+    logger.error('获取订单失败:', e.message);
     res.status(500).json({ error: '获取订单失败' });
   }
 });

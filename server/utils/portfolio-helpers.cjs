@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { API_URLS, REQUEST_DEFAULTS } = require('../config/index.cjs');
+const logger = require('./logger.cjs');
 
 /**
  * 获取并存储基金历史净值（从东方财富API）
@@ -38,7 +39,7 @@ async function fetchAndStoreHistoricalNav(pool, fundCode, fundName, year) {
     );
     inserted++;
   }
-  console.log(`[VIP分析] ${fundCode} 获取并存储 ${inserted} 条历史净值`);
+  logger.info(`[VIP分析] ${fundCode} 获取并存储 ${inserted} 条历史净值`);
 }
 
 /**

@@ -141,9 +141,10 @@ else
 fi
 
 pm2 delete fund-server 2>/dev/null || true
-pm2 start server/index.cjs --name fund-server --cwd "$DEPLOY_DIR" \
+NODE_ENV=production pm2 start server/index.cjs --name fund-server --cwd "$DEPLOY_DIR" \
     --max-memory-restart 512M \
-    --log-date-format "YYYY-MM-DD HH:mm:ss"
+    --log-date-format "YYYY-MM-DD HH:mm:ss" \
+    --env production
 pm2 save
 
 # 设置 PM2 开机自启
@@ -171,7 +172,6 @@ server {
     # 安全响应头
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
 

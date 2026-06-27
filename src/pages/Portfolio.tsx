@@ -17,6 +17,7 @@ import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { portfolioApi, fundApi } from '../services/api';
 import type { PortfolioHolding, PortfolioSummary, FundRecord } from '../types';
+import { ProBadge } from '../components/stock-picker';
 import ReturnsMap from '../components/ReturnsMap';
 import VIPInsights from '../components/VIPInsights';
 import { SellModal } from '../components/portfolio/SellModal';
@@ -35,7 +36,7 @@ import { formatCurrency } from '../utils/format';
 export default function Portfolio() {
   const { isDark } = useTheme();
   const { user } = useAuth();
-  const isVIP = user?.subscription_status === 'premium';
+  const isVIP = user?.subscription_status === 'premium' || user?.subscription_tier === 'premium' || user?.subscription_tier === 'svip' || user?.role === 'admin';
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -1642,15 +1643,10 @@ export default function Portfolio() {
     ...(isVIP ? [{
       key: 'vip',
       label: (
-        <span style={{ position: 'relative' }}>
-          <CrownOutlined style={{ marginRight: 6, color: 'var(--color-gold)' }} />
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <CrownOutlined style={{ color: 'var(--color-gold)' }} />
           VIP分析
-          <span style={{
-            position: 'absolute', top: -8, right: -16,
-            background: 'linear-gradient(135deg, #ffd700, #ff8c00)',
-            color: '#fff', fontSize: 9, padding: '1px 4px', borderRadius: 4,
-            fontWeight: 700, lineHeight: '14px',
-          }}>PRO</span>
+          <ProBadge isSVIP={user?.subscription_tier === 'svip' || user?.role === 'admin'} size="small" />
         </span>
       ),
       children: <VIPInsights />,

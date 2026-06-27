@@ -2,6 +2,8 @@
  * 共享调度器 — 在指定时间执行任务
  */
 
+const logger = require('./logger.cjs');
+
 /**
  * 调度每日任务（在指定小时:分钟执行）
  * @param {Function} task - 异步任务函数
@@ -35,13 +37,13 @@ function scheduleDaily(task, hour, minute, label = '任务', options = {}) {
 
     const delay = target.getTime() - now.getTime();
     const hours = Math.round(delay / 3600000);
-    console.log(`[${label}] 下次执行: ${target.toLocaleString()} (${hours}小时后)`);
+    logger.info(`[${label}] 下次执行: ${target.toLocaleString()} (${hours}小时后)`);
 
     timer = setTimeout(async () => {
       try {
         await task();
       } catch (err) {
-        console.error(`[${label}] 执行失败:`, err.message);
+        logger.error(`[${label}] 执行失败: ${err.message}`);
       }
       scheduleNext();
     }, delay);
@@ -84,13 +86,13 @@ function scheduleWeekly(task, dayOfWeek, hour, minute, label = '任务') {
     const delay = target.getTime() - now.getTime();
     const days = Math.round(delay / 86400000);
     const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-    console.log(`[${label}] 下次执行: ${dayNames[dayOfWeek]} ${hour}:${String(minute).padStart(2, '0')} (${days}天后)`);
+    logger.info(`[${label}] 下次执行: ${dayNames[dayOfWeek]} ${hour}:${String(minute).padStart(2, '0')} (${days}天后)`);
 
     timer = setTimeout(async () => {
       try {
         await task();
       } catch (err) {
-        console.error(`[${label}] 执行失败:`, err.message);
+        logger.error(`[${label}] 执行失败: ${err.message}`);
       }
       scheduleNext();
     }, delay);
@@ -171,13 +173,13 @@ function scheduleTradingHours(task, intervalMinutes, label = '任务') {
     const delay = Math.max(nextTime.getTime() - Date.now(), 60 * 1000);
     const label2 = isTradingHours() ? `${intervalMinutes}分钟` : nextTime.toLocaleString('zh-CN');
 
-    console.log(`[${label}] 下次执行: ${label2}`);
+    logger.info(`[${label}] 下次执行: ${label2}`);
 
     timer = setTimeout(async () => {
       try {
         await task();
       } catch (err) {
-        console.error(`[${label}] 执行失败:`, err.message);
+        logger.error(`[${label}] 执行失败: ${err.message}`);
       }
       scheduleNext();
     }, delay);

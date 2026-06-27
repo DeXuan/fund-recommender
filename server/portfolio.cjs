@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('./utils/logger.cjs');
 const multer = require('multer');
 const axios = require('axios');
 const iconv = require('iconv-lite');
@@ -57,7 +58,7 @@ router.post('/init-demo', async (req, res) => {
 
     res.json({ message: '示例数据导入成功', imported: demoRecords.length });
   } catch (error) {
-    console.error('初始化示例数据失败:', error.message);
+    logger.error('初始化示例数据失败:', error.message);
     res.status(500).json({ error: '初始化失败' });
   }
 });
@@ -79,7 +80,7 @@ router.get('/records', async (req, res) => {
     const result = await pool.query(sql, params);
     res.json(result.rows);
   } catch (error) {
-    console.error('获取记录失败:', error.message);
+    logger.error('获取记录失败:', error.message);
     res.status(500).json({ error: '获取记录失败' });
   }
 });
@@ -112,7 +113,7 @@ router.post('/records', async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('添加记录失败:', error.message);
+    logger.error('添加记录失败:', error.message);
     res.status(500).json({ error: '添加记录失败' });
   }
 });
@@ -165,7 +166,7 @@ router.put('/records/:id', async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('更新记录失败:', error.message);
+    logger.error('更新记录失败:', error.message);
     res.status(500).json({ error: '更新记录失败' });
   }
 });
@@ -183,7 +184,7 @@ router.delete('/records/:id', async (req, res) => {
     await pool.query('DELETE FROM fund_records WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (error) {
-    console.error('删除记录失败:', error.message);
+    logger.error('删除记录失败:', error.message);
     res.status(500).json({ error: '删除记录失败' });
   }
 });
@@ -236,12 +237,12 @@ router.get('/returns-map', async (req, res) => {
     // Fetch historical NAV from eastmoney for funds with insufficient data
     const fundsToFetch = fundCodes.filter(code => (navCountMap[code] || 0) < 10);
     if (fundsToFetch.length > 0) {
-      console.log(`[收益地图] 需要获取 ${fundsToFetch.length} 只基金的历史净值`);
+      logger.info(`[收益地图] 需要获取 ${fundsToFetch.length} 只基金的历史净值`);
       for (const code of fundsToFetch) {
         try {
           await fetchAndStoreHistoricalNav(pool, code, fundHoldings[code].fund_name, targetYear);
         } catch (e) {
-          console.warn(`[收益地图] 获取 ${code} 历史净值失败:`, e.message);
+          logger.warn(`[收益地图] 获取 ${code} 历史净值失败:`, e.message);
         }
       }
     }
@@ -323,7 +324,7 @@ router.get('/returns-map', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('获取收益地图失败:', error.message);
+    logger.error('获取收益地图失败:', error.message);
     res.status(500).json({ error: '获取收益地图失败' });
   }
 });
@@ -363,7 +364,7 @@ async function fetchAndStoreHistoricalNav(pool, fundCode, fundName, year) {
     );
     inserted++;
   }
-  console.log(`[VIP分析] ${fundCode} 获取并存储 ${inserted} 条历史净值`);
+  logger.info(`[VIP分析] ${fundCode} 获取并存储 ${inserted} 条历史净值`);
 }
 
 // GET /api/portfolio/summary
@@ -452,7 +453,7 @@ router.get('/summary', async (req, res) => {
       totalReturn: parseFloat(totalReturn.toFixed(2)),
     });
   } catch (error) {
-    console.error('获取汇总失败:', error.message);
+    logger.error('获取汇总失败:', error.message);
     res.status(500).json({ error: '获取汇总失败' });
   }
 });
@@ -595,7 +596,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
     res.json({ imported, errors, total: lines.length - 1 });
   } catch (error) {
-    console.error('导入失败:', error.message);
+    logger.error('导入失败:', error.message);
     res.status(500).json({ error: '导入失败' });
   }
 });
@@ -707,7 +708,7 @@ router.post('/import-alipay', upload.single('file'), async (req, res) => {
 
     res.json({ imported, errors, skipped, total: dataLines.length });
   } catch (error) {
-    console.error('支付宝导入失败:', error.message);
+    logger.error('支付宝导入失败:', error.message);
     res.status(500).json({ error: '导入失败，请检查文件格式是否正确' });
   }
 });
@@ -721,7 +722,7 @@ router.get('/dca-plans', async (req, res) => {
     const result = await pool.query('SELECT * FROM dca_plans WHERE user_id = $1 ORDER BY created_at DESC', [req.user.id]);
     res.json(result.rows);
   } catch (error) {
-    console.error('获取定投计划失败:', error.message);
+    logger.error('获取定投计划失败:', error.message);
     res.status(500).json({ error: '获取定投计划失败' });
   }
 });
@@ -747,7 +748,7 @@ router.post('/dca-plans', async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('创建定投计划失败:', error.message);
+    logger.error('创建定投计划失败:', error.message);
     res.status(500).json({ error: '创建定投计划失败' });
   }
 });
@@ -780,7 +781,7 @@ router.put('/dca-plans/:id', async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('更新定投计划失败:', error.message);
+    logger.error('更新定投计划失败:', error.message);
     res.status(500).json({ error: '更新定投计划失败' });
   }
 });
@@ -798,7 +799,7 @@ router.delete('/dca-plans/:id', async (req, res) => {
     await pool.query('DELETE FROM dca_plans WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (error) {
-    console.error('删除定投计划失败:', error.message);
+    logger.error('删除定投计划失败:', error.message);
     res.status(500).json({ error: '删除定投计划失败' });
   }
 });
@@ -855,7 +856,7 @@ router.post('/dca-plans/sync', async (req, res) => {
 
     res.json({ synced: totalSynced, details, message: `同步完成，共生成 ${totalSynced} 条定投记录` });
   } catch (error) {
-    console.error('同步定投失败:', error.message);
+    logger.error('同步定投失败:', error.message);
     res.status(500).json({ error: '同步定投失败' });
   }
 });
@@ -936,7 +937,7 @@ router.post('/risk-profile', async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('保存风险评估失败:', error.message);
+    logger.error('保存风险评估失败:', error.message);
     res.status(500).json({ error: '保存失败' });
   }
 });
@@ -958,7 +959,7 @@ router.get('/risk-profile', async (req, res) => {
       allocation: typeof row.allocation === 'string' ? JSON.parse(row.allocation) : row.allocation,
     });
   } catch (error) {
-    console.error('获取风险评估失败:', error.message);
+    logger.error('获取风险评估失败:', error.message);
     res.status(500).json({ error: '获取失败' });
   }
 });
@@ -1089,7 +1090,7 @@ router.get('/insights', async (req, res) => {
 
     res.json({ holdings, categories, market, riskProfile, suggestions, totalValue: parseFloat(totalValue.toFixed(2)) });
   } catch (error) {
-    console.error('获取组合洞察失败:', error.message);
+    logger.error('获取组合洞察失败:', error.message);
     res.status(500).json({ error: '获取组合洞察失败' });
   }
 });
@@ -1264,7 +1265,7 @@ router.post('/refresh-nav', async (req, res) => {
         }
       }
     } catch (e) {
-      console.warn(`[手动刷新] API获取失败，回退到 fund_nav 表: ${e.message}`);
+      logger.warn(`[手动刷新] API获取失败，回退到 fund_nav 表: ${e.message}`);
     }
 
     // 对API未返回的基金，从 fund_nav 表补充
@@ -1333,7 +1334,7 @@ router.post('/refresh-nav', async (req, res) => {
     }
 
     if (warnings.length > 0) {
-      console.warn(`[手动刷新] 用户${req.user.id} 校验警告:`, warnings);
+      logger.warn(`[手动刷新] 用户${req.user.id} 校验警告:`, warnings);
     }
 
     res.json({
@@ -1343,7 +1344,7 @@ router.post('/refresh-nav', async (req, res) => {
       message: `已更新 ${updated} 条持仓记录的净值和盈亏`,
     });
   } catch (error) {
-    console.error('手动刷新净值失败:', error.message);
+    logger.error('手动刷新净值失败:', error.message);
     res.status(500).json({ error: '刷新失败' });
   }
 });
@@ -1519,13 +1520,13 @@ router.get('/vip-insights', subscriptionMiddleware, async (req, res) => {
     // 对数据不足的基金自动获取历史净值（API返回最近365天，每只基金调一次即可）
     const fundsToFetch = fundCodes.filter(code => (navCountMap[code] || 0) < 10);
     if (fundsToFetch.length > 0) {
-      console.log(`[VIP分析] 自动获取 ${fundsToFetch.length} 只基金的历史净值`);
+      logger.info(`[VIP分析] 自动获取 ${fundsToFetch.length} 只基金的历史净值`);
       for (const code of fundsToFetch) {
         try {
           const fundName = grouped[code].fund_name;
           await fetchAndStoreHistoricalNav(pool, code, fundName, new Date().getFullYear());
         } catch (e) {
-          console.warn(`[VIP分析] 获取 ${code} 历史净值失败:`, e.message);
+          logger.warn(`[VIP分析] 获取 ${code} 历史净值失败:`, e.message);
         }
       }
     }
@@ -1773,7 +1774,7 @@ router.get('/vip-insights', subscriptionMiddleware, async (req, res) => {
       aiAdvice,
     });
   } catch (error) {
-    console.error('VIP分析失败:', error.message, error.stack);
+    logger.error('VIP分析失败:', error.message, error.stack);
     res.status(500).json({ error: 'VIP分析失败，请稍后重试' });
   }
 });

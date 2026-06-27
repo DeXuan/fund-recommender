@@ -134,7 +134,7 @@ function safeParseTime(ts: string): string {
   } catch (e) { console.error('解析时间戳失败:', e); return ''; }
 }
 
-export default function AIAssistant() {
+export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: boolean } = {}) {
   const { isDark } = useTheme();
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -676,7 +676,8 @@ export default function AIAssistant() {
       `}</style>
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {/* Left Sidebar */}
+        {/* Left Sidebar - 抽屉模式下隐藏 */}
+        {!isDrawerMode && (
         <div style={{
           width: sidebarCollapsed ? 56 : 220, flexShrink: 0,
           borderRight: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}`,
@@ -753,6 +754,7 @@ export default function AIAssistant() {
             {sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           </div>
         </div>
+        )}
 
         {/* Main Chat Area */}
         <Card

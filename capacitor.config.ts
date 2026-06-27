@@ -1,5 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+const API_HOST = process.env.VITE_API_HOST || 'localhost';
+
 const config: CapacitorConfig = {
   appId: 'com.guanfundrecommender.app',
   appName: '基金推荐助手',
@@ -13,7 +15,7 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'http',
     cleartext: true,
-    allowNavigation: ['111.229.32.106'],
+    allowNavigation: [API_HOST],
   },
   plugins: {
     StatusBar: {

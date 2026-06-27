@@ -3,6 +3,7 @@
  */
 
 const express = require('express');
+const logger = require('../utils/logger.cjs');
 const fundService = require('../fund-service.cjs');
 const { getPool } = require('../db.cjs');
 const { authMiddleware, adminMiddleware } = require('../auth.cjs');
@@ -73,7 +74,7 @@ async function getFundDetail(fund) {
       })).slice(-6);
     }
   } catch (e) {
-    console.error(`获取基金 ${fund.code} 净值历史失败:`, e.message);
+    logger.error(`获取基金 ${fund.code} 净值历史失败:`, e.message);
   }
 
   const getValuationCode = (valuation) => {
@@ -351,7 +352,7 @@ function createYiFangDaRoute(fetchYiFangDaFundData) {
       const result = await fetchYiFangDaFundData();
       res.json({ success: true, ...result });
     } catch (error) {
-      console.error('获取易方达基金数据失败:', error.message);
+      logger.error('获取易方达基金数据失败:', error.message);
       res.status(500).json({ error: '获取失败: ' + error.message });
     }
   });
@@ -364,7 +365,7 @@ function createGoldFundRoute(fetchGoldFundData) {
       const result = await fetchGoldFundData();
       res.json({ success: true, ...result });
     } catch (error) {
-      console.error('抓取金选基金数据失败:', error.message);
+      logger.error('抓取金选基金数据失败:', error.message);
       res.status(500).json({ error: '抓取失败: ' + error.message });
     }
   });

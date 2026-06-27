@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../utils/logger.cjs');
 const router = express.Router();
 const { getPool } = require('../db.cjs');
 const { authMiddleware } = require('../auth.cjs');
@@ -103,7 +104,7 @@ router.get('/api/portfolio/overlap', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('持仓重叠分析失败:', error.message);
+    logger.error('持仓重叠分析失败:', error.message);
     res.status(500).json({ error: '分析失败' });
   }
 });
@@ -186,7 +187,7 @@ router.post('/api/goal-planning', async (req, res) => {
       yearlyData: monthData,
     });
   } catch (error) {
-    console.error('目标规划计算失败:', error.message);
+    logger.error('目标规划计算失败:', error.message);
     res.status(500).json({ error: '计算失败' });
   }
 });

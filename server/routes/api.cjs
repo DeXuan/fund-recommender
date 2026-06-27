@@ -12,6 +12,7 @@
  */
 
 const express = require('express');
+const logger = require('../utils/logger.cjs');
 const { isTradingHours, isTradingDay, getMarketState, getNextUpdateTime } = require('../utils/trading-hours.cjs');
 const { authMiddleware, adminMiddleware } = require('../auth.cjs');
 
@@ -48,7 +49,7 @@ function createStatusRoute(dataUpdateStatus) {
         updateInterval: isTradingHours() ? '15分钟' : '等待开盘',
       });
     } catch (e) {
-      console.error('获取状态失败:', e.message);
+      logger.error('获取状态失败:', e.message);
       res.status(500).json({ error: '获取状态失败' });
     }
   });

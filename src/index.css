@@ -406,11 +406,11 @@ a:hover {
   transform: scale(0.98);
 }
 
-/* 卡片 & 统计值初始隐藏 — GSAP 按视口顺序渐入，避免先闪现再动画 */
+/* 卡片 & 统计值 — 立即可见，GSAP 可选增强动画 */
 .ant-card,
 .ant-statistic-content-value {
-  opacity: 0;
-  transform: translateY(24px);
+  opacity: 1;
+  transform: none;
 }
 
 /* 用户偏好减少动画时直接显示，GSAP 未加载时的安全回退 */
@@ -422,15 +422,15 @@ a:hover {
   }
 }
 
-/* GSAP 未加载时的安全回退：3秒后自动显示 */
+/* GSAP 未加载时的安全回退：0.5秒后自动显示 */
 @keyframes gsap-fallback-reveal {
   to { opacity: 1; transform: none; }
 }
 .ant-card:not(.gsap-revealed) {
-  animation: gsap-fallback-reveal 0.01s ease 3s forwards;
+  animation: gsap-fallback-reveal 0.01s ease 0.5s forwards;
 }
 .ant-statistic-content-value:not(.gsap-revealed) {
-  animation: gsap-fallback-reveal 0.01s ease 3.5s forwards;
+  animation: gsap-fallback-reveal 0.01s ease 0.6s forwards;
 }
 
 /* GSAP 动画完成后标记为已显示 */

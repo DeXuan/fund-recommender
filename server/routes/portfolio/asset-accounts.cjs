@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const logger = require('../../utils/logger.cjs');
 const router = express.Router();
 const { getPool } = require('../../db.cjs');
 const { authMiddleware } = require('../../auth.cjs');
@@ -18,7 +19,7 @@ router.get('/', async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error('获取资产账户失败:', err);
+    logger.error('获取资产账户失败:', err);
     res.status(500).json({ error: '获取资产账户失败' });
   }
 });
@@ -51,7 +52,7 @@ router.get('/summary', async (req, res) => {
       total: totalResult.rows[0] || { total_assets: 0, total_cost: 0, total_pnl: 0 },
     });
   } catch (err) {
-    console.error('获取资产汇总失败:', err);
+    logger.error('获取资产汇总失败:', err);
     res.status(500).json({ error: '获取资产汇总失败' });
   }
 });
@@ -72,7 +73,7 @@ router.post('/', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error('创建资产账户失败:', err);
+    logger.error('创建资产账户失败:', err);
     res.status(500).json({ error: '创建资产账户失败' });
   }
 });
@@ -104,7 +105,7 @@ router.put('/:id', async (req, res) => {
     }
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('更新资产账户失败:', err);
+    logger.error('更新资产账户失败:', err);
     res.status(500).json({ error: '更新资产账户失败' });
   }
 });
@@ -124,7 +125,7 @@ router.delete('/:id', async (req, res) => {
     }
     res.json({ message: '账户已删除', id: result.rows[0].id });
   } catch (err) {
-    console.error('删除资产账户失败:', err);
+    logger.error('删除资产账户失败:', err);
     res.status(500).json({ error: '删除资产账户失败' });
   }
 });
