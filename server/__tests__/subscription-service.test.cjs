@@ -143,7 +143,8 @@ describe('subscription-service', () => {
       mockClient.query = async (sql, params) => {
         lastQuery = sql;
         lastParams = params;
-        if (sql === 'BEGIN' || sql === 'COMMIT') return;
+        if (sql === 'BEGIN') return;
+        if (sql === 'COMMIT') { transactionCommitted = true; return; }
         if (sql.includes('subscription_orders') && sql.includes('SELECT')) {
           return { rows: [{ id: 1, user_id: 1, plan_id: 1, status: 'pending' }] };
         }

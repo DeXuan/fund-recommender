@@ -11,8 +11,6 @@ const portfolioRoutes = require('./routes/portfolio/index.cjs');
 const adminRoutes = require('./admin.cjs');
 const { incrementRequestCount, resetQpsCounter, recordApiStat } = require('./admin.cjs');
 const { createRateLimit } = require('./utils/rate-limiter.cjs');
-const { scheduleDaily } = require('./utils/scheduler.cjs');
-const { spawn } = require('child_process');
 const path = require('path');
 const { isTradingHours, isTradingDay, getNextUpdateTime } = require('./utils/trading-hours.cjs');
 const {
@@ -316,85 +314,9 @@ async function startServer() {
       });
     });
 
-    // 每日9:30执行完整数据更新（收益率+QDII限额+HS300+持仓盈亏）
-    scheduleDaily(() => runDailyDataUpdate(allFunds), 9, 30, '每日数据更新');
-
-    // 每日10:15从支付宝获取易方达基金数据（经理、净值、收益率）
-    scheduleDaily(() => {
-      fetchYiFangDaFundData().catch(err => {
-        logger.error(`[易方达] 定时更新失败: ${err.message}`);
-      });
-    }, 10, 15, '易方达基金数据更新');
-
-    // 每日10:45更新金选基金数据（经理、净值、收益率）
-    scheduleDaily(() => {
-      fetchGoldFundData().catch(err => {
-        logger.error(`[金选基金] 定时更新失败: ${err.message}`);
-      });
-    }, 10, 45, '金选基金数据更新');
-
-    // 每日10:00执行招行理财产品数据爬取
-    scheduleDaily(() => {
-      logger.info('[CMB] 开始爬取招行理财产品数据...');
-      const scriptPath = path.join(__dirname, '..', 'scripts', 'fetch_cmb_nav.py');
-      const proc = spawn('python', [scriptPath], {
-        env: { ...process.env },
-        cwd: path.join(__dirname, '..'),
-        stdio: 'pipe',
-      });
-      proc.stdout.on('data', (data) => logger.info(`[CMB] ${data.toString().trim()}`));
-      proc.stderr.on('data', (data) => logger.error(`[CMB] ${data.toString().trim()}`));
-      proc.on('close', (code) => logger.info(`[CMB] 爬取完成，退出码: ${code}`));
-      proc.on('error', (err) => logger.error(`[CMB] 爬取启动失败: ${err.message}`));
-    }, 10, 0, '招行理财产品爬取');
-
-    // 每周一10:30执行个人理财产品净值爬取（weekly更新原有54只 + target更新25只目标产品）
-    scheduleDaily(() => {
-      const today = new Date();
-      if (today.getDay() !== 1) return; // 仅周一执行
-      const scriptPath = path.join(__dirname, '..', 'scripts', 'fetch_cmb_personal_nav.py');
-
-      // 先运行 weekly 模式更新原有54只产品
-      logger.info('[CMB-NAV] 开始爬取个人理财产品净值（weekly）...');
-      const proc1 = spawn('python', [scriptPath, 'weekly'], {
-        env: { ...process.env },
-        cwd: path.join(__dirname, '..'),
-        stdio: 'pipe',
-      });
-      proc1.stdout.on('data', (data) => logger.info(`[CMB-NAV-W] ${data.toString().trim()}`));
-      proc1.stderr.on('data', (data) => logger.error(`[CMB-NAV-W] ${data.toString().trim()}`));
-      proc1.on('close', (code) => {
-        logger.info(`[CMB-NAV-W] weekly完成，退出码: ${code}`);
-        logger.info('[CMB-NAV-T] 开始爬取目标产品净值（target）...');
-        const proc2 = spawn('python', [scriptPath, 'target'], {
-          env: { ...process.env },
-          cwd: path.join(__dirname, '..'),
-          stdio: 'pipe',
-        });
-        proc2.stdout.on('data', (data) => logger.info(`[CMB-NAV-T] ${data.toString().trim()}`));
-        proc2.stderr.on('data', (data) => logger.error(`[CMB-NAV-T] ${data.toString().trim()}`));
-        proc2.on('close', (code2) => logger.info(`[CMB-NAV-T] target完成，退出码: ${code2}`));
-        proc2.on('error', (err) => logger.error(`[CMB-NAV-T] 启动失败: ${err.message}`));
-      });
-      proc1.on('error', (err) => logger.error(`[CMB-NAV-W] 启动失败: ${err.message}`));
-    }, 10, 30, '个人理财产品净值爬取');
-
-    // 每周六11:00执行招银理财净值数据爬取（最近5个交易日）
-    scheduleDaily(() => {
-      const day = new Date().getDay();
-      if (day !== 6) return; // 仅周六执行
-      logger.info('[NAV] 开始爬取招银理财净值数据...');
-      const scriptPath = path.join(__dirname, '..', 'scripts', 'fetch_zhaoyin_nav.py');
-      const proc = spawn('python', [scriptPath, 'weekly'], {
-        env: { ...process.env },
-        cwd: path.join(__dirname, '..'),
-        stdio: 'pipe',
-      });
-      proc.stdout.on('data', (data) => logger.info(`[NAV] ${data.toString().trim()}`));
-      proc.stderr.on('data', (data) => logger.error(`[NAV] ${data.toString().trim()}`));
-      proc.on('close', (code) => logger.info(`[NAV] 爬取完成，退出码: ${code}`));
-      proc.on('error', (err) => logger.error(`[NAV] 爬取启动失败: ${err.message}`));
-    }, 11, 0, '招银理财净值爬取');
+    // 注册所有每日定时任务（从 jobs/index.cjs 统一管理）
+    const { registerJobs } = require('./jobs/index.cjs');
+    registerJobs({ allFunds, runDailyDataUpdate, fetchYiFangDaFundData, fetchGoldFundData });
 
   } catch (err) {
     logger.error(`服务器启动失败: ${err.message}`);

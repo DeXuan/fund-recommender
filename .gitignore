@@ -65,3 +65,6 @@ finpilot/
 
 # 爬虫产出数据（根目录 data/）
 data/
+
+# 测试运行时生成的 mock 文件
+server/__tests__/mock-db.cjs
