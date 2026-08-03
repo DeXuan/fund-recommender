@@ -55,9 +55,13 @@ fund-recommender.zip
 make-zip.ps1
 
 # 临时脚本和数据
+scripts/**/*.py
 scripts/*.py
 scripts/*.json
 scripts/*.csv
 test_*.py
 *.tmp
 finpilot/
+
+# 爬虫产出数据（根目录 data/）
+data/

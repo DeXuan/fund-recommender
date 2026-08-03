@@ -1,6 +1,16 @@
 # 基金推荐助手
 
-> 基于 React + Node.js + PostgreSQL 的公募基金分析与推荐平台，覆盖 14000+ 只基金（含 69 只支付宝金选基金），支持 14 大行业深度分析、AI 智能选股引擎（七因子量化模型）、指数研究、基金对比、风险评估、定投模拟、持仓管理、AI 助手等功能。支持 Web 端 + Android APK 双端使用。三档会员体系（免费/会员/至尊SVIP）。
+[![GitHub stars](https://img.shields.io/github/stars/DeXuan/fund-recommender?style=flat-square&label=Stars&color=blue)](https://github.com/DeXuan/fund-recommender/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/DeXuan/fund-recommender?style=flat-square&label=Forks&color=green)](https://github.com/DeXuan/fund-recommender/network/members)
+[![GitHub license](https://img.shields.io/github/license/DeXuan/fund-recommender?style=flat-square&label=License&color=purple)](https://github.com/DeXuan/fund-recommender)
+[![GitHub issues](https://img.shields.io/github/issues/DeXuan/fund-recommender?style=flat-square&label=Issues&color=orange)](https://github.com/DeXuan/fund-recommender/issues)
+[![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=white)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Express](https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-4169e1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Capacitor](https://img.shields.io/badge/Capacitor-8-119eff?style=flat-square&logo=capacitor&logoColor=white)](https://capacitorjs.com/)
+
+> 基于 React + Node.js + PostgreSQL 的公募基金分析与推荐平台，覆盖 14000+ 只基金（含 69 只支付宝金选基金），支持 14 大行业深度分析、AI 智能选股引擎（七因子量化模型）、指数研究、基金对比、风险评估、定投模拟、持仓管理、AI 助手等功能。支持 Web 端 + Android APK 双端使用。三档会员体系（免费 / 会员 / 至尊 SVIP）。
 
 ---
 
@@ -285,7 +295,7 @@ ALLOWED_ORIGINS=...,http://localhost,https://localhost
 
 ## 部署
 
-项目支持多种部署方式，详见 [DEPLOY.md](./DEPLOY.md)。
+项目支持多种部署方式，详见 [DEPLOY.md](./docs/deploy/DEPLOY.md)。
 
 ### 一键部署（Linux 服务器）
 
@@ -327,7 +337,7 @@ bash /var/www/fix-permission.sh  # 修复 403 权限错误
 | 测试环境 | 功能验证 | 独立数据库，允许 mock 登录 |
 | 生产环境 | 正式上线 | `ENABLE_MOCK_AUTH=false`，HTTPS，pm2 守护 |
 
-详见 [DEPLOY.md](./DEPLOY.md) 中的「多环境部署方案」章节。
+详见 [DEPLOY.md](./docs/deploy/DEPLOY.md) 中的「多环境部署方案」章节。
 
 ## 项目结构
 
@@ -486,7 +496,30 @@ fund-recommender/
 ├── scripts/
 │   ├── generate-icons.cjs     # Android 图标生成脚本（sharp）
 │   ├── generate-alipay-keys.cjs # 支付宝密钥生成
-│   └── fetch-gold-funds.cjs   # 金选基金数据抓取
+│   ├── fetch-gold-funds.cjs   # 金选基金数据抓取
+│   ├── scrape/
+│   │   ├── scrape_cmb_final.py # 招行理财爬虫（最新版）
+│   │   └── archive/            # 历史爬虫版本归档
+│   ├── data/
+│   │   ├── import_to_pg.py     # 企业产品数据导入 PostgreSQL
+│   │   └── cmb_products_summary.py # 招行产品汇总报告
+│   └── test/
+│       └── verify_portfolio.py # 持仓页面 E2E 验证
+├── data/                       # 爬虫产出数据（gitignore）
+│   ├── cmb_products_info.json
+│   ├── cmb_products_detail.json
+│   └── corporate_products*.{json,csv}
+├── docs/
+│   ├── deploy/
+│   │   └── DEPLOY.md           # 部署文档
+│   ├── security/
+│   │   ├── SECURITY_FIX_LOG.md # 安全修复台账
+│   │   └── security-audit-report.md # 安全审计报告
+│   ├── UPDATE_GUIDE.md         # 更新指南
+│   ├── 项目自评.md              # 项目自评报告
+│   └── history/
+│       ├── 基金代码更新总结.md
+│       └── 基金代码验证问题汇总.md
 ├── public/
 │   ├── icon.svg               # 应用图标（SVG 源文件）
 │   └── icon.png               # 应用图标（1024x1024 PNG）
@@ -496,7 +529,6 @@ fund-recommender/
 ├── deploy-full.sh             # 服务器全新部署脚本
 ├── update.sh                  # 服务器一键更新脚本
 ├── deploy-termux.sh           # Termux (Android) 部署脚本
-├── DEPLOY.md                  # 部署文档
 ├── vite.config.ts             # Vite 配置（支持 Capacitor 模式）
 ├── vitest.config.ts           # 测试配置
 ├── eslint.config.js           # ESLint 配置
@@ -726,7 +758,7 @@ ETF、ETF 联接、QDII、指数增强、LOF、债券型、混合型、货币型
 - OAuth token 注入防护（URL 参数 token 先验证再存储）
 - 管理员批量删除用户使用数据库事务（防止部分删除导致数据不一致）
 
-> 详细的安全漏洞修复记录请参阅 [SECURITY_FIX_LOG.md](./SECURITY_FIX_LOG.md)。
+> 详细的安全漏洞修复记录请参阅 [SECURITY_FIX_LOG.md](./docs/security/SECURITY_FIX_LOG.md)。
 
 ## 版本更新记录
 
@@ -980,7 +1012,7 @@ bash /var/www/fix-permission.sh
 2. 申请证书：`certbot --nginx -d your-domain.com`
 3. 自动续期：`certbot renew --dry-run`
 
-详见 [DEPLOY.md](./DEPLOY.md) 中的 HTTPS 配置章节。
+详见 [DEPLOY.md](./docs/deploy/DEPLOY.md) 中的 HTTPS 配置章节。
 
 ### Q: 如何更新到最新版本？
 

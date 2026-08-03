@@ -134,7 +134,7 @@ cd "$DEPLOY_DIR"
 # 检查 .env 文件
 if [ ! -f ".env" ]; then
     echo "[远程] ⚠️  .env 文件不存在，请手动创建"
-    echo "[远程] 参考 DEPLOY.md 中的数据库配置章节"
+    echo "[远程] 参考 docs/deploy/DEPLOY.md 中的数据库配置章节"
 else
     chmod 600 .env
     echo "[远程] .env 文件权限已设置为 600"
