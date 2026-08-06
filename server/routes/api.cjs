@@ -24,6 +24,7 @@ const { router: toolsRouter } = require('./tools.cjs');
 const { router: cmbRouter } = require('./cmb.cjs');
 const { router: newsRouter, createNewsRefreshRoute } = require('./news.cjs');
 const { router: alertsRouter } = require('./alerts.cjs');
+const fundDiagnosisRouter = require('./fund-diagnosis.cjs');
 
 const router = express.Router();
 
@@ -75,6 +76,42 @@ router.use(cmbRouter);
 router.use(newsRouter);
 router.use(alertsRouter);
 
+// 手动触发全量基金数据更新（净值+收益率+规模，从支付宝/东方财富API获取）
+// 不传参数 = 更新数据库中全部基金；传 ?scope=curated = 仅更新 fund-data.cjs 中的精选基金
+function createFullUpdateRoute(fetchAllCuratedFundsData) {
+  router.post('/api/funds/fetch-all', authMiddleware, async (req, res) => {
+    try {
+      const scope = req.query.scope;
+      let fundCount;
+      if (scope === 'curated') {
+        const { allFunds } = require('../fund-data.cjs');
+        fundCount = allFunds.length;
+        fetchAllCuratedFundsData(allFunds).then(result => {
+          logger.info(`[API] 精选基金更新完成: 成功${result.success}/${result.total}`);
+        }).catch(err => {
+          logger.error(`[API] 精选基金更新失败: ${err.message}`);
+        });
+      } else {
+        // 全库模式：不传 allFunds，从数据库读取全部基金代码
+        const { getPool } = require('../db.cjs');
+        const { rows } = await getPool().query('SELECT COUNT(*)::int as c FROM funds');
+        fundCount = rows[0].c;
+        fetchAllCuratedFundsData(null).then(result => {
+          logger.info(`[API] 全库更新完成: 成功${result.success}/${result.total}`);
+        }).catch(err => {
+          logger.error(`[API] 全库更新失败: ${err.message}`);
+        });
+      }
+      res.json({ success: true, message: `基金数据更新已启动，共${fundCount}只基金` });
+    } catch (e) {
+      logger.error('启动全量更新失败:', e.message);
+      res.status(500).json({ error: '启动更新失败' });
+    }
+  });
+}
+
+router.use(fundDiagnosisRouter);
+
 module.exports = {
   router,
   createStatusRoute,
@@ -82,4 +119,5 @@ module.exports = {
   createYiFangDaRoute,
   createGoldFundRoute,
   createNewsRefreshRoute,
+  createFullUpdateRoute,
 };

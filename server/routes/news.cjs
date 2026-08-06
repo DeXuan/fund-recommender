@@ -47,7 +47,8 @@ router.get('/api/news/personal', authMiddleware, handler(async (req) => {
   const items = news.items || [];
 
   const holdings = await pool.query(
-    `SELECT DISTINCT fund_code, fund_name, industry FROM fund_records WHERE user_id = $1 AND industry IS NOT NULL`,
+    `SELECT DISTINCT fr.fund_code, fr.fund_name, f.industry FROM fund_records fr
+     LEFT JOIN funds f ON fr.fund_code = f.code WHERE fr.user_id = $1 AND f.industry IS NOT NULL`,
     [req.user.id]
   );
   const watchlist = await pool.query(

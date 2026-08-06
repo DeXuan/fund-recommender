@@ -421,7 +421,7 @@ export default function FundDetail() {
             </Space>
           </Col>
           <Col xs={24} md={8} style={{ textAlign: 'right' }}>
-            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>最新净值 ({fund.navDate})</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>最新净值 ({new Date(new Date(fund.navDate).getTime() + 8 * 3600 * 1000).toISOString().slice(0, 10)})</div>
             <div style={{ fontSize: 36, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{fund.nav?.toFixed(4)}</div>
             <div style={{ marginTop: 4 }}>
               <span style={{ color: 'var(--warning)', fontSize: 18 }}>{'★'.repeat(fund.rating)}</span>
