@@ -23,7 +23,14 @@
 ### 网页版
 
 🔗 **http://111.229.32.106:8686/web/**
-<img width="1909" height="1080" alt="ScreenShot_2026-08-16_163050_508" src="https://github.com/user-attachments/assets/05cca001-7ee3-454b-b8b1-69c88341439a" />
+<img width="1914" height="1080" alt="1" src="https://github.com/user-attachments/assets/b25a258e-66e3-4185-b1de-bfc51d790c1d" />
+<img width="1920" height="1080" alt="2" src="https://github.com/user-attachments/assets/055b6b01-00b6-4249-bd96-b8da4362d82d" />
+<img width="1920" height="1080" alt="3" src="https://github.com/user-attachments/assets/9e923e1c-bc31-4a37-9023-4254e07c9b28" />
+<img width="1913" height="1080" alt="4" src="https://github.com/user-attachments/assets/83dfa865-ceee-41c1-b359-ccff3c62de7d" />
+<img width="1913" height="1080" alt="5" src="https://github.com/user-attachments/assets/837fb18f-88a9-4dfb-a538-81a45aef2676" />
+<img width="1915" height="1080" alt="6" src="https://github.com/user-attachments/assets/5b4c8608-e0f5-4c79-80b5-1f85a94a355e" />
+<img width="1909" height="1080" alt="7" src="https://github.com/user-attachments/assets/b68b51cd-09a6-41d6-ba73-21aca6bfc08a" />
+
 
 已部署：Ubuntu 服务器 · Nginx 反向代理 + Express 5 + PostgreSQL · PM2 守护 · 每 15 分钟自动更新基金净值 · 集思录实时财经日历。
 
