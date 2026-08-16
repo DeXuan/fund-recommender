@@ -16,10 +16,10 @@ const { isTradingHours, isTradingDay, getNextUpdateTime } = require('./utils/tra
 const {
   fetchCapitalFlow, fetchQDIIData, fetchHS300FundDetails,
   updateAllFundData: fetchUpdateAllFundData, updateAllFundReturns, updatePortfolioPnl,
-  runDailyDataUpdate, fetchYiFangDaFundData, fetchGoldFundData,
+  runDailyDataUpdate, fetchYiFangDaFundData, fetchGoldFundData, fetchAllCuratedFundsData,
   defaultIndices,
 } = require('./data-fetcher.cjs');
-const { router: apiRoutes, createStatusRoute, createUpdateRoute, createYiFangDaRoute, createGoldFundRoute, createNewsRefreshRoute } = require('./routes/api.cjs');
+const { router: apiRoutes, createStatusRoute, createUpdateRoute, createYiFangDaRoute, createGoldFundRoute, createNewsRefreshRoute, createFullUpdateRoute } = require('./routes/api.cjs');
 const { fetchAllNews, handleSSEConnection, FETCH_INTERVAL_MS } = require('./news-fetcher.cjs');
 const subscriptionRoutes = require('./routes/subscription.cjs');
 const stockPickerRoutes = require('./routes/stock-picker.cjs');
@@ -165,6 +165,7 @@ createUpdateRoute(() => fetchUpdateAllFundData(allFunds, dataUpdateStatus, isTra
 createYiFangDaRoute(fetchYiFangDaFundData);
 createGoldFundRoute(fetchGoldFundData);
 createNewsRefreshRoute(fetchAllNews);
+createFullUpdateRoute(fetchAllCuratedFundsData);
 
 // SSE 实时新闻推送端点
 app.get('/api/news/stream', (req, res) => {
@@ -314,7 +315,7 @@ async function startServer() {
       });
     });
 
-    // 注册所有每日定时任务（从 jobs/index.cjs 统一管理）
+// 注册所有每日定时任务（从 jobs/index.cjs 统一管理）
     const { registerJobs } = require('./jobs/index.cjs');
     registerJobs({ allFunds, runDailyDataUpdate, fetchYiFangDaFundData, fetchGoldFundData });
 

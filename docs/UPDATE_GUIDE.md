@@ -2,7 +2,7 @@
 
 ## 访问地址
 
-**http://47.116.77.67:8688/web**
+**http://111.229.32.106:8686/web**
 
 ---
 
@@ -18,7 +18,7 @@
 
 ### 3. SSH登录运行部署
 ```bash
-ssh root@47.116.77.67
+ssh root@111.229.32.106
 bash /tmp/deploy-full.sh
 ```
 
@@ -30,7 +30,7 @@ cd c:\Users\gdx\fund-recommender
 npm run build
 
 # 上传到服务器
-scp -r dist/* root@47.116.77.67:/var/www/jijin/dist/
+scp -r dist/* root@111.229.32.106:/var/www/jijin85/dist/
 ```
 
 ---
@@ -45,7 +45,7 @@ scp -r dist/* root@47.116.77.67:/var/www/jijin/dist/
 
 ### 3. SSH登录运行更新
 ```bash
-ssh root@47.116.77.67
+ssh root@111.229.32.106
 bash /var/www/update.sh
 ```
 
@@ -80,7 +80,7 @@ PG_PASSWORD=your_db_password
 ALIPAY_APP_ID=your_alipay_app_id
 ALIPAY_PRIVATE_KEY=keys/alipay_private_key.pem
 ALIPAY_PUBLIC_KEY=keys/alipay_public_key_from_alipay.pem
-ALIPAY_RETURN_URL=http://47.116.77.67:8688/api/auth/alipay/callback
+ALIPAY_RETURN_URL=http://111.229.32.106:8686/api/auth/alipay/callback
 ```
 
 ---
@@ -91,14 +91,14 @@ ALIPAY_RETURN_URL=http://47.116.77.67:8688/api/auth/alipay/callback
 # 查看后端状态
 pm2 status
 
-# 查看后端日志
-pm2 logs fund-server --lines 30
+# 查看后端日志（新站 fund-server-85）
+pm2 logs fund-server-85 --lines 30
 
-# 重启后端
-pm2 restart fund-server
+# 重启后端（新站）
+pm2 restart fund-server-85
 
-# 测试API
-curl http://localhost:3003/api/funds
+# 测试API（新站后端 3303）
+curl http://localhost:3303/api/funds
 
 # 重启Nginx
 systemctl restart nginx
@@ -115,8 +115,8 @@ systemctl status nginx
 后端服务没启动：
 ```bash
 pm2 status
-pm2 restart fund-server
-pm2 logs fund-server --lines 30
+pm2 restart fund-server-85
+pm2 logs fund-server-85 --lines 30
 ```
 
 ### 403 Forbidden
@@ -128,14 +128,14 @@ bash /var/www/fix-permission.sh
 ### 数据库连接失败
 检查.env配置：
 ```bash
-cat /var/www/jijin/.env | grep PG_
+cat /var/www/jijin85/.env | grep PG_
 # 确保 PG_HOST=localhost
 ```
 
 ### 页面没有数据
 ```bash
 # 检查API返回
-curl http://localhost:3003/api/funds
+curl http://localhost:3303/api/funds
 
 # 如果返回空，检查数据库
 psql -h localhost -U your_db_user -d your_database -c "SELECT COUNT(*) FROM funds;"
@@ -153,7 +153,7 @@ psql -h localhost -U your_db_user -d your_database -c "SELECT COUNT(*) FROM fund
 cd /var/www
 ls backups/  # 查看备份列表
 tar -xzf backups/jijin_XXXXXXXX_XXXXXX.tar.gz
-pm2 restart fund-server
+pm2 restart fund-server-85
 ```
 
 ---
@@ -166,7 +166,7 @@ pm2 restart fund-server
 - [ ] 确认 `.env` 文件配置正确（PG_HOST=localhost）
 - [ ] 上传前端构建产物 `dist/`（如果服务器构建失败）
 - [ ] 确认 Python 3.8+ 已安装（招行理财产品数据爬取需要，可选）
-- [ ] 测试访问 http://47.116.77.67:8688/web
+- [ ] 测试访问 http://111.229.32.106:8686/web
 - [ ] 测试支付宝登录功能
 - [ ] 运行 `pm2 startup` 确保开机自启已配置
 
@@ -175,16 +175,16 @@ pm2 restart fund-server
 每次更新后建议检查：
 ```bash
 # 1. 确认 .env 包含所有必需变量（新版可能新增变量）
-cat /var/www/jijin/.env | grep -v "^#" | grep -v "^$"
+cat /var/www/jijin85/.env | grep -v "^#" | grep -v "^$"
 
 # 2. 确认后端正常启动
-pm2 logs fund-server --lines 20
+pm2 logs fund-server-85 --lines 20
 
 # 3. 确认 API 正常响应
-curl http://localhost:3003/api/funds | head -c 200
+curl http://localhost:3303/api/funds | head -c 200
 
 # 4. 确认前端可访问
-curl -I http://localhost:8688/web/
+curl -I http://127.0.0.1:8686/web/
 ```
 
 ---

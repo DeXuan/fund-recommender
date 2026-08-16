@@ -37,19 +37,22 @@ function httpGet(url) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 async function fetchHolderStructure(code) {
-  try {
-    const url = `https://fundmobapi.eastmoney.com/FundMApi/FundHolderStructure.ashx?FCODE=${code}&deviceid=wap&plat=Wap&product=EFund&version=2.0.0`;
-    const raw = await httpGet(url);
-    const r = JSON.parse(raw);
-    if (!r.Datas || r.Datas.length === 0) return null;
-    const latest = r.Datas[0]; // 最新一期
-    return {
-      individualHold: parseFloat(latest.GRBL) || null,
-      institutionHold: parseFloat(latest.JGBL) || null,
-    };
-  } catch {
-    return null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const url = `https://fundmobapi.eastmoney.com/FundMApi/FundHolderStructure.ashx?FCODE=${code}&deviceid=wap&plat=Wap&product=EFund&version=2.0.0`;
+      const raw = await httpGet(url);
+      const r = JSON.parse(raw);
+      if (!r.Datas || r.Datas.length === 0) return null;
+      const latest = r.Datas[0]; // 最新一期
+      return {
+        individualHold: parseFloat(latest.GRBL) || null,
+        institutionHold: parseFloat(latest.JGBL) || null,
+      };
+    } catch {
+      if (attempt < 3) await sleep(500 * attempt);
+    }
   }
+  return null;
 }
 
 async function main() {

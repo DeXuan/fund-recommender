@@ -388,6 +388,18 @@ async function fetchAllNews() {
   const mockItems = generateMockNews();
   const newItems = mergeAndDedupe(mockItems, realItems);
 
+  // 基于关键词给每条新闻标注关联行业（供持仓匹配使用）
+  for (const item of newItems) {
+    if (!item.industries) {
+      const text = (item.title + ' ' + item.content).toLowerCase();
+      item.industries = Array.from(new Set(
+        Object.entries(NEWS_INDUSTRY_MAP)
+          .filter(([kw]) => text.includes(kw.toLowerCase()))
+          .map(([, ind]) => ind)
+      ));
+    }
+  }
+
   // 找出新增的高影响新闻用于推送
   const oldIds = new Set(newsCache.map(n => n.id));
   const breakingNews = newItems.filter(n => !oldIds.has(n.id) && n.impact === 'high');

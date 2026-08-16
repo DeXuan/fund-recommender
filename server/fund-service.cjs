@@ -25,7 +25,8 @@ function _cacheSet(key, data) {
 
 async function getAllFunds(filters = {}) {
   const pool = getPool();
-  let query = 'SELECT * FROM funds WHERE 1=1';
+  // 过滤非基金数据：仅保留6位数字代码且名称非空（排除银行理财计划/清盘空壳）
+  let query = `SELECT * FROM funds WHERE code ~ '^[0-9]{6}$' AND name IS NOT NULL AND name != ''`;
   const params = [];
   let paramIndex = 1;
 
@@ -34,8 +35,13 @@ async function getAllFunds(filters = {}) {
     params.push(filters.industry);
   }
   if (filters.type) {
-    query += ` AND type = $${paramIndex++}`;
-    params.push(filters.type);
+    if (filters.type === 'QDII') {
+      // QDII 有多种 type 变体 (QDII-混合偏股 等)，用前缀 + 名称兜底
+      query += ` AND (type LIKE 'QDII%' OR name LIKE '%QDII%')`;
+    } else {
+      query += ` AND type = $${paramIndex++}`;
+      params.push(filters.type);
+    }
   }
   if (filters.search) {
     query += ` AND (code ILIKE $${paramIndex} OR name ILIKE $${paramIndex})`;
@@ -244,8 +250,8 @@ async function batchFetchReturns(codes) {
 
 async function getAllFundsWithNav(filters = {}) {
   // 构建缓存 key（只缓存无筛选的场景）
-  const cacheKey = (!filters.industry && !filters.type && !filters.search && !filters.manager && !filters.sort)
-    ? '_all_'
+  const cacheKey = (!filters.industry && !filters.type && !filters.search && !filters.manager && !filters.sort && !filters.goldOnly)
+    ? `_all_${filters.pageSize || 100}`
     : null;
 
   // 尝试命中缓存
@@ -292,6 +298,9 @@ async function getAllFundsWithNav(filters = {}) {
       FROM yifangda_funds y
       WHERE y.fund_code NOT IN (SELECT code FROM funds)
     ) combined WHERE 1=1
+    -- 过滤非基金数据：仅保留6位数字代码且名称非空（排除银行理财计划/清盘空壳）
+    AND code ~ '^[0-9]{6}$'
+    AND name IS NOT NULL AND name != ''
   `;
   const params = [];
   let paramIndex = 1;
@@ -301,8 +310,13 @@ async function getAllFundsWithNav(filters = {}) {
     params.push(filters.industry);
   }
   if (filters.type) {
-    query += ` AND type = $${paramIndex++}`;
-    params.push(filters.type);
+    if (filters.type === 'QDII') {
+      // QDII 有多种 type 变体 (QDII-混合偏股 等)，用前缀 + 名称兜底
+      query += ` AND (type LIKE 'QDII%' OR name LIKE '%QDII%')`;
+    } else {
+      query += ` AND type = $${paramIndex++}`;
+      params.push(filters.type);
+    }
   }
   if (filters.search) {
     query += ` AND (code ILIKE $${paramIndex} OR name ILIKE $${paramIndex})`;
@@ -312,6 +326,9 @@ async function getAllFundsWithNav(filters = {}) {
   if (filters.manager) {
     query += ` AND manager = $${paramIndex++}`;
     params.push(filters.manager);
+  }
+  if (filters.goldOnly) {
+    query += ` AND is_gold_selected = true`;
   }
 
   // 排序

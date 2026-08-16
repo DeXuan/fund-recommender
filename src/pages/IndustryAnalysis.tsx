@@ -354,9 +354,10 @@ export default function IndustryAnalysis() {
 
           {/* 标签页 */}
           <div className="card" style={{ padding: 0 }}>
-            <div style={{ display: 'flex', borderBottom: `1px solid ${isDark ? '#333' : '#e8e8e8'}`, alignItems: 'center' }}>
+            <div style={{ display: 'flex', borderBottom: `1px solid ${isDark ? '#333' : '#e8e8e8'}`, alignItems: 'center', overflowX: 'auto', scrollbarWidth: 'none' }}>
               {[
                 { key: 'compare', label: '基金对比总表' },
+                { key: 'analysis', label: '专业分析' },
                 { key: 'fee', label: '费率对比' },
                 { key: 'return', label: '收益率排名' },
                 { key: 'recommend', label: '综合推荐' },
@@ -369,6 +370,7 @@ export default function IndustryAnalysis() {
               ].map((tab) => (
                 <button
                   key={tab.key}
+                  className="industry-tab-btn"
                   onClick={() => { setActiveTab(tab.key); setCurrentPage(1); }}
                   style={{
                     padding: '12px 24px',
@@ -419,7 +421,7 @@ export default function IndustryAnalysis() {
                 </span>
               </h3>
               <div style={{ overflowX: 'auto' }}>
-                <table className="table">
+                <table className="table industry-compare">
                   <thead>
                     <tr>
                       <th>基金代码</th>
@@ -513,6 +515,247 @@ export default function IndustryAnalysis() {
                   />
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 专业分析 — 金选基金的估值/趋势/逻辑/建议 */}
+          {activeTab === 'analysis' && (
+            <div>
+              {/* 分析概览统计 */}
+              <div className="card" style={{
+                background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                color: 'white',
+              }}>
+                <h3 style={{ color: 'var(--color-text-on-dark)', marginBottom: 12 }}>
+                  专业分析 — {data.industry}行业
+                </h3>
+                <p style={{ opacity: 0.8, fontSize: 14, marginBottom: 16 }}>
+                  基于估值、收益趋势、费率、规模等维度的综合分析
+                </p>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {(() => {
+                    const goldFunds = data.funds.filter(f => f.isGoldSelected);
+                    const valuationDist: Record<string, number> = {};
+                    const trendDist: Record<string, number> = {};
+                    const suggestionDist: Record<string, number> = {};
+                    goldFunds.forEach(f => {
+                      const v = f.valuation || '--';
+                      const t = f.trend || '--';
+                      const s = f.buySuggestion || '--';
+                      if (!valuationDist[v]) valuationDist[v] = 0;
+                      if (!trendDist[t]) trendDist[t] = 0;
+                      if (!suggestionDist[s]) suggestionDist[s] = 0;
+                      valuationDist[v]++; trendDist[t]++; suggestionDist[s]++;
+                    });
+                    return (
+                      <>
+                        <div style={{ flex: 1, minWidth: 180, padding: 12, background: 'rgba(255,255,255,0.1)', borderRadius: 8 }}>
+                          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>估值分布</div>
+                          {Object.entries(valuationDist).sort(([,a],[,b]) => b-a).map(([k,v]) => (
+                            <div key={k} style={{ fontSize: 13, marginBottom: 2 }}>
+                              {k}: <strong>{v}</strong>只
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 180, padding: 12, background: 'rgba(255,255,255,0.1)', borderRadius: 8 }}>
+                          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>趋势分布</div>
+                          {Object.entries(trendDist).sort(([,a],[,b]) => b-a).map(([k,v]) => (
+                            <div key={k} style={{ fontSize: 13, marginBottom: 2 }}>
+                              {k}: <strong>{v}</strong>只
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 180, padding: 12, background: 'rgba(255,255,255,0.1)', borderRadius: 8 }}>
+                          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>建议分布</div>
+                          {Object.entries(suggestionDist).sort(([,a],[,b]) => b-a).map(([k,v]) => (
+                            <div key={k} style={{ fontSize: 13, marginBottom: 2 }}>
+                              {k}: <strong>{v}</strong>只
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* 金选基金专业分析详情 */}
+              <div className="card">
+                <h3 className="card-title">
+                  金选基金专业分析详情
+                  <span className="text-muted" style={{ fontSize: 12, fontWeight: 400, marginLeft: 12 }}>
+                    共 {data.funds.filter(f => f.isGoldSelected).length} 只金选基金
+                  </span>
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>基金名称</th>
+                        <th>代码</th>
+                        <th>估值判断</th>
+                        <th>走势趋势</th>
+                        <th>投资逻辑</th>
+                        <th>买入建议</th>
+                        <th>评级</th>
+                        <th>近1年</th>
+                        <th>综合费率</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.funds
+                        .filter(f => f.isGoldSelected)
+                        .sort((a, b) => b.rating - a.rating || (b.return1y ?? 0) - (a.return1y ?? 0))
+                        .map((fund) => (
+                          <tr key={fund.code}>
+                            <td style={{ fontWeight: 600 }}>
+                              <Link to={`/funds/${fund.code}`} style={{ color: 'var(--primary)', textDecoration: 'none' }}>
+                                {fund.name}
+                              </Link>
+                            </td>
+                            <td style={{ fontFamily: 'monospace' }}>{fund.code}</td>
+                            <td>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                background: (fund.valuation || '').includes('低') ? isDark ? '#162312' : '#f6ffed'
+                                  : (fund.valuation || '').includes('高') ? isDark ? '#2c1618' : '#fff2f0'
+                                  : isDark ? '#1a1a1a' : '#f5f5f5',
+                                color: (fund.valuation || '').includes('低') ? '#52c41a'
+                                  : (fund.valuation || '').includes('高') ? '#ff4d4f'
+                                  : '#1677ff',
+                              }}>
+                                {fund.valuation || '--'}
+                              </span>
+                            </td>
+                            <td>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                                fontSize: 12,
+                                background: (fund.trend || '').includes('上涨') ? isDark ? '#162312' : '#f6ffed'
+                                  : (fund.trend || '').includes('反弹') ? isDark ? '#111a2c' : '#e6f4ff'
+                                  : (fund.trend || '').includes('跌') ? isDark ? '#2c1618' : '#fff2f0'
+                                  : isDark ? '#1a1a1a' : '#f5f5f5',
+                                color: (fund.trend || '').includes('上涨') ? '#52c41a'
+                                  : (fund.trend || '').includes('反弹') ? '#1677ff'
+                                  : (fund.trend || '').includes('跌') ? '#ff4d4f'
+                                  : isDark ? '#a0a0a0' : '#666',
+                              }}>
+                                {fund.trend || '--'}
+                              </span>
+                            </td>
+                            <td style={{ fontSize: 12, maxWidth: 300, color: isDark ? '#a0a0a0' : '#666' }}>
+                              {fund.logic || fund.index || '--'}
+                            </td>
+                            <td>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                background: (fund.buySuggestion || '').includes('优先') ? isDark ? '#162312' : '#f6ffed'
+                                  : (fund.buySuggestion || '').includes('布局') ? isDark ? '#111a2c' : '#e6f4ff'
+                                  : (fund.buySuggestion || '').includes('配置') ? isDark ? '#1a1a1a' : '#f5f5f5'
+                                  : isDark ? '#2c1618' : '#fff2f0',
+                                color: (fund.buySuggestion || '').includes('优先') ? '#52c41a'
+                                  : (fund.buySuggestion || '').includes('布局') ? '#1677ff'
+                                  : (fund.buySuggestion || '').includes('配置') ? '#1677ff'
+                                  : '#ff4d4f',
+                              }}>
+                                {fund.buySuggestion || '--'}
+                              </span>
+                            </td>
+                            <td>{'★'.repeat(Math.min(fund.rating || 0, 5))}{'☆'.repeat(5 - Math.min(fund.rating || 0, 5))}</td>
+                            <td>{formatReturn(fund.return1y)}</td>
+                            <td>
+                              <span style={{ color: fund.totalFee > 0.8 ? 'var(--danger)' : isDark ? '#e8e8e8' : '#333', fontWeight: fund.totalFee > 0.8 ? 600 : 400 }}>
+                                {fund.totalFee}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      {data.funds.filter(f => f.isGoldSelected).length === 0 && (
+                        <tr>
+                          <td colSpan={9} style={{ textAlign: 'center', padding: 24, color: isDark ? '#a0a0a0' : '#666' }}>
+                            该行业暂无金选基金数据，请先运行金选基金数据更新
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 所有基金分析总表（含非金选） */}
+              <div className="card">
+                <h3 className="card-title">
+                  全部基金分析总表
+                  <span className="text-muted" style={{ fontSize: 12, fontWeight: 400, marginLeft: 12 }}>
+                    包含估值、趋势、投资逻辑等专业分析维度
+                  </span>
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>基金名称</th>
+                        <th>A/C</th>
+                        <th>金选</th>
+                        <th>估值</th>
+                        <th>趋势</th>
+                        <th>投资逻辑</th>
+                        <th>建议</th>
+                        <th>评级</th>
+                        <th>近1年</th>
+                        <th>综合费率</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedFunds.map((fund) => (
+                        <tr key={fund.code}>
+                          <td><Link to={`/funds/${fund.code}`} style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>{fund.name}</Link></td>
+                          <td>
+                            <span className={`badge ${getAClassLabel(fund.name) === 'C' ? 'badge-warning' : 'badge-success'}`}>
+                              {getAClassLabel(fund.name)}
+                            </span>
+                          </td>
+                          <td>
+                            {fund.isGoldSelected ? (
+                              <span style={{ fontSize: 10, background: 'var(--warning)', color: 'white', padding: '2px 6px', borderRadius: 3, fontWeight: 600 }}>金选</span>
+                            ) : (
+                              <span style={{ color: isDark ? '#444' : '#d9d9d9' }}>--</span>
+                            )}
+                          </td>
+                          <td><span style={{ color: getValuationColor(fund.valuation || ''), fontWeight: 600, fontSize: 12 }}>{fund.valuation || '--'}</span></td>
+                          <td><span style={{ fontSize: 12, color: (fund.trend || '').includes('上涨') ? 'var(--success)' : (fund.trend || '').includes('跌') ? 'var(--danger)' : isDark ? '#a0a0a0' : '#666' }}>{fund.trend || '--'}</span></td>
+                          <td style={{ fontSize: 11, maxWidth: 250, color: isDark ? '#a0a0a0' : '#666' }}>{fund.logic || fund.index || '--'}</td>
+                          <td><span style={{ fontSize: 12, color: (fund.buySuggestion || '').includes('优先') ? 'var(--success)' : (fund.buySuggestion || '').includes('观望') ? 'var(--danger)' : 'var(--primary)' }}>{fund.buySuggestion || '--'}</span></td>
+                          <td>{'★'.repeat(Math.min(fund.rating || 0, 5))}</td>
+                          <td>{formatReturn(fund.return1y)}</td>
+                          <td><span style={{ color: fund.totalFee > 0.8 ? 'var(--danger)' : undefined, fontWeight: fund.totalFee > 0.8 ? 600 : 400 }}>{fund.totalFee}%</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {allSortedFunds.length > pageSize && (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+                    <Pagination
+                      current={currentPage}
+                      pageSize={pageSize}
+                      total={allSortedFunds.length}
+                      showSizeChanger
+                      showQuickJumper
+                      showTotal={(total) => `共 ${total} 只基金`}
+                      onChange={(page, size) => { setCurrentPage(page); setPageSize(size); }}
+                      pageSizeOptions={['10', '20', '50', '100']}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

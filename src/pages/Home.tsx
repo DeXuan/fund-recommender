@@ -23,7 +23,6 @@ import {
   InfoCircleOutlined,
   DashboardOutlined,
   BulbOutlined,
-  WarningOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons';
@@ -205,7 +204,6 @@ export default function Home() {
   const monthlyReturn = totalReturn * 0.15; // rough estimate
 
   // Upcoming DCA plans count (placeholder)
-  const alertCount = holdings.filter((h: any) => h.pnl_percent < -10).length;
 
   const trophyColors = ['#f5a623', '#b0b0b0', '#cd7f32'];
 
@@ -473,55 +471,9 @@ export default function Home() {
             </Card>
           </Col>
 
-          {/* 风险预警 + 快捷操作 */}
+          {/* 快捷操作 */}
           <Col xs={24} lg={10}>
             <Row gutter={[0, 20]}>
-              {/* 风险预警 */}
-              <Col span={24}>
-                <Card
-                  style={{ borderRadius: 12, border: `1px solid ${alertCount > 0 ? 'rgba(255,77,79,0.3)' : 'var(--border-color-light)'}` }}
-                  title={
-                    <div className="section-title-bar" style={{ marginBottom: 0 }}>
-                      <WarningOutlined style={{ color: alertCount > 0 ? 'var(--danger)' : 'var(--warning)' }} />
-                      <span style={{ fontWeight: 600 }}>风险预警</span>
-                      {alertCount > 0 && <Tag color="red" style={{ marginLeft: 8 }}>{alertCount}项</Tag>}
-                    </div>
-                  }
-                >
-                  {alertCount > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {holdings.filter((h: any) => h.pnl_percent < -10).map((h: any) => (
-                        <div
-                          key={h.fund_code}
-                          className="alert-pulse"
-                          style={{
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                            padding: '10px 14px', borderRadius: 8,
-                            background: isDark ? 'rgba(255,77,79,0.08)' : 'rgba(255,77,79,0.04)',
-                            border: `1px solid ${isDark ? 'rgba(255,77,79,0.2)' : 'rgba(255,77,79,0.15)'}`,
-                            cursor: 'pointer',
-                          }}
-                          onClick={() => navigate(`/funds/${h.fund_code}`)}
-                        >
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{h.fund_name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>亏损超过10%，建议关注</div>
-                          </div>
-                          <span style={{ color: 'var(--danger)', fontWeight: 700, fontSize: 15, fontFamily: 'var(--font-mono)' }}>
-                            {h.pnl_percent?.toFixed(2)}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                      <CheckCircleOutlined style={{ fontSize: 32, color: 'var(--success)', marginBottom: 8 }} />
-                      <div style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>持仓状态健康，暂无风险预警</div>
-                    </div>
-                  )}
-                </Card>
-              </Col>
-
               {/* 快捷入口 */}
               <Col span={24}>
                 <Card style={{ borderRadius: 12 }} styles={{ body: { padding: 16 } }}>

@@ -2,7 +2,7 @@
 
 ## 访问地址
 
-**http://47.116.77.67:8688/web**
+**http://111.229.32.106:8686/web**
 
 ## 功能概述
 
@@ -11,7 +11,7 @@
 ## 登录流程
 
 ### 1. 用户访问登录页面
-- 访问 http://47.116.77.67:8688/web
+- 访问 http://111.229.32.106:8686/web
 - 点击"支付宝扫码登录"按钮
 
 ### 2. 打开支付宝授权窗口
@@ -43,24 +43,24 @@
 
 ## 配置要求
 
-### 环境变量（/var/www/jijin/.env）
+### 环境变量（/var/www/jijin85/.env）
 ```env
 ALIPAY_APP_ID=your_alipay_app_id
 ALIPAY_PRIVATE_KEY=keys/alipay_private_key.pem
 ALIPAY_PUBLIC_KEY=keys/alipay_public_key_from_alipay.pem
-ALIPAY_RETURN_URL=http://47.116.77.67:8688/api/auth/alipay/callback
+ALIPAY_RETURN_URL=http://111.229.32.106:8686/api/auth/alipay/callback
 ```
 
 ### 支付宝开放平台配置
 1. 登录 [支付宝开放平台](https://open.alipay.com)
-2. 配置授权回调地址：`http://47.116.77.67:8688/api/auth/alipay/callback`
+2. 配置授权回调地址：`http://111.229.32.106:8686/api/auth/alipay/callback`
 3. 上传应用公钥
 
 ## 测试流程
 
 ### 1. 访问登录页面
 ```
-http://47.116.77.67:8688/web
+http://111.229.32.106:8686/web
 ```
 
 ### 2. 点击支付宝登录
@@ -86,7 +86,7 @@ A: 检查服务器上的 `.env` 文件是否正确配置了支付宝相关参数
 ## 文件结构
 
 ```
-/var/www/jijin/
+/var/www/jijin85/
 ├── src/pages/Login.tsx              # 登录页面
 ├── server/auth.cjs                  # 认证路由
 ├── server/utils/alipay.cjs         # 支付宝SDK封装

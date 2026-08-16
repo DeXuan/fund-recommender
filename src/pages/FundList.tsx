@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Card, Input, Select, Table, Tag, Button, Space, Spin, AutoComplete, Alert, Row, Col, Tooltip, message } from 'antd';
+import { Card, Input, Select, Table, Tag, Button, Space, Spin, AutoComplete, Alert, Row, Col, Tooltip, message, Grid } from 'antd';
+const { useBreakpoint } = Grid;
 import { SearchOutlined, SwapOutlined, CloseCircleOutlined, StarOutlined, StarFilled, SyncOutlined, LineChartOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { fundApi, watchlistApi, fundCompareApi } from '../services/api';
@@ -36,6 +37,8 @@ interface Fund {
   pePercentile: number;
   pbPercentile: number;
   valuation: string;
+  trend: string;
+  logic: string;
   dailyLimit?: number;
   purchaseFee?: number;
   purchaseFeeDiscount?: number;
@@ -56,6 +59,8 @@ interface Fund {
 export default function FundList() {
   const { user } = useAuth();
   const { isDark } = useTheme();
+  const screens = useBreakpoint();
+  const isMobile = !screens.sm;
   const [searchParams] = useSearchParams();
   const initialCodes = (searchParams.get('codes')?.split(',') || [])
     .filter(code => /^\d{6}$/.test(code));
@@ -245,7 +250,7 @@ export default function FundList() {
       const res = await fundApi.getFunds({
         industry: industry !== '全部' ? industry : undefined,
         search: debouncedSearch || undefined,
-        pageSize: 10000,
+        pageSize: 20000,
       });
       const list = Array.isArray(res) ? res : (res as any).data || [];
       setFunds(list);
@@ -639,6 +644,7 @@ export default function FundList() {
       title: '基金名称',
       dataIndex: 'name',
       key: 'name',
+      fixed: isMobile ? 'left' as const : false,
       render: (name: string, record: Fund) => (
         <Space>
           {user && (
@@ -770,6 +776,46 @@ export default function FundList() {
       sorter: (a: Fund, b: Fund) => a.scale - b.scale,
       render: (val: number) => val?.toFixed(2) || '-',
     },
+    ...(goldOnly ? [
+      {
+        title: '估值',
+        dataIndex: 'valuation',
+        key: 'valuation',
+        width: 80,
+        render: (val: string) => {
+          if (!val) return <span style={{ color: 'var(--text-quaternary)' }}>-</span>;
+          const color = val.includes('低') ? 'var(--success)' : val.includes('高') ? 'var(--danger)' : 'var(--primary)';
+          return <span style={{ color, fontWeight: 600, fontSize: 12 }}>{val}</span>;
+        },
+      },
+      {
+        title: '趋势',
+        dataIndex: 'trend',
+        key: 'trend',
+        width: 90,
+        render: (val: string) => {
+          if (!val) return <span style={{ color: 'var(--text-quaternary)' }}>-</span>;
+          const color = val.includes('上涨') ? 'var(--success)' : val.includes('反弹') ? 'var(--primary)' : val.includes('跌') ? 'var(--danger)' : isDark ? '#a0a0a0' : '#666';
+          return <span style={{ color, fontSize: 12 }}>{val}</span>;
+        },
+      },
+      {
+        title: '投资逻辑',
+        dataIndex: 'logic',
+        key: 'logic',
+        width: 180,
+        render: (val: string, record: Fund) => {
+          const text = val || record.index || '-';
+          return (
+            <Tooltip title={text}>
+              <span style={{ fontSize: 11, color: isDark ? '#a0a0a0' : '#666' }}>
+                {text.length > 18 ? text.slice(0, 18) + '...' : text}
+              </span>
+            </Tooltip>
+          );
+        },
+      },
+    ] : []),
     {
       title: '操作',
       key: 'action',
@@ -782,6 +828,22 @@ export default function FundList() {
     },
   ];
 
+  // 手机端精简列：只留核心列，去掉固定/宽高，让表格自适应一屏不横滚
+  const displayColumns = useMemo(() => {
+    if (!isMobile) return columns;
+    const keyToWidth: Record<string, number> = {
+      code: 78, industry: 78, nav: 80,
+      return1y: 82, return6m: 82, totalFee: 72, action: 64,
+    };
+    const allowed = new Set(['code', 'name', 'industry', 'nav', 'return1y', 'return6m', 'totalFee', 'action']);
+    return columns
+      .filter(c => c.key && allowed.has(c.key))
+      .map(c => {
+        const w = keyToWidth[c.key as string];
+        return w ? { ...c, width: w, fixed: false as const } : { ...c, fixed: false as const };
+      });
+  }, [isMobile, columns]);
+
   return (
     <div>
       <h1 style={{ marginBottom: 24, fontSize: 24, fontWeight: 600 }}>基金列表</h1>
@@ -792,14 +854,14 @@ export default function FundList() {
             placeholder="搜索基金名称或代码..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 300 }}
+            style={{ width: isMobile ? '100%' : 300 }}
             allowClear
             prefix={<SearchOutlined />}
           />
           <Select
             value={industry}
             onChange={setIndustry}
-            style={{ width: 160 }}
+            style={{ width: isMobile ? 120 : 160 }}
             options={industries.map((ind) => ({ label: ind, value: ind }))}
           />
           <Select
@@ -998,6 +1060,34 @@ export default function FundList() {
               </div>
             </div>
           )}
+          {goldStats.analysis && (goldStats.analysis.valuation?.length > 0 || goldStats.analysis.suggestion?.length > 0) && (
+            <div style={{ marginTop: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              {goldStats.analysis.valuation?.length > 0 && (
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>估值分布</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {goldStats.analysis.valuation.map((v: any) => (
+                      <Tag key={v.name} color={v.name.includes('低') ? 'green' : v.name.includes('高') ? 'red' : 'blue'}>
+                        {v.name}: {v.count}只
+                      </Tag>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {goldStats.analysis.suggestion?.length > 0 && (
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>建议分布</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {goldStats.analysis.suggestion.map((s: any) => (
+                      <Tag key={s.name} color={s.name.includes('优先') ? 'green' : s.name.includes('观望') ? 'red' : 'blue'}>
+                        {s.name}: {s.count}只
+                      </Tag>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
       )}
 
@@ -1067,12 +1157,12 @@ export default function FundList() {
           </div>
         )}
         <Table
-          columns={columns}
+          columns={displayColumns}
           dataSource={filteredFunds}
           rowKey="code"
           loading={loading}
-          size="middle"
-          scroll={{ x: 1000 }}
+          size={isMobile ? 'small' : 'middle'}
+          scroll={{ x: isMobile ? 620 : 1000 }}
           rowSelection={{
             selectedRowKeys: selectedCodes,
             onChange: (keys) => setSelectedCodes(keys as string[]),
@@ -1080,7 +1170,7 @@ export default function FundList() {
               disabled: !selectedCodes.includes(record.code) && selectedCodes.length >= 5,
             }),
           }}
-          pagination={{ defaultPageSize: 20, showSizeChanger: true, pageSizeOptions: ['10', '20', '50', '100'], showTotal: (total) => `共 ${total} 只基金` }}
+          pagination={{ defaultPageSize: 30, showSizeChanger: true, pageSizeOptions: ['10', '20', '30', '50', '100'], showTotal: (total) => `共 ${total} 只基金` }}
         />
       </Card>
 
@@ -1105,7 +1195,7 @@ export default function FundList() {
             }
             style={{ marginBottom: 16 }}
           >
-            <Space>
+            <Space wrap>
               <AutoComplete
                 value={compareSearchCode}
                 onChange={handleCompareSearchChange}
@@ -1114,7 +1204,7 @@ export default function FundList() {
                   setCompareSearchCode('');
                   addFundToCompare(value);
                 }}
-                style={{ width: 400 }}
+                style={{ width: isMobile ? '100%' : 400 }}
                 placeholder="输入基金代码或名称搜索添加..."
                 allowClear
               />
@@ -1259,9 +1349,9 @@ export default function FundList() {
           <Card title="热门对比组合">
             <Row gutter={16}>
               {[
-                { label: 'AI + 半导体 + 光伏', codes: ['013349', '008887', '011102'] },
+                { label: 'AI + 半导体 + 光伏', codes: ['012734', '008887', '011102'] },
                 { label: '纳斯达克 + 沪深300 + 新能源', codes: ['040046', '110020', '012831'] },
-                { label: '医药 + 消费 + AI', codes: ['012634', '000248', '013349'] },
+                { label: '医药 + 消费 + AI', codes: ['012634', '000248', '012734'] },
                 { label: '煤炭三巨头对比', codes: ['008279', '161724', '161032'] },
               ].map((combo) => (
                 <Col xs={24} sm={8} key={combo.label}>

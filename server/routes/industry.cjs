@@ -36,7 +36,7 @@ router.get('/api/recommendations/industry', handler(async () => {
 // 获取分批建仓方案
 router.get('/api/recommendations/batch-plans', handler(async () => {
   return [
-    { batch: 1, time: '本周', ratio: 40, funds: ['人工智能ETF联接A(013349)', '半导体芯片ETF联接A(008887)'], method: '一次性买入', reason: 'AI+半导体为年度核心主线，Q2涨幅领先' },
+    { batch: 1, time: '本周', ratio: 40, funds: ['人工智能ETF联接A(012733)', '半导体芯片ETF联接A(008887)'], method: '一次性买入', reason: 'AI+半导体为年度核心主线，Q2涨幅领先' },
     { batch: 2, time: '下周', ratio: 30, funds: ['光伏ETF联接A(011102)', '新能源ETF联接A(012348)'], method: '定投或一次性买入', reason: '光伏/新能源底部反转，估值低估区间' },
     { batch: 3, time: '第三周', ratio: 20, funds: ['军工ETF联接A(013139)', '科技ETF联接A(007873)'], method: '定投', reason: '稳健配置型标的，分散风险' },
     { batch: 4, time: '第四周', ratio: 10, funds: ['银行ETF联接A(001594)', '煤炭ETF联接C(008280)'], method: '定投', reason: '银行+煤炭高股息防守，平衡组合风险' },
@@ -347,22 +347,27 @@ router.get('/api/sp500/analysis', handler(async () => {
   };
 }));
 
-// 市场重大事件日历
+// 市场重大事件日历（静态基线 + 集思录实时事件）
 router.get('/api/market-events', handler(async (req) => {
   const { marketEvents, categoryConfig, impactConfig } = require('../market-events.cjs');
+  const { getCachedCalendar } = require('../calendar-fetcher.cjs');
   const { month, category, impact } = req.query;
 
-  let events = [...marketEvents];
+  let live = [];
+  try { live = await getCachedCalendar(); } catch { live = []; }
+
+  // 实时事件 + 静态年报级事件，实时优先
+  let events = [...live, ...marketEvents.map(e => ({ ...e, source: '手动维护' }))];
   if (month) { const m = parseInt(month); if (m >= 1 && m <= 12) events = events.filter(e => e.month === m); }
   if (category) events = events.filter(e => e.category === category);
   if (impact) events = events.filter(e => e.impact === impact);
 
-  events.sort((a, b) => a.month - b.month || a.id.localeCompare(b.id));
+  events.sort((a, b) => a.month - b.month || (a.date || a.dateRange || '').localeCompare(b.date || b.dateRange || ''));
 
   const byMonth = {};
   events.forEach(e => { if (!byMonth[e.month]) byMonth[e.month] = []; byMonth[e.month].push(e); });
 
-  return { events, byMonth, categoryConfig, impactConfig, total: events.length };
+  return { events, byMonth, categoryConfig, impactConfig, total: events.length, liveCount: live.length };
 }));
 
 module.exports = { router };

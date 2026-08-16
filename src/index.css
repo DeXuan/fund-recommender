@@ -482,6 +482,116 @@ a:hover {
   }
 }
 
+/* 手机端适配 (折叠屏外屏 374px ~ 平放手机 430px) */
+@media (max-width: 767px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  /* 页面标题缩小 */
+  .page-title, h1[class] {
+    font-size: 19px !important;
+    margin-bottom: 14px !important;
+  }
+
+  /* 表格：压缩单元格、字号，减少横向滚动负担 */
+  .ant-table-wrapper .ant-table-thead > tr > th,
+  .ant-table-wrapper .ant-table-tbody > tr > td {
+    padding: 10px 8px !important;
+    font-size: 12px;
+  }
+  .ant-table-wrapper .ant-table-thead > tr > th {
+    font-size: 12px;
+  }
+
+  /* 卡片内边距压缩 */
+  .ant-card .ant-card-body {
+    padding: 12px !important;
+  }
+  .ant-card .ant-card-head {
+    min-height: 44px;
+  }
+  .ant-card .ant-card-head-title {
+    font-size: 15px;
+  }
+
+  /* 分页器手机简化 */
+  .ant-pagination {
+    font-size: 12px;
+  }
+  .ant-pagination .ant-pagination-options {
+    display: none;
+  }
+
+  /* 表单控件保证点击区 */
+  .ant-input, .ant-input-affix-wrapper, .ant-select-selector, .ant-btn {
+    min-height: 36px;
+  }
+
+  /* antd 栅格标签间隙压缩 */
+  .ant-tag {
+    font-size: 11px;
+  }
+
+  /* 行业分析：手写 Tab 栏手机横滑 + 收紧 */
+  .industry-tab-btn {
+    white-space: nowrap;
+    padding: 10px 10px !important;
+    font-size: 13px !important;
+  }
+
+  /* AI 选股：多 Tab 页手机横向滚动 */
+  .ant-tabs-nav {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ant-tabs-nav::-webkit-scrollbar { display: none; }
+  .ant-tabs-nav .ant-tabs-nav-wrap { white-space: nowrap; }
+  .ant-tabs-ink-bar { min-width: 40px; }
+
+  /* AI 助手：手机气泡 markdown 表格横向滚动 */
+  .markdown-body {
+    overflow-x: auto;
+  }
+
+  /* 行业分析·基金对比总表：手机只保留核心列，隐藏次要列 */
+  .industry-compare tr > *:nth-child(1),
+  .industry-compare tr > *:nth-child(3),
+  .industry-compare tr > *:nth-child(4),
+  .industry-compare tr > *:nth-child(5),
+  .industry-compare tr > *:nth-child(7),
+  .industry-compare tr > *:nth-child(8),
+  .industry-compare tr > *:nth-child(9),
+  .industry-compare tr > *:nth-child(10),
+  .industry-compare tr > *:nth-child(11),
+  .industry-compare tr > *:nth-child(13),
+  .industry-compare tr > *:nth-child(14),
+  .industry-compare tr > *:nth-child(16) {
+    display: none;
+  }
+  /* 名称列吸顶，滚动易对照 */
+  .industry-compare td:nth-child(2) {
+    position: sticky;
+    left: 0;
+    background: var(--card-bg, #fff);
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+    z-index: 1;
+  }
+  .industry-compare thead th:nth-child(2) {
+    position: sticky;
+    left: 0;
+    background: var(--card-bg, #fff);
+    z-index: 2;
+  }
+  .industry-compare tr > *:nth-child(6),
+  .industry-compare tr > *:nth-child(12),
+  .industry-compare tr > *:nth-child(15),
+  .industry-compare tr > *:nth-child(17) {
+    font-size: 12px;
+    white-space: nowrap;
+  }
+}
+
 /* 大屏适配 1920x1080 */
 @media (min-width: 1600px) {
   html {
@@ -985,15 +1095,6 @@ a:hover {
   height: 18px;
   border-radius: 2px;
   background: var(--primary);
-}
-
-/* 风险预警脉冲 */
-@keyframes alertPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(255, 77, 79, 0); }
-}
-.alert-pulse {
-  animation: alertPulse 2s ease-in-out infinite;
 }
 
 /* 实时刷新旋转 */

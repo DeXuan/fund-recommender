@@ -37,7 +37,7 @@ export default function ParticleCanvas() {
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const isMobile = window.innerWidth < 768;
+    const isMobile = window.innerWidth < 680;
     const count = isMobile ? 20 : 45;
     const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 

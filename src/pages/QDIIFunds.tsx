@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Tabs, Table, Tag, Button, Spin, Row, Col, Alert } from 'antd';
+import { Card, Tabs, Table, Tag, Button, Spin, Row, Col, Alert, Grid } from 'antd';
+const { useBreakpoint } = Grid;
 import { GlobalOutlined } from '@ant-design/icons';
 import { fundApi } from '../services/api';
 import { formatReturn, getReturnColor } from '../utils/format';
@@ -95,6 +96,8 @@ interface SP500Analysis {
 
 export default function QDIIFunds() {
   const { isDark } = useTheme();
+  const screens = useBreakpoint();
+  const isMobile = !screens.sm;
   const [funds, setFunds] = useState<Fund[]>([]);
   const [loading, setLoading] = useState(true);
   const [sp500Data, setSp500Data] = useState<SP500Analysis | null>(null);
@@ -113,7 +116,8 @@ export default function QDIIFunds() {
     setLoading(true);
     try {
       const data = await fundApi.getQDIIFunds();
-      setFunds(data);
+      // 排除暂停申购 + 纯场内ETF（场外/人民币不可直接购买）
+      setFunds(data.filter((f: { buySuggestion?: string; type?: string }) => f.buySuggestion !== '暂停申购' && f.type !== 'ETF'));
     } catch (error) {
       console.error('加载QDII基金失败:', error);
     } finally {
@@ -197,6 +201,7 @@ export default function QDIIFunds() {
       title: '基金名称',
       dataIndex: 'name',
       key: 'name',
+      fixed: 'left' as const,
       render: (name: string, record: Fund) => (
         <Link to={`/funds/${record.code}`} style={{ color: 'var(--primary)', fontWeight: 500 }}>{name}</Link>
       ),
@@ -224,9 +229,10 @@ export default function QDIIFunds() {
       key: 'dailyLimit',
       defaultSortOrder: 'descend' as const,
       sorter: (a: Fund, b: Fund) => (a.dailyLimit ?? 0) - (b.dailyLimit ?? 0),
-      render: (v: number) => {
-        const label = v === 0 ? '暂停' : v >= 10000 ? `${(v / 10000).toFixed(0)}万` : `${v}元`;
-        const color = v === 0 ? 'var(--color-text-muted)' : v <= 10 ? 'var(--danger)' : v >= 10000 ? 'var(--success)' : 'var(--warning)';
+      render: (v: number, record: Fund) => {
+        const paused = record?.buySuggestion === '暂停申购';
+        const label = paused ? '暂停' : v === 0 ? '不限' : v >= 10000 ? `${(v / 10000).toFixed(0)}万` : `${v}元`;
+        const color = paused || v === 0 ? 'var(--color-text-muted)' : v <= 10 ? 'var(--danger)' : v >= 10000 ? 'var(--success)' : 'var(--warning)';
         return <span style={{ fontWeight: 600, color }}>{label}</span>;
       },
     },
@@ -245,6 +251,11 @@ export default function QDIIFunds() {
       render: (_: any, record: Fund) => <Link to={`/funds/${record.code}`}><Button type="link" size="small">详情</Button></Link>,
     },
   ];
+
+  // 手机端精简列（隐藏次要列，减少横向滚动）
+  const displayNasdaqColumns = isMobile
+    ? nasdaqColumns.filter(c => !['type', 'return3m', 'return1m', 'managementFee', 'scale'].includes((c as any).key))
+    : nasdaqColumns;
 
   const sp500Columns = [
     {
@@ -298,9 +309,10 @@ export default function QDIIFunds() {
       title: '每日限额', dataIndex: 'dailyLimit', key: 'dailyLimit', width: 90,
       sorter: true, sortOrder: sortField === 'dailyLimit' ? sortOrder : undefined,
       onHeaderCell: () => ({ onClick: () => handleSort('dailyLimit') }),
-      render: (v: number) => {
-        const label = v === 0 ? '暂停' : v >= 10000 ? `${(v / 10000).toFixed(0)}万` : `${v}元`;
-        const color = v === 0 ? 'var(--color-text-muted)' : v <= 10 ? 'var(--danger)' : v >= 10000 ? 'var(--success)' : 'var(--warning)';
+      render: (v: number, record: { buySuggestion?: string }) => {
+        const paused = record?.buySuggestion === '暂停申购';
+        const label = paused ? '暂停' : v === 0 ? '不限' : v >= 10000 ? `${(v / 10000).toFixed(0)}万` : `${v}元`;
+        const color = paused || v === 0 ? 'var(--color-text-muted)' : v <= 10 ? 'var(--danger)' : v >= 10000 ? 'var(--success)' : 'var(--warning)';
         return <span style={{ fontWeight: 600, color }}>{label}</span>;
       },
     },
@@ -355,7 +367,7 @@ export default function QDIIFunds() {
             showIcon
             style={{ marginBottom: 16 }}
           />
-          <Table columns={nasdaqColumns} dataSource={nasdaqFunds} rowKey="code" pagination={false} size="small" scroll={{ x: 1000 }} />
+          <Table columns={displayNasdaqColumns} dataSource={nasdaqFunds} rowKey="code" pagination={false} size="small" scroll={{ x: isMobile ? 560 : 1000 }} />
         </div>
       ),
     },
@@ -365,7 +377,7 @@ export default function QDIIFunds() {
       .map(([industry, industryFunds]) => ({
         key: `industry-${industry}`,
         label: `${industry} (${industryFunds.length})`,
-        children: <Table columns={nasdaqColumns} dataSource={industryFunds} rowKey="code" pagination={false} size="small" scroll={{ x: 1000 }} />,
+        children: <Table columns={displayNasdaqColumns} dataSource={industryFunds} rowKey="code" pagination={false} size="small" scroll={{ x: isMobile ? 560 : 1000 }} />,
       })),
     {
       key: 'sp500',
@@ -621,7 +633,7 @@ export default function QDIIFunds() {
               </Tag>
             ))}
           </div>
-          <Table columns={nasdaqColumns} dataSource={funds} rowKey="code" pagination={{ pageSize: 20 }} size="small" scroll={{ x: 1000 }} />
+          <Table columns={displayNasdaqColumns} dataSource={funds} rowKey="code" pagination={{ pageSize: 20 }} size="small" scroll={{ x: isMobile ? 560 : 1000 }} />
         </div>
       ),
     },

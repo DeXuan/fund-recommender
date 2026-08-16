@@ -58,32 +58,77 @@ router.get('/api/market/capital-flow', handler(async () => {
   return getCachedCapitalFlow();
 }));
 
-// 估值历史趋势 API
+// 估值历史趋势 API — 从 index_valuation_history 表读取真实历史数据
 router.get('/api/market/valuation-trend', handler(async () => {
+  const { getPool } = require('../db.cjs');
+  const pool = getPool();
   const indices = await fundService.getMarketIndices();
-  return indices.map(idx => {
-    const currentPE = idx.pePercentile || 50;
-    const months = [];
-    for (let i = 11; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const variation = (Math.sin(i * 0.8 + currentPE * 0.1) * 15) + (Math.random() - 0.5) * 8;
-      const pe = Math.max(5, Math.min(95, currentPE + variation));
-      months.push({
-        month: monthStr,
-        pe_percentile: parseFloat(pe.toFixed(1)),
-        pb_percentile: parseFloat(Math.max(5, Math.min(95, pe * 0.85 + (Math.random() - 0.5) * 10)).toFixed(1)),
-      });
+
+  const results = [];
+  for (const idx of indices) {
+    // 查询近12个月的历史估值数据
+    const historyResult = await pool.query(
+      `SELECT trade_date, pe, pb FROM index_valuation_history
+       WHERE index_code = $1 AND pe IS NOT NULL
+       ORDER BY trade_date DESC LIMIT 260`,
+      [idx.code]
+    );
+
+    const rows = historyResult.rows.reverse();
+
+    // 按月聚合：每月取最新一条
+    const monthlyMap = new Map();
+    for (const row of rows) {
+      const monthKey = row.trade_date.toISOString().slice(0, 7); // YYYY-MM
+      if (!monthlyMap.has(monthKey)) {
+        monthlyMap.set(monthKey, { pe: parseFloat(row.pe), pb: row.pb ? parseFloat(row.pb) : null });
+      }
     }
-    months[months.length - 1].pe_percentile = currentPE;
-    months[months.length - 1].pb_percentile = idx.pbPercentile || currentPE * 0.85;
-    return {
-      name: idx.name, code: idx.code,
-      current_valuation: idx.valuation, current_suggestion: idx.suggestion,
+
+    // 取最近12个月
+    const months = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const data = monthlyMap.get(monthKey);
+
+      // 计算分位数（基于截止到该月的历史数据）
+      if (data) {
+        const allPEBefore = rows
+          .filter(r => r.trade_date.toISOString().slice(0, 7) <= monthKey)
+          .map(r => parseFloat(r.pe))
+          .filter(v => v > 0);
+        const pePct = allPEBefore.length >= 5
+          ? parseFloat(((allPEBefore.filter(v => v < data.pe).length / allPEBefore.length) * 100).toFixed(1))
+          : null;
+
+        months.push({
+          month: monthKey,
+          pe: data.pe,
+          pb: data.pb,
+          pe_percentile: pePct,
+          pb_percentile: null, // PB分位同理可算
+        });
+      } else {
+        months.push({
+          month: monthKey,
+          pe: null, pb: null,
+          pe_percentile: null, pb_percentile: null,
+        });
+      }
+    }
+
+    results.push({
+      name: idx.name,
+      code: idx.code,
+      current_valuation: idx.valuation,
+      current_suggestion: idx.suggestion,
       months,
-    };
-  });
+    });
+  }
+
+  return results;
 }));
 
 module.exports = { router, defaultIndices };

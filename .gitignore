@@ -59,6 +59,7 @@ scripts/**/*.py
 scripts/*.py
 scripts/*.json
 scripts/*.csv
+scripts/run_batch*.cmd
 test_*.py
 *.tmp
 finpilot/
@@ -68,3 +69,14 @@ data/
 
 # 测试运行时生成的 mock 文件
 server/__tests__/mock-db.cjs
+
+# 招行爬取缓存数据
+cmb_data/
+
+# 手机截图
+scripts/shots/
+
+# 一次性维护/诊断脚本
+disable_gold_old.py
+scripts/check-*.cjs
+scripts/count-junk.cjs

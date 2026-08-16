@@ -14,13 +14,13 @@ const handler = createHandler('基金');
 
 // 获取基金列表（支持分页）
 router.get('/api/funds', handler(async (req) => {
-  const { industry, type, sort, order, search, page, pageSize } = req.query;
-  return await fundService.getAllFundsWithNav({ industry, type, sort, order, search, page, pageSize });
+  const { industry, type, sort, order, search, page, pageSize, goldOnly } = req.query;
+  return await fundService.getAllFundsWithNav({ industry, type, sort, order, search, page, pageSize, goldOnly: goldOnly === 'true' || goldOnly === '1' });
 }));
 
 // 获取QDII基金数据
 router.get('/api/funds/qdii', handler(async () => {
-  const result = await fundService.getAllFundsWithNav({ type: 'QDII' });
+  const result = await fundService.getAllFundsWithNav({ type: 'QDII', pageSize: 10000 });
   return result.data || result;
 }));
 
@@ -115,73 +115,6 @@ async function getFundDetail(fund) {
   };
 }
 
-// 获取易方达基金数据
-router.get('/api/yifangda-funds', handler(async (req) => {
-  const pool = getPool();
-  const { search, sort = 'return_1y', order = 'desc', manager, page = 1, pageSize = 50 } = req.query;
-  const safePageSize = Math.min(100, Math.max(1, parseInt(pageSize) || 50));
-  const safePage = Math.max(1, parseInt(page) || 1);
-
-  const conditions = [];
-  const params = [];
-  let idx = 1;
-
-  if (search) {
-    conditions.push(`(fund_code ILIKE $${idx} OR fund_name ILIKE $${idx})`);
-    params.push(`%${search}%`);
-    idx++;
-  }
-  if (manager) {
-    conditions.push(`fund_manager = $${idx}`);
-    params.push(manager);
-    idx++;
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const countResult = await pool.query(`SELECT COUNT(*) FROM yifangda_funds ${where}`, params);
-  const total = parseInt(countResult.rows[0].count);
-
-  const sortMap = {
-    'fund_code': 'fund_code', 'fund_name': 'fund_name', 'unit_nav': 'unit_nav',
-    'return_1m': 'return_1m', 'return_3m': 'return_3m', 'return_6m': 'return_6m',
-    'return_1y': 'return_1y', 'scale': 'scale', 'fund_manager': 'fund_manager',
-  };
-  const sortCol = sortMap[sort] || 'return_1y';
-  const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
-  const offset = (safePage - 1) * safePageSize;
-
-  const dataResult = await pool.query(
-    `SELECT fund_code, fund_name, fund_manager, unit_nav, nav_date,
-            return_1w, return_1m, return_3m, return_6m, return_1y, scale, updated_at
-     FROM yifangda_funds ${where}
-     ORDER BY ${sortCol} ${sortOrder} NULLS LAST
-     LIMIT $${idx++} OFFSET $${idx++}`,
-    [...params, safePageSize, offset]
-  );
-
-  const managersResult = await pool.query(
-    `SELECT DISTINCT fund_manager, COUNT(*) as cnt
-     FROM yifangda_funds WHERE fund_manager != ''
-     GROUP BY fund_manager ORDER BY cnt DESC LIMIT 30`
-  );
-
-  return {
-    data: dataResult.rows.map(r => ({
-      fund_code: r.fund_code, fund_name: r.fund_name, fund_manager: r.fund_manager,
-      unit_nav: r.unit_nav ? parseFloat(r.unit_nav) : null, nav_date: r.nav_date,
-      return_1w: r.return_1w ? parseFloat(r.return_1w) : null,
-      return_1m: r.return_1m ? parseFloat(r.return_1m) : null,
-      return_3m: r.return_3m ? parseFloat(r.return_3m) : null,
-      return_6m: r.return_6m ? parseFloat(r.return_6m) : null,
-      return_1y: r.return_1y ? parseFloat(r.return_1y) : null,
-      scale: r.scale ? parseFloat(r.scale) : null, updated_at: r.updated_at,
-    })),
-    total, page: safePage, pageSize: safePageSize,
-    totalPages: Math.ceil(total / safePageSize),
-    managers: managersResult.rows.map(r => ({ name: r.fund_manager, count: parseInt(r.cnt) })),
-  };
-}));
-
 // 获取金选基金列表
 router.get('/api/gold-funds', handler(async (req) => {
   const pool = getPool();
@@ -191,7 +124,7 @@ router.get('/api/gold-funds', handler(async (req) => {
     page = 1, pageSize = 100,
     minReturn, maxFee, minScale,
   } = req.query;
-  const safePageSize = Math.min(100, Math.max(1, parseInt(pageSize) || 100));
+  const safePageSize = Math.min(2000, Math.max(1, parseInt(pageSize) || 100));
   const safePage = Math.max(1, parseInt(page) || 1);
 
   const conditions = ['f.is_gold_selected = true'];
@@ -302,6 +235,14 @@ router.get('/api/gold-funds/stats', handler(async () => {
   const fee = feeResult.rows[0];
   const scale = scaleResult.rows[0];
 
+  // 分析统计：估值分布、建议分布
+  const valuationResult = await pool.query(
+    `SELECT valuation, COUNT(*) as cnt FROM funds WHERE is_gold_selected = true AND valuation IS NOT NULL GROUP BY valuation ORDER BY cnt DESC`
+  );
+  const suggestionResult = await pool.query(
+    `SELECT buy_suggestion, COUNT(*) as cnt FROM funds WHERE is_gold_selected = true AND buy_suggestion IS NOT NULL GROUP BY buy_suggestion ORDER BY cnt DESC`
+  );
+
   return {
     total: parseInt(countResult.rows[0].total),
     categories: categoryResult.rows.map(r => ({
@@ -325,6 +266,10 @@ router.get('/api/gold-funds/stats', handler(async () => {
       total: scale.total_scale ? parseFloat(scale.total_scale).toFixed(2) : '0',
       avg: scale.avg_scale ? parseFloat(scale.avg_scale).toFixed(2) : '0',
       max: scale.max_scale ? parseFloat(scale.max_scale).toFixed(2) : '0',
+    },
+    analysis: {
+      valuation: valuationResult.rows.map(r => ({ name: r.valuation, count: parseInt(r.cnt) })),
+      suggestion: suggestionResult.rows.map(r => ({ name: r.buy_suggestion, count: parseInt(r.cnt) })),
     },
   };
 }));

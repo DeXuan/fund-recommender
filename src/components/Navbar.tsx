@@ -153,29 +153,30 @@ export default function Navbar() {
         position: 'sticky',
         top: 0,
         zIndex: 1000,
-        padding: '0 24px',
+        padding: isMobile ? '0 12px' : '0 24px',
         height: 64,
         lineHeight: '64px',
         borderBottom: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)'}`,
       }}
     >
       <div style={{ maxWidth: 1800, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%' }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', minWidth: 0, flexShrink: 1 }}>
           <div style={{
-            width: 36,
-            height: 36,
+            width: isMobile ? 32 : 36,
+            height: isMobile ? 32 : 36,
             borderRadius: 10,
             background: 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             boxShadow: '0 2px 8px rgba(22, 119, 255, 0.3)',
+            flexShrink: 0,
           }}>
-            <StockOutlined style={{ fontSize: 20, color: '#fff' }} />
+            <StockOutlined style={{ fontSize: isMobile ? 17 : 20, color: '#fff' }} />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontWeight: 700, fontSize: 17, color: 'var(--primary)', lineHeight: 1.2, whiteSpace: 'nowrap' }}>基金推荐助手</span>
-            <span style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.2 }}>智能投资分析平台</span>
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <span style={{ fontWeight: 700, fontSize: isMobile ? 15 : 17, color: 'var(--primary)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>基金推荐助手</span>
+            {!isMobile && <span style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.2 }}>智能投资分析平台</span>}
           </div>
         </Link>
 
@@ -186,7 +187,7 @@ export default function Navbar() {
               <Dropdown
                 trigger={['click']}
                 dropdownRender={() => (
-                  <div style={{ background: 'var(--bg-container)', borderRadius: 8, boxShadow: 'var(--shadow-md)', padding: 12, width: 300, maxHeight: 360, overflow: 'auto' }}>
+                  <div style={{ background: 'var(--bg-container)', borderRadius: 8, boxShadow: 'var(--shadow-md)', padding: 12, width: 'calc(100vw - 24px)', maxWidth: 300, maxHeight: 360, overflow: 'auto' }}>
                     <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, padding: '0 4px' }}>消息提醒</div>
                     {alerts.length === 0 ? (
                       <Empty description="暂无提醒" image={Empty.PRESENTED_IMAGE_SIMPLE} />

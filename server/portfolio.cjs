@@ -343,16 +343,23 @@ async function fetchAndStoreHistoricalNav(pool, fundCode, fundName, year) {
     );
   }
 
-  // Fetch up to 260 days of historical NAV from eastmoney
-  const res = await axios.get(
-    `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${fundCode}&pageIndex=1&pageSize=365`,
-    { timeout: 10000, headers: { Referer: 'https://fund.eastmoney.com/', 'User-Agent': 'Mozilla/5.0' } }
-  );
-  const list = res.data?.Data?.LSJZList;
-  if (!list || list.length === 0) return;
+  // Fetch historical NAV from eastmoney via paginated API (pageSize max 20)
+  let allRecords = [];
+  for (let page = 1; page <= 30; page++) {
+    const res = await axios.get(
+      `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${fundCode}&pageIndex=${page}&pageSize=20`,
+      { timeout: 10000, headers: { Referer: 'https://fund.eastmoney.com/', 'User-Agent': 'Mozilla/5.0' } }
+    );
+    const list = res.data?.Data?.LSJZList;
+    if (!list || list.length === 0) break;
+    allRecords.push(...list);
+    if (allRecords.length >= 500 || list.length < 20) break;
+    await new Promise(r => setTimeout(r, 80));
+  }
+  if (allRecords.length === 0) return;
 
   let inserted = 0;
-  for (const item of list) {
+  for (const item of allRecords) {
     const navDate = item.FSRQ; // e.g. "2025-01-15"
     const nav = parseFloat(item.DWJZ);
     if (!navDate || isNaN(nav)) continue;

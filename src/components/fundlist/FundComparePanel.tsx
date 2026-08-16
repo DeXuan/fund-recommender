@@ -588,9 +588,9 @@ export function FundComparePanel({
       <Card title="热门对比组合">
         <Row gutter={16}>
           {[
-            { label: 'AI + 半导体 + 光伏', codes: ['013349', '008887', '011102'] },
+            { label: 'AI + 半导体 + 光伏', codes: ['012734', '008887', '011102'] },
             { label: '纳斯达克 + 沪深300 + 新能源', codes: ['040046', '110020', '012831'] },
-            { label: '医药 + 消费 + AI', codes: ['012634', '000248', '013349'] },
+            { label: '医药 + 消费 + AI', codes: ['012634', '000248', '012734'] },
             { label: '煤炭三巨头对比', codes: ['008279', '161724', '161032'] },
           ].map((combo) => (
             <Col xs={24} sm={8} key={combo.label}>

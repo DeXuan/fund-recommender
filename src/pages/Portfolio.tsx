@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Card, Table, Button, Modal, Form, Input, InputNumber, DatePicker, message,
   Popconfirm, Space, Statistic, Row, Col, Upload, Tag, Empty, Spin, Select, Badge, Tooltip,
-  Tabs, Steps, Radio, Progress, Alert, Segmented,
+  Tabs, Steps, Radio, Progress, Alert, Segmented, Grid,
 } from 'antd';
+const { useBreakpoint } = Grid;
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined,
   DownloadOutlined, ArrowUpOutlined, ArrowDownOutlined, FundOutlined,
@@ -36,6 +37,8 @@ import { formatCurrency } from '../utils/format';
 export default function Portfolio() {
   const { isDark } = useTheme();
   const { user } = useAuth();
+  const screens = useBreakpoint();
+  const isMobile = !screens.sm;
   const isVIP = user?.subscription_status === 'premium' || user?.subscription_tier === 'premium' || user?.subscription_tier === 'svip' || user?.role === 'admin';
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,8 +47,6 @@ export default function Portfolio() {
   const [form] = Form.useForm();
   const [lookupLoading, setLookupLoading] = useState(false);
   const [productType, setProductType] = useState<'fund' | 'cmb'>('fund');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const alipayFileInputRef = useRef<HTMLInputElement>(null);
   const lookupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Tab 状态管理
@@ -247,79 +248,6 @@ export default function Portfolio() {
     } catch {
       // validation error
     }
-  };
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const result = await portfolioApi.importCSV(file);
-      message.success(`成功导入 ${result.imported} 条记录`);
-      if (result.errors?.length > 0) {
-        message.warning(`${result.errors.length} 条记录导入失败`);
-      }
-      loadData();
-    } catch {
-      message.error('导入失败');
-    }
-    e.target.value = '';
-  };
-
-  const handleAlipayImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const result = await portfolioApi.importAlipay(file);
-      let msg = `成功导入 ${result.imported} 条记录`;
-      if (result.skipped > 0) msg += `，跳过 ${result.skipped} 条非申购记录`;
-      message.success(msg);
-      if (result.errors?.length > 0) {
-        message.warning(`${result.errors.length} 条记录导入失败`);
-      }
-      loadData();
-    } catch (err: any) {
-      message.error(err.message || '导入失败');
-    }
-    e.target.value = '';
-  };
-
-  const handleDownloadTemplate = () => {
-    const csv = `fund_code,fund_name,shares,cost_price,buy_date,buy_fee,notes
-013349,人工智能ETF联接A,1000,1.2345,2024-01-15,0,示例-完整信息
-008887,,2000,,2026-03-15,,示例-根据名称自动查询代码和净值
-,招商中证白酒指数A,1500,,2026-04-20,,示例-根据名称自动查询代码和净值
-`;
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = '基金持仓导入模板.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleExportHoldings = () => {
-    if (!summary?.holdings?.length) {
-      message.warning('暂无持仓数据可导出');
-      return;
-    }
-    const escCsv = (v: string | number | null | undefined) => {
-      const s = String(v ?? '');
-      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const header = '基金代码,基金名称,持有份额,成本价,总成本,当前净值,市值,盈亏,盈亏比例,净值更新时间';
-    const rows = summary.holdings.map((h: PortfolioHolding) =>
-      [h.fund_code, h.fund_name, h.total_shares, h.avg_cost_price, h.total_cost, h.current_nav, h.market_value, h.pnl, h.pnl_percent + '%', h.nav_updated_at || ''].map(escCsv).join(',')
-    );
-    const csv = header + '\n' + rows.join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `持仓明细_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    message.success('导出成功');
   };
 
   // 定投计划操作
@@ -702,7 +630,7 @@ export default function Portfolio() {
 
   const columns = [
     {
-      title: '基金名称', dataIndex: 'fund_name', key: 'fund_name', width: 180,
+      title: '基金名称', dataIndex: 'fund_name', key: 'fund_name', width: 180, fixed: 'left' as const,
       sorter: (a: PortfolioHolding, b: PortfolioHolding) => a.fund_name.localeCompare(b.fund_name, 'zh-CN'),
       render: (name: string, record: PortfolioHolding) => (
         <Link to={`/funds/${record.fund_code}`} style={{ fontWeight: 500, color: 'var(--primary)' }}>
@@ -792,6 +720,11 @@ export default function Portfolio() {
     },
   ];
 
+  // 手机端精简列（隐藏次要列，减少横向滚动）
+  const displayColumns = isMobile
+    ? columns.filter((c) => !['total_shares', 'avg_cost_price', 'current_nav'].includes(c.key as string))
+    : columns;
+
   // Flatten records for the table (grouped view)
   const tableData = holdings.map((h, i) => ({ ...h, key: h.fund_code || i }));
 
@@ -847,33 +780,16 @@ export default function Portfolio() {
           </span>
         }
         extra={
-          <Space>
+          <Space wrap>
             <Button
               icon={<SyncOutlined spin={refreshing} />}
               onClick={handleRefreshNav}
               loading={refreshing}
+              style={isMobile ? { fontSize: 12, paddingInline: 8 } : undefined}
             >
               刷新净值
             </Button>
-            <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>下载模板</Button>
-            <Button icon={<UploadOutlined />} onClick={() => fileInputRef.current?.click()}>导入CSV</Button>
-            <Button icon={<DownloadOutlined />} onClick={handleExportHoldings}>导出持仓</Button>
-            <Button icon={<UploadOutlined />} onClick={() => alipayFileInputRef.current?.click()}>支付宝导入</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>添加持仓</Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              style={{ display: 'none' }}
-              onChange={handleImport}
-            />
-            <input
-              ref={alipayFileInputRef}
-              type="file"
-              accept=".csv"
-              style={{ display: 'none' }}
-              onChange={handleAlipayImport}
-            />
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} style={isMobile ? { fontSize: 12, paddingInline: 8 } : undefined}>添加持仓</Button>
           </Space>
         }
         style={{ marginBottom: 24 }}
@@ -882,12 +798,12 @@ export default function Portfolio() {
           <Empty description="暂无持仓记录，点击上方按钮添加" />
         ) : (
           <Table
-            columns={columns}
+            columns={displayColumns}
             dataSource={tableData}
             loading={loading}
-            scroll={{ x: 1000 }}
+            scroll={{ x: isMobile ? 560 : 1000 }}
             pagination={false}
-            size="middle"
+            size={isMobile ? 'small' : 'middle'}
           />
         )}
       </Card>

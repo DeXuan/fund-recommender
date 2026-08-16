@@ -237,6 +237,8 @@ async function main() {
 
       for (const fund of allRecords) {
         if (!fund.code || !/^\d{6}$/.test(fund.code)) { skipped++; continue; }
+        // 跳过债券/货币基金（手动维护类型字段，防止回填）
+        if (/债|货币/.test(fund.name)) { skipped++; continue; }
 
         const industry = classifyIndustry(fund.name);
         const dbType = ft === 'zs' ? '指数' : typeName;

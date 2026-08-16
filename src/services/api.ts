@@ -311,6 +311,20 @@ export const aiApi = {
       method: 'DELETE',
       body: JSON.stringify({ sessionId }),
     }),
+  sendFeedback: (messageId: string | number, sessionId: string, rating: 'up' | 'down') =>
+    fetchApi<any>('/ai/feedback', {
+      method: 'POST',
+      body: JSON.stringify({ messageId, sessionId, rating }),
+    }),
+  addFavorite: (messageId: string | number, sessionId: string, content: string) =>
+    fetchApi<any>('/ai/favorites', {
+      method: 'POST',
+      body: JSON.stringify({ messageId, sessionId, content }),
+    }),
+  getFavorites: () =>
+    fetchApi<any>('/ai/favorites'),
+  removeFavorite: (messageId: string | number) =>
+    fetchApi<any>(`/ai/favorites/${messageId}`, { method: 'DELETE' }),
 };
 
 export const portfolioApi = {

@@ -32,7 +32,7 @@ export default function StockPicker() {
   const { isDark } = useTheme();
   const { useBreakpoint } = Grid;
   const screens = useBreakpoint();
-  const isMobile = !screens.md;
+  const isMobile = !screens.sm;
   const isSVIP = user?.subscription_tier === 'svip' || user?.role === 'admin';
   const isVIP = user?.subscription_status === 'premium' || user?.subscription_tier === 'premium' || isSVIP;
   const [activeTab, setActiveTab] = useState('rank');
@@ -497,9 +497,7 @@ export default function StockPicker() {
   }
 
   const top3 = results.slice(0, 3);
-
-  // 表格列定义
-  const tableColumns = [
+  const tableColumns: any[] = [
     { title: '排名', width: 60, render: (_: any, __: any, i: number) => <span style={{ fontWeight: 600, color: i < 3 ? '#faad14' : undefined }}>{i < 3 ? <TrophyOutlined /> : null} {i + 1}</span> },
     { title: '基金名称', dataIndex: ['fund', 'name'], width: 170, render: (v: string, r: any) => <a onClick={() => navigate(`/funds/${r.fund.code}`)} style={{ fontWeight: 500 }}>{v}</a> },
     { title: '代码', dataIndex: ['fund', 'code'], width: 70 },
@@ -533,6 +531,9 @@ export default function StockPicker() {
     { title: '操作', width: 60, render: (_: any, r: any) => <Tooltip title={watchedCodes.has(r.fund.code) ? '取消自选' : '加自选'}><Button type="text" size="small" icon={watchedCodes.has(r.fund.code) ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />} onClick={(e) => toggleWatchlist(r.fund.code, e)} /></Tooltip> },
   ];
 
+  // 手机精简主排名表列：只留 排名/名称/评分/近1年/操作
+  const rankTableColumns = isMobile ? [0, 1, 4, 5, 13].map(i => tableColumns[i]) : tableColumns;
+
   // ====== Tab 内容 ======
 
   // Tab1: 多因子排名
@@ -541,86 +542,89 @@ export default function StockPicker() {
       {/* 筛选栏 */}
       <Card size="small" style={{ marginBottom: 16 }}>
         <Space wrap>
-          <Select placeholder="选择行业" allowClear style={{ width: 140 }} value={filters.industry || undefined} onChange={v => setFilters(f => ({ ...f, industry: v || '' }))}>
+          <Select placeholder="选择行业" allowClear style={{ width: isMobile ? '100%' : 140 }} value={filters.industry || undefined} onChange={v => setFilters(f => ({ ...f, industry: v || '' }))}>
             {industries.map(i => <Select.Option key={i} value={i}>{i}</Select.Option>)}
           </Select>
-          <Select placeholder="基金类型" allowClear style={{ width: 100 }} value={filters.type || undefined} onChange={v => setFilters(f => ({ ...f, type: v || '' }))}>
+          <Select placeholder="基金类型" allowClear style={{ width: isMobile ? '100%' : 100 }} value={filters.type || undefined} onChange={v => setFilters(f => ({ ...f, type: v || '' }))}>
             <Select.Option value="A">A类</Select.Option><Select.Option value="C">C类</Select.Option>
           </Select>
-          <span style={{ fontSize: 13 }}>数量：</span>
-          <Slider min={10} max={50} step={5} value={filters.limit} style={{ width: 100 }} onChange={(v: number) => setFilters(f => ({ ...f, limit: v }))} />
+          {isMobile ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+            <span style={{ fontSize: 13 }}>数量：</span>
+            <Slider min={10} max={50} step={5} value={filters.limit} style={{ flex: 1 }} onChange={(v: number) => setFilters(f => ({ ...f, limit: v }))} />
+          </div> : <span style={{ fontSize: 13 }}>数量：</span>}
+          {!isMobile && <Slider min={10} max={50} step={5} value={filters.limit} style={{ width: 100 }} onChange={(v: number) => setFilters(f => ({ ...f, limit: v }))} />}
           <Button type="primary" icon={<ReloadOutlined />} loading={loading} onClick={() => handleRank()}>重新扫描</Button>
         </Space>
       </Card>
 
-      {/* 自定义因子权重面板 (SVIP) */}
-      <div style={{ marginBottom: 16 }}>
-        <CustomFactorPanel
-          isSVIP={isSVIP}
-          isDark={isDark}
-          onApply={(factors) => { setCustomFactors(factors); handleRank(undefined, factors); }}
-          onUpgrade={() => navigate('/subscription')}
-        />
-      </div>
-
-      {/* Top 3 精选 */}
-      {top3.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <TrophyOutlined style={{ color: '#faad14', fontSize: 18 }} />
-            <Text strong style={{ fontSize: 15 }}>Top 3 精选基金</Text>
-            <Text type="secondary" style={{ fontSize: 12 }}>—— 当前策略下综合评分最高</Text>
-          </div>
-          <Row gutter={16}>
-            {top3.map((r, i) => {
-              const gradients = [
-                isDark ? 'linear-gradient(135deg, #2d1b00 0%, #1a1a2e 100%)' : 'linear-gradient(135deg, #fff7e6 0%, #fff1b8 50%, #fffbe6 100%)',
-                isDark ? 'linear-gradient(135deg, #1a2332 0%, #1a1a2e 100%)' : 'linear-gradient(135deg, #f0f5ff 0%, #d6e4ff 50%, #f0f7ff 100%)',
-                isDark ? 'linear-gradient(135deg, #1f1215 0%, #1a1a2e 100%)' : 'linear-gradient(135deg, #fff2e8 0%, #ffccc7 50%, #fff2f0 100%)',
-              ];
-              const borders = ['#ffd666', '#91caff', '#ffbb96'];
-              const medals = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
-              const medalColors = ['#faad14', '#8c8c8c', '#d46b08'];
-              return (
-                <Col xs={24} sm={8} key={r.fund.code}>
-                  <Card hoverable onClick={() => navigate(`/funds/${r.fund.code}`)}
-                    bordered={false}
-                    style={{ background: gradients[i], border: `1px solid ${borders[i]}40`, borderRadius: 12, position: 'relative', overflow: 'hidden' }}>
-                    {i === 0 && <div style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: '50%', background: 'rgba(250,173,20,0.08)' }} />}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 10px', borderRadius: 20, background: `${medalColors[i]}18`, marginBottom: 8 }}>
-                          <span style={{ fontSize: 14 }}>{medals[i]}</span>
-                          <Text style={{ color: medalColors[i], fontWeight: 600, fontSize: 12 }}>第{i + 1}名</Text>
-                        </div>
-                        <div style={{ fontWeight: 600, fontSize: 15 }}>{r.fund.name}</div>
-                        <Text type="secondary" style={{ fontSize: 12 }}>{r.fund.code} · {r.fund.industry}{r.fund.manager ? ` · ${r.fund.manager}` : ''}</Text>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: r.score >= 70 ? '#52c41a' : '#1677ff', lineHeight: 1 }}>{r.score}</div>
-                        <Text type="secondary" style={{ fontSize: 11 }}>综合评分</Text>
-                        {r.rating && <div style={{ marginTop: 4 }}><FundRatingBadge rating={r.rating} size="small" /></div>}
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <Tag color="blue" style={{ borderRadius: 4 }}>近1年 {formatReturn(r.fund.return1y)}</Tag>
-                      <Tag color="geekblue" style={{ borderRadius: 4 }}>近6月 {formatReturn(r.fund.return6m)}</Tag>
-                      <Tag color="cyan" style={{ borderRadius: 4 }}>近3月 {formatReturn(r.fund.return3m)}</Tag>
-                      <Tooltip title={`管理费 ${r.fund.mgmtFee}% + 托管费 ${r.fund.custodyFee}%`}>
-                        <Tag color="green" style={{ borderRadius: 4, cursor: 'help' }}>费率 {r.fund.totalFee}%</Tag>
-                      </Tooltip>
-                      <Tag color="orange" style={{ borderRadius: 4 }}>规模 {Number(r.fund.scale || 0).toFixed(1)}亿</Tag>
-                    </div>
-                    <div style={{ marginTop: 8, padding: '6px 10px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderRadius: 6, fontSize: 12, color: isDark ? '#a0a0a0' : '#666', lineHeight: 1.5 }}>
-                      {r.reasoning}
-                    </div>
-                  </Card>
-                </Col>
-              );
-            })}
-          </Row>
+      {/* 自定义因子权重 + Top 3 精选（左右排布） */}
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
+        <div style={{ flex: isMobile ? '1 0 100%' : '0 0 360px', maxWidth: '100%' }}>
+          <CustomFactorPanel
+            isSVIP={isSVIP}
+            isDark={isDark}
+            onApply={(factors) => { setCustomFactors(factors); handleRank(undefined, factors); }}
+            onUpgrade={() => navigate('/subscription')}
+          />
         </div>
-      )}
+        {top3.length > 0 && (
+          <div style={{ flex: isMobile ? '1 0 100%' : 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <TrophyOutlined style={{ color: '#faad14', fontSize: 18 }} />
+              <Text strong style={{ fontSize: 15 }}>Top 3 精选基金</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>—— 当前策略下综合评分最高</Text>
+            </div>
+            <Row gutter={16}>
+              {top3.map((r, i) => {
+                const gradients = [
+                  isDark ? 'linear-gradient(135deg, #2d1b00 0%, #1a1a2e 100%)' : 'linear-gradient(135deg, #fff7e6 0%, #fff1b8 50%, #fffbe6 100%)',
+                  isDark ? 'linear-gradient(135deg, #1a2332 0%, #1a1a2e 100%)' : 'linear-gradient(135deg, #f0f5ff 0%, #d6e4ff 50%, #f0f7ff 100%)',
+                  isDark ? 'linear-gradient(135deg, #1f1215 0%, #1a1a2e 100%)' : 'linear-gradient(135deg, #fff2e8 0%, #ffccc7 50%, #fff2f0 100%)',
+                ];
+                const borders = ['#ffd666', '#91caff', '#ffbb96'];
+                const medals = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
+                const medalColors = ['#faad14', '#8c8c8c', '#d46b08'];
+                return (
+                  <Col xs={24} sm={8} key={r.fund.code}>
+                    <Card hoverable onClick={() => navigate(`/funds/${r.fund.code}`)}
+                      bordered={false}
+                      style={{ background: gradients[i], border: `1px solid ${borders[i]}40`, borderRadius: 12, position: 'relative', overflow: 'hidden' }}>
+                      {i === 0 && <div style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: '50%', background: 'rgba(250,173,20,0.08)' }} />}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 10px', borderRadius: 20, background: `${medalColors[i]}18`, marginBottom: 8 }}>
+                            <span style={{ fontSize: 14 }}>{medals[i]}</span>
+                            <Text style={{ color: medalColors[i], fontWeight: 600, fontSize: 12 }}>第{i + 1}名</Text>
+                          </div>
+                          <div style={{ fontWeight: 600, fontSize: 15 }}>{r.fund.name}</div>
+                          <Text type="secondary" style={{ fontSize: 12 }}>{r.fund.code} · {r.fund.industry}{r.fund.manager ? ` · ${r.fund.manager}` : ''}</Text>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 32, fontWeight: 800, color: r.score >= 70 ? '#52c41a' : '#1677ff', lineHeight: 1 }}>{r.score}</div>
+                          <Text type="secondary" style={{ fontSize: 11 }}>综合评分</Text>
+                          {r.rating && <div style={{ marginTop: 4 }}><FundRatingBadge rating={r.rating} size="small" /></div>}
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <Tag color="blue" style={{ borderRadius: 4 }}>近1年 {formatReturn(r.fund.return1y)}</Tag>
+                        <Tag color="geekblue" style={{ borderRadius: 4 }}>近6月 {formatReturn(r.fund.return6m)}</Tag>
+                        <Tag color="cyan" style={{ borderRadius: 4 }}>近3月 {formatReturn(r.fund.return3m)}</Tag>
+                        <Tooltip title={`管理费 ${r.fund.mgmtFee}% + 托管费 ${r.fund.custodyFee}%`}>
+                          <Tag color="green" style={{ borderRadius: 4, cursor: 'help' }}>费率 {r.fund.totalFee}%</Tag>
+                        </Tooltip>
+                        <Tag color="orange" style={{ borderRadius: 4 }}>规模 {Number(r.fund.scale || 0).toFixed(1)}亿</Tag>
+                      </div>
+                      <div style={{ marginTop: 8, padding: '6px 10px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderRadius: 6, fontSize: 12, color: isDark ? '#a0a0a0' : '#666', lineHeight: 1.5 }}>
+                        {r.reasoning}
+                      </div>
+                    </Card>
+                  </Col>
+                );
+              })}
+            </Row>
+          </div>
+        )}
+      </div>
 
       {/* 高级工具栏 */}
       <Card size="small" bordered={false} style={{ marginBottom: 16, background: isDark ? 'linear-gradient(135deg, #0d1b3e, #1a1a2e)' : 'linear-gradient(135deg, #f0f7ff, #e8f4ff)', borderRadius: 10 }}>
@@ -709,7 +713,7 @@ export default function StockPicker() {
             ))}
           </Row>
         ) : (
-          <Table dataSource={results} columns={tableColumns} rowKey={r => r.fund.code} loading={loading} size="small" pagination={{ pageSize: 20 }} scroll={{ x: 1300 }}
+          <Table dataSource={results} columns={rankTableColumns} rowKey={r => r.fund.code} loading={loading} size={isMobile ? 'small' : 'small'} pagination={{ pageSize: 20 }} scroll={{ x: isMobile ? 360 : 1300 }}
             expandable={{
               expandedRowRender: (r) => (
                 <Row gutter={16} style={{ padding: '8px 0' }}>
@@ -979,7 +983,7 @@ export default function StockPicker() {
           <Select
             mode="tags"
             placeholder="输入基金代码"
-            style={{ width: 300 }}
+            style={{ width: isMobile ? '100%' : 300 }}
             value={deepCodes ? deepCodes.split(',').filter(Boolean) : []}
             onChange={(vals) => setDeepCodes(vals.join(','))}
           />
@@ -1114,7 +1118,7 @@ export default function StockPicker() {
               rowKey="code"
               size="small"
               pagination={false}
-              scroll={{ x: 1000 }}
+              scroll={{ x: isMobile ? 500 : 1000 }}
               columns={[
                 { title: '排名', width: 50, render: (_: any, __: any, i: number) => <span style={{ fontWeight: 600, color: i < 3 ? '#faad14' : undefined }}>{i < 3 ? <TrophyOutlined /> : null} {i + 1}</span> },
                 { title: '基金名称', dataIndex: 'name', width: 160, render: (v: string, r: any) => <a onClick={() => navigate(`/funds/${r.code}`)} style={{ fontWeight: 500 }}>{v}</a> },
@@ -1157,7 +1161,7 @@ export default function StockPicker() {
         </div>
         {portfolioData && (
           <>
-            <Descriptions column={2} bordered size="small" style={{ marginBottom: 16 }}>
+            <Descriptions column={isMobile ? 1 : 2} bordered size="small" style={{ marginBottom: 16 }}>
               <Descriptions.Item label="总投资金额">¥{portfolioData.totalBudget?.toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="每只基金">¥{portfolioData.perFund?.toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="基金数量">{portfolioData.allocation?.length}只</Descriptions.Item>
@@ -1395,11 +1399,11 @@ export default function StockPicker() {
 
       {/* 主内容区 - Tabs */}
       <Card bordered={false} style={{ borderRadius: 10 }}>
-        <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabItems} />
+        <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabItems} size={isMobile ? 'small' : 'middle'} />
       </Card>
 
       {/* 一键建仓弹窗 */}
-      <Modal title="一键建仓建议" open={portfolioModal} onCancel={() => setPortfolioModal(false)} footer={null} width={600}>
+      <Modal title="一键建仓建议" open={portfolioModal} onCancel={() => setPortfolioModal(false)} footer={null} width={isMobile ? '100%' : 600}>
         <div style={{ marginBottom: 16 }}>
           <Space>
             <span>投资金额：</span>
@@ -1409,7 +1413,7 @@ export default function StockPicker() {
         </div>
         {portfolioData && (
           <>
-            <Descriptions column={2} bordered size="small" style={{ marginBottom: 16 }}>
+            <Descriptions column={isMobile ? 1 : 2} bordered size="small" style={{ marginBottom: 16 }}>
               <Descriptions.Item label="总投资金额">¥{portfolioData.totalBudget?.toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="每只基金">¥{portfolioData.perFund?.toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="基金数量">{portfolioData.allocation?.length}只</Descriptions.Item>

@@ -23,7 +23,7 @@
 
 | 序号 | 漏洞 | 严重程度 | 文件位置 | 漏洞描述 | 修复方案 | 修复状态 |
 |------|------|----------|----------|----------|----------|----------|
-| 1 | 硬编码服务器 IP | Medium | `server/index.cjs:40` | CORS 默认白名单包含硬编码 IP `47.116.77.67` | 移除硬编码 IP，仅保留 localhost 默认值，生产环境必须通过 `ALLOWED_ORIGINS` 环境变量配置 | ✅ 已修复 |
+| 1 | 硬编码服务器 IP | Medium | `server/index.cjs:40` | CORS 默认白名单包含硬编码 IP `111.229.32.106` | 移除硬编码 IP，仅保留 localhost 默认值，生产环境必须通过 `ALLOWED_ORIGINS` 环境变量配置 | ✅ 已修复 |
 | 2 | 硬编码 IP（支付宝回调） | Medium | `server/auth.cjs:478` | `ALIPAY_RETURN_URL` 默认使用硬编码 IP 的 HTTP 地址 | 移除默认值，未配置时返回 503 错误，强制使用环境变量 | ✅ 已修复 |
 | 3 | 硬编码 IP（支付宝通知） | Medium | `server/utils/alipay.cjs:106` | `ALIPAY_NOTIFY_URL` 默认使用硬编码 IP 的 HTTP 地址 | 移除默认值，未配置时抛出错误，强制使用环境变量 | ✅ 已修复 |
 | 4 | 支付宝回调无限流 | Medium | `server/routes/subscription.cjs:129` | 支付宝异步通知端点无速率限制，可被攻击者洪泛消耗 CPU（签名验证） | 添加每 IP 100次/分钟的速率限制 | ✅ 已修复 |

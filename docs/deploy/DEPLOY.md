@@ -20,6 +20,14 @@
 └───────────────────────────────────────────────────────────┘
 ```
 
+> **生产服务器：111.229.32.106**（47.116.77.67 为已下线废弃旧机，勿再使用）
+>
+> 当前有两套站点并存：
+> - **旧站** `/var/www/jijin`：Nginx 8688，PM2 `fund-server`，后端 3003
+> - **新站 `/var/www/jijin85`（在用）**：Nginx 8686，PM2 `fund-server-85`，后端 3303，访问 http://111.229.32.106:8686/web
+>
+> 共享数据库在服务器本地（PG_HOST=localhost）。部署用 `scp -r` 上传，**不要用 rsync**；不要直接运行 `deploy.sh`（会 `pm2 delete` 杀掉旧站）。
+
 ## 技术栈
 
 | 组件 | 技术 | 端口 |
@@ -50,13 +58,34 @@
 │   ├── subscription-service.cjs # 订阅会员服务
 │   ├── routes/
 │   │   ├── api.cjs               # 主 API 路由
+│   │   ├── funds.cjs             # 基金数据路由
+│   │   ├── market.cjs            # 市场数据路由
+│   │   ├── industry.cjs          # 行业分析路由
+│   │   ├── tools.cjs             # 工具路由
+│   │   ├── cmb.cjs               # 招行理财路由
+│   │   ├── news.cjs              # 新闻路由
+│   │   ├── alerts.cjs            # 智能提醒路由
+│   │   ├── ai-assistant.cjs      # AI 助手路由
+│   │   ├── watchlist.cjs         # 自选基金路由
+│   │   ├── subscription.cjs      # 订阅支付路由
 │   │   ├── fund-compare.cjs      # 基金对比
+│   │   ├── fund-diagnosis.cjs    # 基金诊断
 │   │   ├── portfolio-analysis.cjs # 持仓分析
-│   │   ├── stock-picker.cjs      # AI 选股
+│   │   ├── stock-picker.cjs      # AI 选股核心（8 端点）
+│   │   ├── stock-picker-user.cjs # 选股用户数据（10 端点）
+│   │   ├── stock-picker-temperature.cjs # 指数温度计
+│   │   ├── stock-picker-nl.cjs   # 自然语言筛选（SVIP）
+│   │   ├── stock-picker-corr.cjs # 相关性分析
+│   │   ├── stock-picker-alerts.cjs # 选股提醒
 │   │   └── portfolio/
+│   │       ├── index.cjs         # 持仓路由聚合
+│   │       ├── records.cjs       # 持仓记录 CRUD
 │   │       ├── analytics.cjs     # 持仓统计
 │   │       ├── insights.cjs      # 组合洞察
-│   │       └── transactions.cjs  # 交易记录
+│   │       ├── transactions.cjs  # 交易记录
+│   │       ├── dca.cjs           # 定投计划
+│   │       ├── import.cjs        # CSV 导入
+│   │       └── asset-accounts.cjs # 多账户资产
 │   └── utils/
 │       ├── rate-limiter.cjs   # 速率限制器
 │       ├── scheduler.cjs      # 定时任务调度器
@@ -98,7 +127,7 @@
 - Node.js >= 20 LTS
 - npm >= 9
 - SSH 可连接到目标服务器
-- rsync 已安装
+- scp 已安装（部署用 scp -r 上传，勿用 rsync）
 
 ---
 
@@ -644,11 +673,11 @@ psql -h localhost -U fund_user fund_db < backup_20260101.sql
 ```bash
 # 只更新前端
 npm run build
-rsync -avz --delete dist/ root@server:/var/www/jijin/dist/
+scp -r dist/* root@111.229.32.106:/var/www/jijin85/dist/
 
 # 只更新后端
-rsync -avz server/ root@server:/var/www/jijin/server/
-ssh root@server "cd /var/www/jijin && pm2 restart fund-server"
+scp -r server/ root@111.229.32.106:/var/www/jijin85/server/
+ssh root@111.229.32.106 "cd /var/www/jijin85 && pm2 restart fund-server-85"
 ```
 
 ---

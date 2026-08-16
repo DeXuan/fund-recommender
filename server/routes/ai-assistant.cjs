@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const { getPool } = require('../db.cjs');
 const fundService = require('../fund-service.cjs');
-const { getClient } = require('../utils/anthropicClient.cjs');
+const { getClient, getModels } = require('../utils/anthropicClient.cjs');
 const { buildContext } = require('../services/aiContextProvider.cjs');
 
 // 安全的 HTML 清理：转义 HTML 实体而非简单剥离标签（防止 XSS 变体绕过）
@@ -49,7 +49,7 @@ router.use(optionalAuth);
 // ======================== 共享常量 ========================
 
 // 系统提示（流式/非流式共用）
-const SYSTEM_PROMPT = `你是 FinPilot，顶级AI投资研究助手，由 Claude AI 驱动。
+const SYSTEM_PROMPT = `你是 FinPilot，顶级AI投资研究助手，由先进AI大模型驱动。
 
 ## 🎯 分层能力体系
 
@@ -471,7 +471,7 @@ router.post('/api/ai/chat/stream', aiLimiter, async (req, res) => {
     if (!message || typeof message !== 'string' || message.length > 2000) {
       return res.status(400).json({ error: '请输入有效问题' });
     }
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
       return res.status(503).json({ error: 'AI 服务未配置' });
     }
 
@@ -502,20 +502,40 @@ router.post('/api/ai/chat/stream', aiLimiter, async (req, res) => {
 
     const client = getClient();
     let fullReply = '';
+    let streamFailed = false;
 
-    const stream = await client.messages.stream({
-      model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-      max_tokens: 2048,
-      system: fullSystemPrompt,
-      messages,
-    });
+    // 模型热切换：主模型失败时依次尝试备用模型
+    const models = getModels();
+    let stream = null;
+    let lastErr = null;
+    for (const model of models) {
+      try {
+        stream = await client.chat.completions.create({
+          model,
+          max_tokens: 4096,
+          stream: true,
+          messages: [{ role: 'system', content: fullSystemPrompt }, ...messages],
+        });
+        break;
+      } catch (e) {
+        lastErr = e;
+        logger.warn(`[AI Stream] 模型 ${model} 初始化失败: ${e.message}`);
+      }
+    }
+    if (!stream) {
+      throw lastErr || new Error('所有模型均不可用');
+    }
 
-    stream.on('text', (text) => {
-      fullReply += text;
-      res.write(`data: ${JSON.stringify({ type: 'text', content: text })}\n\n`);
-    });
-
-    stream.on('error', async (err) => {
+    try {
+      for await (const chunk of stream) {
+        const text = chunk.choices?.[0]?.delta?.content;
+        if (text) {
+          fullReply += text;
+          res.write(`data: ${JSON.stringify({ type: 'text', content: text })}\n\n`);
+        }
+      }
+    } catch (err) {
+      streamFailed = true;
       logger.warn('[AI Stream] 错误:', err.message);
       // 规则引擎兜底
       try {
@@ -536,11 +556,9 @@ router.post('/api/ai/chat/stream', aiLimiter, async (req, res) => {
       } catch (fallbackErr) {
         res.write(`data: ${JSON.stringify({ type: 'error', content: 'AI 服务异常' })}\n\n`);
       }
-      res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
-      res.end();
-    });
+    }
 
-    stream.on('end', async () => {
+    if (!streamFailed) {
       fullReply = sanitizeHtml(fullReply);
       try {
         await pool.query(
@@ -554,12 +572,13 @@ router.post('/api/ai/chat/stream', aiLimiter, async (req, res) => {
       } catch (e) {
         logger.warn('[AI Stream] 保存记录失败:', e.message);
       }
-      res.write(`data: ${JSON.stringify({ type: 'done', sessionId: sid })}\n\n`);
-      res.end();
-    });
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'done', sessionId: sid })}\n\n`);
+    res.end();
 
     req.on('close', () => {
-      stream.abort();
+      try { stream.controller?.abort(); } catch {}
     });
 
   } catch (error) {
@@ -590,8 +609,8 @@ router.post('/api/ai/chat', aiLimiter, async (req, res) => {
     let reply = '';
     let data = null;
 
-    // ========== Claude API 智能问答（优先） ==========
-    let useClaude = !!process.env.ANTHROPIC_API_KEY;
+    // ========== LLM API 智能问答（优先，OpenAI兼容） ==========
+    let useClaude = !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
     if (useClaude) {
       try {
         const client = getClient();
@@ -612,15 +631,31 @@ router.post('/api/ai/chat', aiLimiter, async (req, res) => {
         const fullSystemPrompt = SYSTEM_PROMPT + commandPrompt + (context ? `\n\n--- 实时数据上下文 ---\n${context}` : '');
 
         const messages = [...historyMessages, { role: 'user', content: message.trim() }];
+        const apiMessages = [
+          { role: 'system', content: fullSystemPrompt },
+          ...messages,
+        ];
 
-        const response = await client.messages.create({
-          model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-          max_tokens: 4096,
-          system: fullSystemPrompt,
-          messages,
-        });
+        // 模型热切换：主模型失败时依次尝试备用模型
+        const models = getModels();
+        let response = null;
+        let lastErr = null;
+        for (const model of models) {
+          try {
+            response = await client.chat.completions.create({
+              model,
+              max_tokens: 4096,
+              messages: apiMessages,
+            });
+            break;
+          } catch (e) {
+            lastErr = e;
+            logger.warn(`[AI] 模型 ${model} 调用失败: ${e.message}`);
+          }
+        }
+        if (!response) throw lastErr || new Error('所有模型均不可用');
 
-        reply = sanitizeHtml(response.content[0].text);
+        reply = sanitizeHtml(response.choices?.[0]?.message?.content || '');
       } catch (claudeErr) {
         logger.warn('[AI] Claude API 调用失败，回退到规则引擎:', claudeErr.message);
         useClaude = false;

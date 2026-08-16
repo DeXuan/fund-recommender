@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Layout, Spin } from 'antd';
+import { Layout, Spin, Grid } from 'antd';
+const { useBreakpoint } = Grid;
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -88,6 +89,8 @@ function AppRoutes() {
 }
 
 function App() {
+  const screens = useBreakpoint();
+  const isMobile = !screens.sm;
   return (
     <Router basename={import.meta.env.VITE_CAPACITOR === 'true' ? '' : '/web'}>
       <AuthProvider>
@@ -95,10 +98,10 @@ function App() {
           <ParticleCanvas />
           <GsapEnhancer />
           <Navbar />
-          <div role="status" aria-live="polite" aria-label="数据状态" style={{ position: 'sticky', top: 64, zIndex: 99, padding: '8px 24px', background: 'var(--bg-primary)', backdropFilter: 'blur(8px)', borderBottom: '1px solid var(--border-color-light)' }}>
+          <div role="status" aria-live="polite" aria-label="数据状态" style={{ position: 'sticky', top: 64, zIndex: 99, padding: isMobile ? '6px 12px' : '8px 24px', background: 'var(--bg-primary)', backdropFilter: 'blur(8px)', borderBottom: '1px solid var(--border-color-light)' }}>
             <DataStatus />
           </div>
-          <Layout.Content role="main" aria-label="主要内容" style={{ maxWidth: 1800, margin: '0 auto', padding: '20px 24px', width: '100%' }}>
+          <Layout.Content role="main" aria-label="主要内容" style={{ maxWidth: 1800, margin: '0 auto', padding: isMobile ? '12px 12px' : '20px 24px', width: '100%' }}>
             <ErrorBoundary>
               <AppRoutes />
             </ErrorBoundary>

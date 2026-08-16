@@ -6,7 +6,7 @@
 
 ## 访问地址
 
-**http://47.116.77.67:8688/web**
+**http://111.229.32.106:8686/web**
 
 ## 配置步骤
 
@@ -35,34 +35,34 @@ npm run generate-alipay-keys
 
 ### 4. 更新环境变量
 
-编辑服务器上的 `/var/www/jijin/.env` 文件：
+编辑服务器上的 `/var/www/jijin85/.env` 文件：
 
 ```env
 ALIPAY_APP_ID=your_alipay_app_id
 ALIPAY_PRIVATE_KEY=keys/alipay_private_key.pem
 ALIPAY_PUBLIC_KEY=keys/alipay_public_key_from_alipay.pem
-ALIPAY_RETURN_URL=http://47.116.77.67:8688/api/auth/alipay/callback
+ALIPAY_RETURN_URL=http://111.229.32.106:8686/api/auth/alipay/callback
 ```
 
 ### 5. 配置授权回调地址
 
 在支付宝开放平台的应用配置中，添加授权回调地址：
 ```
-http://47.116.77.67:8688/api/auth/alipay/callback
+http://111.229.32.106:8686/api/auth/alipay/callback
 ```
 
 ### 6. 上传密钥文件到服务器
 
 ```bash
 # 本地执行
-scp -r keys/* root@47.116.77.67:/var/www/jijin/keys/
+scp -r keys/* root@111.229.32.106:/var/www/jijin85/keys/
 ```
 
 ### 7. 重启服务
 
 ```bash
 # SSH登录服务器
-ssh root@47.116.77.67
+ssh root@111.229.32.106
 
 # 重启后端
 pm2 restart fund-server
@@ -70,7 +70,7 @@ pm2 restart fund-server
 
 ## 测试流程
 
-1. 访问 http://47.116.77.67:8688/web
+1. 访问 http://111.229.32.106:8686/web
 2. 点击"支付宝扫码登录"
 3. 在弹出的支付宝窗口中完成授权
 4. 自动登录并跳转
@@ -106,7 +106,7 @@ ENABLE_MOCK_AUTH=true
 ## 文件结构
 
 ```
-/var/www/jijin/
+/var/www/jijin85/
 ├── keys/                              # 密钥目录
 │   ├── alipay_private_key.pem         # 应用私钥
 │   ├── alipay_public_key.pem          # 应用公钥

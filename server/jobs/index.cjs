@@ -22,6 +22,62 @@ function registerJobs({ allFunds, runDailyDataUpdate, fetchYiFangDaFundData, fet
   // 每日9:30执行完整数据更新（收益率+QDII限额+HS300+持仓盈亏）
   jobs.push(scheduleDaily(() => runDailyDataUpdate(allFunds), 9, 30, '每日数据更新'));
 
+  // 每日9:32执行QDII基金专项更新（限额+1y/3m/1m，开盘时间确认）
+  jobs.push(scheduleDaily(() => {
+    logger.info('[QDII专项] 开始更新QDII基金数据...');
+    const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'update-qdii-funds.cjs');
+    const proc = spawn('node', [scriptPath], {
+      env: { ...process.env },
+      cwd: path.join(__dirname, '..', '..'),
+      stdio: 'pipe',
+    });
+    proc.stdout.on('data', (data) => logger.info(`[QDII专项] ${data.toString().trim()}`));
+    proc.stderr.on('data', (data) => logger.error(`[QDII专项] ${data.toString().trim()}`));
+    proc.on('close', (code) => logger.info(`[QDII专项] 完成，退出码: ${code}`));
+  }, 9, 32, 'QDII基金专项更新'));
+
+  // 每日15:30执行指数估值更新（收盘后获取最终PE/PB，含PB历史分位）
+  jobs.push(scheduleDaily(() => {
+    logger.info('[指数估值] 收盘后更新指数PE/PB估值...');
+    const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'update-index-valuation.cjs');
+    const proc = spawn('node', [scriptPath], {
+      env: { ...process.env },
+      cwd: path.join(__dirname, '..', '..'),
+      stdio: 'pipe',
+    });
+    proc.stdout.on('data', (data) => logger.info(`[指数估值] ${data.toString().trim()}`));
+    proc.stderr.on('data', (data) => logger.error(`[指数估值] ${data.toString().trim()}`));
+    proc.on('close', (code) => logger.info(`[指数估值] 完成，退出码: ${code}`));
+  }, 15, 30, '指数估值收盘更新'));
+
+  // 每日16:00执行基金数据全量更新（收盘后获取最新净值+收益率）
+  jobs.push(scheduleDaily(() => {
+    logger.info('[基金数据] 收盘后全量更新基金净值+收益率...');
+    const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'update-fund-data.cjs');
+    const proc = spawn('node', [scriptPath], {
+      env: { ...process.env },
+      cwd: path.join(__dirname, '..', '..'),
+      stdio: 'pipe',
+    });
+    proc.stdout.on('data', (data) => logger.info(`[基金数据] ${data.toString().trim()}`));
+    proc.stderr.on('data', (data) => logger.error(`[基金数据] ${data.toString().trim()}`));
+    proc.on('close', (code) => logger.info(`[基金数据] 完成，退出码: ${code}`));
+  }, 16, 0, '基金数据收盘更新'));
+
+  // 每日16:05执行板块数据更新（收盘后获取行业板块涨跌幅）
+  jobs.push(scheduleDaily(() => {
+    logger.info('[板块数据] 收盘后更新行业板块涨跌幅...');
+    const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'update-sector-data.cjs');
+    const proc = spawn('node', [scriptPath], {
+      env: { ...process.env },
+      cwd: path.join(__dirname, '..', '..'),
+      stdio: 'pipe',
+    });
+    proc.stdout.on('data', (data) => logger.info(`[板块数据] ${data.toString().trim()}`));
+    proc.stderr.on('data', (data) => logger.error(`[板块数据] ${data.toString().trim()}`));
+    proc.on('close', (code) => logger.info(`[板块数据] 完成，退出码: ${code}`));
+  }, 16, 5, '板块数据收盘更新'));
+
   // 每日10:15从支付宝获取易方达基金数据（经理、净值、收益率）
   jobs.push(scheduleDaily(() => {
     fetchYiFangDaFundData().catch(err => {

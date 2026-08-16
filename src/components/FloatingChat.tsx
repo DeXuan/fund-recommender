@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Drawer, Badge, Button } from 'antd';
+import { Drawer, Badge, Button, Grid } from 'antd';
 import { RobotOutlined, CloseOutlined, CustomerServiceOutlined, ExpandOutlined } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AIAssistant from '../pages/AIAssistant';
@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 export default function FloatingChat() {
   const { isDark } = useTheme();
+  const isMobile = Grid.useBreakpoint().sm === false;
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -131,7 +132,7 @@ export default function FloatingChat() {
         placement="right"
         open={open}
         onClose={() => setOpen(false)}
-        width={420}
+        width={isMobile ? '100%' : 420}
         closable={false}
         mask={false}
         push={false}

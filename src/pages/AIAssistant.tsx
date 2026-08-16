@@ -1,20 +1,22 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
-  Card, Input, Button, Tag, Spin, Tooltip, Popconfirm, message, Drawer, Empty, Segmented,
+  Card, Input, Button, Tag, Spin, Tooltip, Popconfirm, message, Drawer, Empty, Segmented, Badge, Grid,
 } from 'antd';
 import {
   SendOutlined, RobotOutlined, UserOutlined, FundOutlined,
   BarChartOutlined, SearchOutlined, DeleteOutlined, HistoryOutlined,
   BulbOutlined, GlobalOutlined, LineChartOutlined, AppstoreOutlined,
-  PlusOutlined, RiseOutlined, FallOutlined,
-  SafetyOutlined,
+  PlusOutlined, RiseOutlined, FallOutlined, SafetyOutlined,
   StockOutlined, PercentageOutlined, RocketOutlined,
-  CopyOutlined, CheckOutlined,
+  CopyOutlined, CheckOutlined, CloseOutlined,
   QuestionCircleOutlined, RightOutlined,
-  CrownOutlined, HeartOutlined,
+  CrownOutlined, HeartOutlined, HeartFilled,
   TrophyOutlined, WarningOutlined, DashboardOutlined,
   SolutionOutlined, AuditOutlined, FileSearchOutlined,
   CalendarOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
+  LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled,
+  ReloadOutlined, StopOutlined, EditOutlined, ThunderboltOutlined,
+  SoundOutlined, ClearOutlined,
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
@@ -31,6 +33,8 @@ interface Message {
   data?: any;
   timestamp: string;
   saved?: boolean;
+  feedback?: 'up' | 'down';
+  favoriteId?: number;
 }
 
 interface Session {
@@ -131,11 +135,26 @@ function safeParseTime(ts: string): string {
     const d = new Date(ts);
     if (isNaN(d.getTime())) return '';
     return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-  } catch (e) { console.error('解析时间戳失败:', e); return ''; }
+  } catch { return ''; }
+}
+
+function relativeTime(ts: string): string {
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '';
+    const now = Date.now();
+    const diff = now - d.getTime();
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
+    if (diff < 604800000) return `${Math.floor(diff / 86400000)}天前`;
+    return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+  } catch { return ''; }
 }
 
 export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: boolean } = {}) {
   const { isDark } = useTheme();
+  const isMobile = Grid.useBreakpoint().sm === false;
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -150,10 +169,13 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
   const isLoadingMore = useRef(false);
   const messagesRef = useRef<Message[]>([]);
   const prevScrollHeightRef = useRef<number>(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const streamDoneRef = useRef<boolean>(false);
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionsDrawerOpen, setSessionsDrawerOpen] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sessionSearch, setSessionSearch] = useState('');
 
   const [selectedCategory, setSelectedCategory] = useState('portfolio');
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -162,22 +184,51 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [savedMessages, setSavedMessages] = useState<Set<string | number>>(new Set());
   const [favoritesDrawerOpen, setFavoritesDrawerOpen] = useState(false);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string | number, 'up' | 'down'>>({});
+  const [editingMsgId, setEditingMsgId] = useState<number | string | null>(null);
+  const [editInput, setEditInput] = useState('');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [cursorVisible, setCursorVisible] = useState(true);
 
   const isVip = user?.subscription_status === 'premium';
+
+  // Network status monitoring
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
+  }, []);
+
+  // Blinking cursor during streaming
+  useEffect(() => {
+    if (!loading) { setCursorVisible(false); return; }
+    const timer = setInterval(() => setCursorVisible(v => !v), 530);
+    return () => clearInterval(timer);
+  }, [loading]);
 
   // Welcome screen typing animation
   useEffect(() => {
     if (messages.length > 0) return;
-    const text = '基于 Claude AI 驱动，七层能力体系，智能投资分析';
-    let i = 0;
+    const texts = [
+      '基于先进 AI 大模型，七层能力体系，智能投资分析',
+      '实时市场数据 · 深度基金诊断 · 个性化投资建议',
+      '支持 /diagnose /portfolio /market 等专业命令',
+    ];
+    let textIdx = 0;
+    let charIdx = 0;
     const timer = setInterval(() => {
-      if (i <= text.length) {
-        setWelcomeText(text.slice(0, i));
-        i++;
+      const text = texts[textIdx];
+      if (charIdx <= text.length) {
+        setWelcomeText(text.slice(0, charIdx));
+        charIdx++;
       } else {
-        clearInterval(timer);
+        textIdx = (textIdx + 1) % texts.length;
+        charIdx = 0;
       }
-    }, 50);
+    }, 45);
     return () => clearInterval(timer);
   }, [messages.length]);
 
@@ -187,13 +238,23 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
     const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant');
     if (!lastAiMsg) return [];
     const content = lastAiMsg.content;
-    if (content.includes('收益') || content.includes('持仓')) return ['哪些基金表现最好？', '帮我分析持仓风险', '推荐类似的基金'];
-    if (content.includes('推荐') || content.includes('基金')) return ['这些基金费率怎么样？', '对比一下这几只基金', '适合定投吗？'];
-    if (content.includes('估值') || content.includes('指数')) return ['现在适合买入吗？', '历史估值趋势', '相关行业基金推荐'];
-    if (content.includes('行业') || content.includes('板块')) return ['这个行业有哪些基金？', '行业估值怎么样？', '推荐行业配置方案'];
-    if (content.includes('亏损') || content.includes('亏了')) return ['帮我分析亏损原因', '制定解套策略', '止损还是补仓？'];
-    if (content.includes('定投')) return ['定投多少合适？', '定投频率怎么选？', '设置止盈点'];
-    return ['继续分析', '换个话题聊聊', '帮我推荐基金'];
+    if (content.includes('诊断') || content.includes('评分') || content.includes('综合评估'))
+      return ['这只基金和同类相比怎么样？', '基金经理风格分析', '给出买卖建议'];
+    if (content.includes('收益') || content.includes('持仓') || content.includes('盈亏'))
+      return ['哪些基金需要止损？', '持仓行业分布合理吗？', '帮我优化持仓配置'];
+    if (content.includes('推荐') || content.includes('Top') || content.includes('排名'))
+      return ['这几只基金费率对比', '历史最大回撤多少？', '适合一次性买入还是定投？'];
+    if (content.includes('估值') || content.includes('PE') || content.includes('分位'))
+      return ['低估指数有哪些基金可以买？', '估值历史趋势怎么看？', '现在适合分批建仓吗？'];
+    if (content.includes('行业') || content.includes('板块') || content.includes('赛道'))
+      return ['这个行业目前估值高吗？', '行业龙头基金有哪些？', '帮我制定行业配置方案'];
+    if (content.includes('亏损') || content.includes('亏了') || content.includes('下跌'))
+      return ['分析亏损的根本原因', '制定解套计划', '要不要补仓降低成本？'];
+    if (content.includes('定投') || content.includes('定期'))
+      return ['定投收益回测分析', '设置智能止盈点', '周投和月投哪个好？'];
+    if (content.includes('风险') || content.includes('回撤') || content.includes('波动'))
+      return ['如何降低持仓风险？', '当前市场风险等级', '推荐低风险替代基金'];
+    return ['深入分析一下', '帮我对比几只基金', '给出具体操作建议'];
   };
 
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -219,7 +280,7 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
   }, []);
 
   const scrollToBottom = useCallback(() => {
-    setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
+    setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 80);
   }, []);
 
   const loadHistory = useCallback(async (sid: string, before?: number) => {
@@ -280,7 +341,14 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
     }
   }, [sessionId, hasMore, loadingHistory, loadHistory]);
 
-  // Send message (streaming)
+  // Stop generation
+  const stopGeneration = useCallback(() => {
+    streamDoneRef.current = true;
+    abortControllerRef.current?.abort();
+    setLoading(false);
+  }, []);
+
+  // Send message (streaming) with abort support
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
     const { command, args } = parseSlashCommand(text);
@@ -293,9 +361,25 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
 
     const aiMsgId = Date.now() + 1;
     let streamedContent = '';
+    streamDoneRef.current = false;
+    abortControllerRef.current = new AbortController();
+
+    const timeoutTimer = setTimeout(() => {
+      if (!streamDoneRef.current && !streamedContent) {
+        streamDoneRef.current = true;
+        setMessages(prev => {
+          const exists = prev.some(m => m.id === aiMsgId);
+          if (exists) return prev.map(m => m.id === aiMsgId ? { ...m, content: '请求超时，请稍后重试' } : m);
+          return [...prev, { id: aiMsgId, role: 'assistant' as const, content: '请求超时，请稍后重试', timestamp: new Date().toISOString() }];
+        });
+        setLoading(false);
+      }
+    }, 90000);
+
     try {
       await aiApi.chatStream(text.trim(), sessionId,
         (chunk) => {
+          if (streamDoneRef.current) return;
           streamedContent += chunk;
           setMessages(prev => {
             const exists = prev.some(m => m.id === aiMsgId);
@@ -305,17 +389,110 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
           scrollToBottom();
         },
         (sid) => { if (sid && sid !== sessionId) { setSessionId(sid); localStorage.setItem('ai_chat_session_id', sid); } },
-        (errMsg) => { if (!streamedContent) setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant' as const, content: errMsg || '网络错误，请稍后重试', timestamp: new Date().toISOString() }]); },
+        (errMsg) => {
+          if (streamDoneRef.current) return;
+          streamDoneRef.current = true;
+          if (!streamedContent) setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant' as const, content: errMsg || '网络错误，请稍后重试', timestamp: new Date().toISOString() }]);
+        },
         command?.name,
         args,
       );
-    } catch (e) {
-      console.error('发送AI消息失败:', e);
-      if (!streamedContent) setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant' as const, content: '网络错误，请稍后重试', timestamp: new Date().toISOString() }]);
+      streamDoneRef.current = true;
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        // User stopped generation
+        if (streamedContent) {
+          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: streamedContent + '\n\n*[已停止生成]*' } : m));
+        }
+      } else {
+        console.error('发送AI消息失败:', e);
+        if (!streamedContent) setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant' as const, content: '网络错误，请稍后重试', timestamp: new Date().toISOString() }]);
+      }
+      streamDoneRef.current = true;
     } finally {
+      clearTimeout(timeoutTimer);
       setLoading(false);
       scrollToBottom();
       setTimeout(() => inputRef.current?.focus(), 200);
+    }
+  };
+
+  // Regenerate last AI response
+  const regenerateMessage = async () => {
+    if (loading) return;
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+    if (!lastUserMsg) return;
+    setMessages(prev => {
+      const lastIdx = prev.length - 1;
+      if (lastIdx >= 0 && prev[lastIdx].role === 'assistant') return prev.slice(0, -1);
+      return prev;
+    });
+    await sendMessage(lastUserMsg.content);
+  };
+
+  // Edit and re-send user message
+  const startEditMessage = (msg: Message) => {
+    setEditingMsgId(msg.id);
+    setEditInput(msg.content);
+  };
+
+  const cancelEdit = () => { setEditingMsgId(null); setEditInput(''); };
+
+  const confirmEdit = async () => {
+    if (!editInput.trim() || !editingMsgId) return;
+    // Remove messages after the edited one
+    setMessages(prev => {
+      const idx = prev.findIndex(m => m.id === editingMsgId);
+      if (idx === -1) return prev;
+      return prev.slice(0, idx);
+    });
+    setEditingMsgId(null);
+    setEditInput('');
+    await sendMessage(editInput.trim());
+  };
+
+  // Send feedback
+  const sendFeedback = async (msg: Message, rating: 'up' | 'down') => {
+    const current = feedbackMap[msg.id];
+    const newRating = current === rating ? undefined : rating;
+    setFeedbackMap(prev => {
+      const next = { ...prev };
+      if (newRating) next[msg.id] = newRating;
+      else delete next[msg.id];
+      return next;
+    });
+    if (newRating) {
+      try { await aiApi.sendFeedback(msg.id, sessionId, newRating); } catch {}
+    }
+  };
+
+  // Load favorites from server
+  useEffect(() => {
+    if (!user) return;
+    aiApi.getFavorites().then(result => {
+      const favs = result.favorites || [];
+      setSavedMessages(new Set(favs.map((f: any) => f.message_id)));
+    }).catch(() => {});
+  }, [user]);
+
+  // Toggle favorite
+  const toggleSaveMessage = async (msg: Message) => {
+    const isSaved = savedMessages.has(msg.id);
+    setSavedMessages(prev => {
+      const next = new Set(prev);
+      if (isSaved) { next.delete(msg.id); message.info('已取消收藏'); }
+      else { next.add(msg.id); message.success('已收藏分析内容'); }
+      return next;
+    });
+    try {
+      if (isSaved) await aiApi.removeFavorite(msg.id);
+      else await aiApi.addFavorite(msg.id, sessionId, msg.content.slice(0, 500));
+    } catch {
+      setSavedMessages(prev => {
+        const next = new Set(prev);
+        if (isSaved) next.add(msg.id); else next.delete(msg.id);
+        return next;
+      });
     }
   };
 
@@ -334,20 +511,6 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
     navigator.clipboard.writeText(text).then(() => {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
-    });
-  };
-
-  const toggleSaveMessage = (msg: Message) => {
-    setSavedMessages(prev => {
-      const next = new Set(prev);
-      if (next.has(msg.id)) {
-        next.delete(msg.id);
-        message.info('已取消收藏');
-      } else {
-        next.add(msg.id);
-        message.success('已收藏分析内容');
-      }
-      return next;
     });
   };
 
@@ -436,11 +599,51 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
     return null;
   };
 
+  // Code block with copy button
+  const CodeBlock = ({ children, className, ...props }: any) => {
+    const [copied, setCopied] = useState(false);
+    const isInline = !className;
+    if (isInline) return <code className={className} {...props}>{children}</code>;
+    const codeText = String(children).replace(/\n$/, '');
+    return (
+      <div style={{ position: 'relative' }}>
+        <div style={{
+          position: 'absolute', top: 8, right: 8, zIndex: 1,
+          display: 'flex', gap: 4,
+        }}>
+          <span style={{
+            fontSize: 11, color: isDark ? '#666' : '#999', padding: '2px 8px',
+            borderRadius: 4, background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+            userSelect: 'none',
+          }}>
+            {className?.replace('language-', '') || 'code'}
+          </span>
+          <span
+            onClick={() => { navigator.clipboard.writeText(codeText); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+            style={{
+              fontSize: 11, color: copied ? '#52c41a' : (isDark ? '#888' : '#999'),
+              padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
+              background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+              transition: 'color 0.2s',
+            }}
+          >
+            {copied ? '已复制' : '复制'}
+          </span>
+        </div>
+        <code className={className} {...props}>{children}</code>
+      </div>
+    );
+  };
+
   // Render message
-  const renderMessage = (msg: Message) => {
+  const renderMessage = (msg: Message, idx: number) => {
     const isUser = msg.role === 'user';
-    const time = safeParseTime(msg.timestamp);
     const isSaved = savedMessages.has(msg.id);
+    const feedback = feedbackMap[msg.id];
+    const isLastAiMsg = !isUser && idx === messages.length - 1;
+    const isEditing = editingMsgId === msg.id;
+    const isLastUserMsg = isUser && idx === messages.length - 1 && !loading;
+
     return (
       <div key={msg.id} className="ai-message-enter" style={{
         display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start',
@@ -448,73 +651,156 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
       }}>
         {!isUser && (
           <div className="ai-avatar-bot" style={{
-            width: 34, height: 34, borderRadius: 11,
+            width: 36, height: 36, borderRadius: 12,
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             marginRight: 10, flexShrink: 0,
             boxShadow: '0 2px 8px rgba(102,126,234,0.25)',
           }}>
-            <RobotOutlined style={{ color: '#fff', fontSize: 15 }} />
+            <RobotOutlined style={{ color: '#fff', fontSize: 16 }} />
           </div>
         )}
-        <div style={{ maxWidth: '78%', minWidth: 60, position: 'relative' }}>
-          <div className={isUser ? 'ai-bubble-user' : 'ai-bubble-bot'} style={{
-            padding: '12px 16px',
-            borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-            background: isUser
-              ? 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)'
-              : (isDark ? 'rgba(255,255,255,0.06)' : '#f7f8fa'),
-            color: isUser ? '#fff' : (isDark ? '#e8e8e8' : '#1f1f1f'),
-            whiteSpace: isUser ? 'pre-wrap' : 'normal',
-            lineHeight: 1.7, fontSize: 14,
-            boxShadow: isUser ? '0 2px 12px rgba(22,119,255,0.18)' : (isDark ? 'none' : '0 1px 4px rgba(0,0,0,0.04)'),
-          }}>
-            {isUser ? msg.content : (
-              <div className="markdown-body" style={{ color: 'inherit', fontSize: 14 }}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+        <div style={{ maxWidth: '78%', minWidth: 80, position: 'relative' }}>
+          {/* Edit mode */}
+          {isEditing ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <Input.TextArea
+                value={editInput}
+                onChange={e => setEditInput(e.target.value)}
+                autoSize={{ minRows: 2, maxRows: 6 }}
+                style={{ borderRadius: 12, fontSize: 14 }}
+                onPressEnter={e => { if (!e.shiftKey) { e.preventDefault(); confirmEdit(); } }}
+              />
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                <Button size="small" onClick={cancelEdit}>取消</Button>
+                <Button size="small" type="primary" onClick={confirmEdit} disabled={!editInput.trim()}>重新发送</Button>
               </div>
-            )}
-            {renderStructuredData(msg.data)}
-          </div>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            marginTop: 4, padding: '0 4px',
-            justifyContent: isUser ? 'flex-end' : 'flex-start',
-          }}>
-            {time && <span style={{ fontSize: 11, color: isDark ? '#555' : '#bbb' }}>{time}</span>}
-            {!isUser && msg.content && (
-              <>
-                <Tooltip title={copiedId === msg.id ? '已复制' : '复制'}>
-                  <span
-                    onClick={() => copyToClipboard(msg.content, msg.id)}
-                    style={{ fontSize: 11, color: isDark ? '#555' : '#bbb', cursor: 'pointer', transition: 'color 0.2s' }}
-                    onMouseEnter={e => { e.currentTarget.style.color = '#1677ff'; }}
-                    onMouseLeave={e => { e.currentTarget.style.color = isDark ? '#555' : '#bbb'; }}
-                  >
-                    {copiedId === msg.id ? <CheckOutlined /> : <CopyOutlined />}
-                  </span>
-                </Tooltip>
-                <Tooltip title={isSaved ? '取消收藏' : '收藏'}>
-                  <span
-                    onClick={() => toggleSaveMessage(msg)}
-                    style={{ fontSize: 11, color: isSaved ? '#faad14' : (isDark ? '#555' : '#bbb'), cursor: 'pointer', transition: 'color 0.2s' }}
-                  >
-                    <HeartOutlined />
-                  </span>
-                </Tooltip>
-              </>
-            )}
-          </div>
+            </div>
+          ) : (
+            <>
+              <div className={isUser ? 'ai-bubble-user' : 'ai-bubble-bot'} style={{
+                padding: '12px 16px',
+                borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                background: isUser
+                  ? 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)'
+                  : (isDark ? 'rgba(255,255,255,0.06)' : '#f7f8fa'),
+                color: isUser ? '#fff' : (isDark ? '#e8e8e8' : '#1f1f1f'),
+                whiteSpace: isUser ? 'pre-wrap' : 'normal',
+                lineHeight: 1.7, fontSize: 14,
+                boxShadow: isUser ? '0 2px 12px rgba(22,119,255,0.18)' : (isDark ? 'none' : '0 1px 4px rgba(0,0,0,0.04)'),
+              }}>
+                {isUser ? msg.content : (
+                  <div className="markdown-body" style={{ color: 'inherit', fontSize: 14 }}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{ code: CodeBlock }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                    {/* Blinking cursor during streaming */}
+                    {loading && isLastAiMsg && !streamDoneRef.current && (
+                      <span style={{
+                        display: 'inline-block', width: 2, height: 16, background: '#1677ff',
+                        marginLeft: 2, verticalAlign: 'text-bottom',
+                        opacity: cursorVisible ? 1 : 0, transition: 'opacity 0.1s',
+                      }} />
+                    )}
+                  </div>
+                )}
+                {renderStructuredData(msg.data)}
+              </div>
+
+              {/* Message actions */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                marginTop: 4, padding: '0 4px',
+                justifyContent: isUser ? 'flex-end' : 'flex-start',
+                opacity: 0.7,
+                transition: 'opacity 0.2s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '0.7'; }}
+              >
+                <span style={{ fontSize: 11, color: isDark ? '#555' : '#bbb' }}>{relativeTime(msg.timestamp)}</span>
+
+                {/* User message actions */}
+                {isUser && isLastUserMsg && !isEditing && (
+                  <Tooltip title="编辑重发">
+                    <span
+                      onClick={() => startEditMessage(msg)}
+                      style={{ fontSize: 11, color: isDark ? '#555' : '#bbb', cursor: 'pointer', transition: 'color 0.2s' }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#1677ff'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = isDark ? '#555' : '#bbb'; }}
+                    >
+                      <EditOutlined />
+                    </span>
+                  </Tooltip>
+                )}
+
+                {/* AI message actions */}
+                {!isUser && msg.content && (
+                  <>
+                    <Tooltip title={copiedId === msg.id ? '已复制' : '复制'}>
+                      <span
+                        onClick={() => copyToClipboard(msg.content, msg.id)}
+                        style={{ fontSize: 11, color: isDark ? '#555' : '#bbb', cursor: 'pointer', transition: 'color 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#1677ff'; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = isDark ? '#555' : '#bbb'; }}
+                      >
+                        {copiedId === msg.id ? <CheckOutlined /> : <CopyOutlined />}
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={isSaved ? '取消收藏' : '收藏'}>
+                      <span
+                        onClick={() => toggleSaveMessage(msg)}
+                        style={{ fontSize: 11, color: isSaved ? '#faad14' : (isDark ? '#555' : '#bbb'), cursor: 'pointer', transition: 'color 0.2s' }}
+                      >
+                        {isSaved ? <HeartFilled /> : <HeartOutlined />}
+                      </span>
+                    </Tooltip>
+                    <Tooltip title="有帮助">
+                      <span
+                        onClick={() => sendFeedback(msg, 'up')}
+                        style={{ fontSize: 11, color: feedback === 'up' ? '#52c41a' : (isDark ? '#555' : '#bbb'), cursor: 'pointer', transition: 'color 0.2s' }}
+                      >
+                        {feedback === 'up' ? <LikeFilled /> : <LikeOutlined />}
+                      </span>
+                    </Tooltip>
+                    <Tooltip title="没帮助">
+                      <span
+                        onClick={() => sendFeedback(msg, 'down')}
+                        style={{ fontSize: 11, color: feedback === 'down' ? '#ff4d4f' : (isDark ? '#555' : '#bbb'), cursor: 'pointer', transition: 'color 0.2s' }}
+                      >
+                        {feedback === 'down' ? <DislikeFilled /> : <DislikeOutlined />}
+                      </span>
+                    </Tooltip>
+                    {isLastAiMsg && !loading && (
+                      <Tooltip title="重新生成">
+                        <span
+                          onClick={regenerateMessage}
+                          style={{ fontSize: 11, color: isDark ? '#555' : '#bbb', cursor: 'pointer', transition: 'color 0.2s' }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#1677ff'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = isDark ? '#555' : '#bbb'; }}
+                        >
+                          <ReloadOutlined />
+                        </span>
+                      </Tooltip>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
         </div>
         {isUser && (
           <div className="ai-avatar-user" style={{
-            width: 34, height: 34, borderRadius: 11,
+            width: 36, height: 36, borderRadius: 12,
             background: 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             marginLeft: 10, flexShrink: 0,
             boxShadow: '0 2px 8px rgba(22,119,255,0.25)',
           }}>
-            <UserOutlined style={{ color: '#fff', fontSize: 15 }} />
+            <UserOutlined style={{ color: '#fff', fontSize: 16 }} />
           </div>
         )}
       </div>
@@ -523,7 +809,6 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
 
   const currentCategory = capabilityCategories.find(c => c.key === selectedCategory) || capabilityCategories[0];
 
-  // Quick action chips
   const quickChips = [
     { text: '我的收益怎么样？', icon: <FundOutlined /> },
     { text: '推荐几只优质基金', icon: <BulbOutlined /> },
@@ -533,7 +818,6 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
 
   const followUps = getFollowUpSuggestions();
 
-  // Sidebar quick functions
   const sidebarFunctions = [
     { key: 'new', icon: <PlusOutlined />, label: '新会话', color: '#1677ff', action: newSession },
     { key: 'history', icon: <HistoryOutlined />, label: '历史记录', color: '#722ed1', action: () => { loadSessions(); setSessionsDrawerOpen(true); } },
@@ -541,32 +825,72 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
     { key: 'clear', icon: <DeleteOutlined />, label: '清空对话', color: '#ff4d4f', action: clearHistory, needConfirm: true },
   ];
 
+  // Filtered sessions
+  const filteredSessions = useMemo(() => {
+    if (!sessionSearch.trim()) return sessions;
+    const q = sessionSearch.toLowerCase();
+    return sessions.filter(s => (s.firstMessage || '').toLowerCase().includes(q));
+  }, [sessions, sessionSearch]);
+
+  // Mobile sidebar drawer (functions entry, desktop sidebar hidden on phone)
+  const renderMobileSidebar = () => (
+    <Drawer
+      title={<span>AI 助手</span>}
+      placement="left" onClose={() => setMobileSidebarOpen(false)} open={mobileSidebarOpen}
+      width={220}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {sidebarFunctions.map(fn => (
+          <div key={fn.key} className="ai-sidebar-btn"
+            onClick={() => { setMobileSidebarOpen(false); fn.action(); }}
+            style={{ color: fn.color }}
+          >
+            <span style={{ fontSize: 16 }}>{fn.icon}</span>{fn.label}
+          </div>
+        ))}
+      </div>
+    </Drawer>
+  );
+
   // Sessions drawer
   const renderSessionsDrawer = () => (
     <Drawer
       title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><HistoryOutlined /><span>会话记录</span></div>}
-      placement="right" onClose={() => setSessionsDrawerOpen(false)} open={sessionsDrawerOpen} width={360}
+      placement="right" onClose={() => setSessionsDrawerOpen(false)} open={sessionsDrawerOpen}
+      width={isMobile ? '100%' : 380}
       extra={<Button type="primary" icon={<PlusOutlined />} size="small" onClick={newSession}>新会话</Button>}
     >
+      <Input
+        prefix={<SearchOutlined style={{ color: isDark ? '#666' : '#bbb' }} />}
+        placeholder="搜索会话..."
+        value={sessionSearch}
+        onChange={e => setSessionSearch(e.target.value)}
+        allowClear
+        style={{ marginBottom: 12, borderRadius: 8 }}
+        size="small"
+      />
       {loadingSessions ? (
         <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-      ) : sessions.length === 0 ? (
-        <Empty description="暂无历史会话" />
+      ) : filteredSessions.length === 0 ? (
+        <Empty description={sessionSearch ? '没有匹配的会话' : '暂无历史会话'} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {sessions.map(s => (
+          {filteredSessions.map(s => (
             <div key={s.sessionId} onClick={() => switchSession(s.sessionId)} style={{
               padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
               background: s.sessionId === sessionId ? (isDark ? 'rgba(22,119,255,0.15)' : 'rgba(22,119,255,0.08)') : (isDark ? 'rgba(255,255,255,0.04)' : '#fff'),
               border: `1px solid ${s.sessionId === sessionId ? '#1677ff' : (isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0')}`,
               transition: 'all 0.2s',
-            }}>
+            }}
+            onMouseEnter={e => { if (s.sessionId !== sessionId) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.02)'; }}
+            onMouseLeave={e => { if (s.sessionId !== sessionId) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : '#fff'; }}
+            >
               <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {s.firstMessage || '新会话'}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: isDark ? '#6b6b6b' : '#999' }}>
                 <span>{s.messageCount} 条消息</span>
-                <span>{new Date(s.lastMessageAt).toLocaleDateString('zh-CN')}</span>
+                <span>{relativeTime(s.lastMessageAt)}</span>
               </div>
             </div>
           ))}
@@ -575,29 +899,45 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
     </Drawer>
   );
 
-  // Favorites drawer
+  // Server-side favorites
+  const [serverFavorites, setServerFavorites] = useState<any[]>([]);
+
+  const loadServerFavorites = async () => {
+    try {
+      const result = await aiApi.getFavorites();
+      setServerFavorites(result.favorites || []);
+    } catch {}
+  };
+
   const renderFavoritesDrawer = () => {
-    const savedMsgs = messages.filter(m => m.role === 'assistant' && savedMessages.has(m.id));
+    const currentSaved = messages.filter(m => m.role === 'assistant' && savedMessages.has(m.id));
+    const serverSaved = serverFavorites.filter(f => !messages.some(m => m.id === f.message_id));
+    const allFavorites = [
+      ...currentSaved.map(m => ({ id: m.id, content: m.content, timestamp: m.timestamp, source: 'current' })),
+      ...serverSaved.map(f => ({ id: f.message_id, content: f.content, timestamp: f.created_at, source: 'server' })),
+    ];
     return (
       <Drawer
         title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><HeartOutlined style={{ color: '#fa541c' }} /><span>收藏的分析</span></div>}
-        placement="right" onClose={() => setFavoritesDrawerOpen(false)} open={favoritesDrawerOpen} width={400}
+        placement="right" onClose={() => setFavoritesDrawerOpen(false)} open={favoritesDrawerOpen}
+      width={isMobile ? '100%' : 400}
+        afterOpenChange={(open) => { if (open) loadServerFavorites(); }}
       >
-        {savedMsgs.length === 0 ? (
+        {allFavorites.length === 0 ? (
           <Empty description="暂无收藏内容" image={Empty.PRESENTED_IMAGE_SIMPLE}>
             <p style={{ fontSize: 12, color: isDark ? '#666' : '#999' }}>在对话中点击 <HeartOutlined /> 收藏优质分析内容</p>
           </Empty>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {savedMsgs.map(msg => (
-              <Card key={msg.id} size="small" style={{ borderRadius: 10 }}>
+            {allFavorites.map(fav => (
+              <Card key={fav.id} size="small" style={{ borderRadius: 10 }}>
                 <div className="markdown-body" style={{ fontSize: 13, maxHeight: 200, overflow: 'auto' }}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content.slice(0, 500)}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{(fav.content || '').slice(0, 500)}</ReactMarkdown>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}` }}>
-                  <span style={{ fontSize: 11, color: isDark ? '#666' : '#999' }}>{safeParseTime(msg.timestamp)}</span>
-                  <Button size="small" icon={<CopyOutlined />} onClick={() => copyToClipboard(msg.content, msg.id)}>
-                    {copiedId === msg.id ? '已复制' : '复制'}
+                  <span style={{ fontSize: 11, color: isDark ? '#666' : '#999' }}>{relativeTime(fav.timestamp)}</span>
+                  <Button size="small" icon={<CopyOutlined />} onClick={() => copyToClipboard(fav.content, fav.id)}>
+                    {copiedId === fav.id ? '已复制' : '复制'}
                   </Button>
                 </div>
               </Card>
@@ -617,6 +957,7 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
         @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
         @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         @keyframes aiMsgEnter { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes breathe { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
         .ai-message-enter { animation: aiMsgEnter 0.3s ease-out; }
         .ai-bubble-user { position: relative; overflow: hidden; }
         .ai-bubble-user::before {
@@ -640,30 +981,33 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
           padding: 12px 14px; border-radius: 12px; cursor: pointer;
           background: ${isDark ? 'rgba(255,255,255,0.04)' : '#fff'};
           border: 1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0'};
-          transition: all 0.2s; display: flex; align-items: center; gap: 10;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; gap: 10;
         }
         .ai-category-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+          transform: translateY(-3px);
+          box-shadow: 0 6px 20px rgba(0,0,0,0.08);
         }
         .ai-quick-chip {
-          display: flex; align-items: center; gap: 4px;
-          padding: 4px 12px; border-radius: 16px; cursor: pointer;
+          display: inline-flex; align-items: center; gap: 4px;
+          padding: 5px 14px; border-radius: 16px; cursor: pointer;
           background: ${isDark ? 'rgba(255,255,255,0.06)' : '#f5f5f5'};
           border: 1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e8e8e8'};
           font-size: 12px; color: ${isDark ? '#aaa' : '#666'};
           transition: all 0.2s;
         }
-        .ai-quick-chip:hover { border-color: #1677ff; color: #1677ff; }
-        .markdown-body { font-size: 14px; line-height: 1.7; }
+        .ai-quick-chip:hover { border-color: #1677ff; color: #1677ff; background: ${isDark ? 'rgba(22,119,255,0.1)' : 'rgba(22,119,255,0.04)'}; }
+        .ai-quick-chip:active { transform: scale(0.96); }
+        .markdown-body { font-size: 14px; line-height: 1.75; }
         .markdown-body table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; border-radius: 8px; overflow: hidden; }
         .markdown-body th, .markdown-body td { border: 1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e8e8e8'}; padding: 8px 12px; text-align: left; }
         .markdown-body th { background: ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f5ff'}; font-weight: 600; color: ${isDark ? '#ccc' : '#333'}; }
         .markdown-body tr:hover td { background: ${isDark ? 'rgba(255,255,255,0.03)' : 'rgba(22,119,255,0.02)'}; }
+        .markdown-body h1 { font-size: 18px; margin: 16px 0 10px; font-weight: 700; }
         .markdown-body h2 { font-size: 16px; margin: 14px 0 8px; font-weight: 700; padding-bottom: 6px; border-bottom: 1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}; }
         .markdown-body h3 { font-size: 14px; margin: 10px 0 4px; font-weight: 600; }
         .markdown-body ul, .markdown-body ol { padding-left: 20px; margin: 6px 0; }
         .markdown-body li { margin: 3px 0; }
+        .markdown-body li::marker { color: #1677ff; }
         .markdown-body blockquote { border-left: 3px solid #1677ff; padding: 8px 12px; margin: 10px 0; background: ${isDark ? 'rgba(22,119,255,0.06)' : 'rgba(22,119,255,0.03)'}; border-radius: 0 8px 8px 0; }
         .markdown-body code { background: ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)'}; padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; }
         .markdown-body pre { background: ${isDark ? 'rgba(0,0,0,0.3)' : '#f6f8fa'}; padding: 14px; border-radius: 10px; overflow-x: auto; margin: 10px 0; position: relative; border: 1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#e8e8e8'}; }
@@ -673,20 +1017,29 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
         .markdown-body hr { border: none; border-top: 1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0'}; margin: 12px 0; }
         .markdown-body a { color: #1677ff; text-decoration: none; }
         .markdown-body a:hover { text-decoration: underline; }
+        .markdown-body img { max-width: 100%; border-radius: 8px; }
+        .ai-stop-btn {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 6px 16px; border-radius: 20px; cursor: pointer;
+          background: ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'};
+          border: 1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'};
+          font-size: 12px; color: ${isDark ? '#aaa' : '#666'};
+          transition: all 0.2s; margin-top: 8px;
+        }
+        .ai-stop-btn:hover { border-color: #ff4d4f; color: #ff4d4f; }
       `}</style>
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {/* Left Sidebar - 抽屉模式下隐藏 */}
-        {!isDrawerMode && (
+        {/* Left Sidebar */}
+        {!isDrawerMode && !isMobile && (
         <div style={{
           width: sidebarCollapsed ? 56 : 220, flexShrink: 0,
           borderRight: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}`,
           background: isDark ? 'rgba(0,0,0,0.15)' : '#fafafa',
           display: 'flex', flexDirection: 'column',
-          transition: 'width 0.3s ease',
+          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           overflow: 'hidden',
         }}>
-          {/* Sidebar header */}
           <div style={{ padding: '12px', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}` }}>
             {!sidebarCollapsed && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -713,7 +1066,6 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
             </Button>
           </div>
 
-          {/* Quick functions */}
           <div style={{ flex: 1, overflow: 'auto', padding: '8px 8px' }}>
             {sidebarFunctions.map(fn => {
               const btn = (
@@ -736,10 +1088,8 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
               }
               return btn;
             })}
-
           </div>
 
-          {/* Collapse toggle */}
           <div
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             style={{
@@ -761,9 +1111,15 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
           styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' } }}
           style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 0, border: 'none', boxShadow: 'none' }}
         >
+          {/* Mobile sidebar toggle (desktop sidebar hidden on phone) */}
+          {isMobile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}` }}>
+              <Button type="text" size="small" icon={<MenuFoldOutlined />} onClick={() => setMobileSidebarOpen(true)} style={{ fontSize: 16 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: isDark ? '#e8e8e8' : '#333' }}>FinPilot AI</span>
+            </div>
+          )}
           {/* Messages */}
-          <div ref={chatContainerRef} onScroll={handleScroll} style={{ flex: 1, overflow: 'auto', padding: '16px 20px', minHeight: 0 }}>
-            {/* Load more */}
+          <div ref={chatContainerRef} onScroll={handleScroll} style={{ flex: 1, overflow: 'auto', padding: isMobile ? '12px 12px' : '16px 20px', minHeight: 0 }}>
             {hasMore && messages.length > 0 && (
               <div style={{ textAlign: 'center', padding: '8px 0', marginBottom: 12 }}>
                 {loadingHistory ? <Spin size="small" /> : (
@@ -781,59 +1137,67 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', padding: '32px 16px', minHeight: 400,
               }}>
-                {/* Logo */}
                 <div className="ai-welcome-logo" style={{
-                  width: 72, height: 72, borderRadius: 22,
+                  width: 80, height: 80, borderRadius: 24,
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  marginBottom: 16,
+                  marginBottom: 20,
                   boxShadow: '0 8px 32px rgba(102,126,234,0.3)',
                   animation: 'pulse-glow 3s ease-in-out infinite',
                 }}>
-                  <RobotOutlined style={{ color: '#fff', fontSize: 32 }} />
+                  <RobotOutlined style={{ color: '#fff', fontSize: 36 }} />
                 </div>
                 <h2 style={{
-                  fontSize: 22, fontWeight: 700, margin: '0 0 6px',
+                  fontSize: 24, fontWeight: 700, margin: '0 0 8px',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                 }}>
                   FinPilot AI 投资助手
                 </h2>
-                <p style={{ fontSize: 13, color: isDark ? '#888' : '#999', margin: '0 0 8px', textAlign: 'center', maxWidth: 400, minHeight: 20 }}>
+                <p style={{ fontSize: 13, color: isDark ? '#888' : '#999', margin: '0 0 8px', textAlign: 'center', maxWidth: 440, minHeight: 20 }}>
                   {welcomeText}
                   <span style={{
-                    display: 'inline-block', width: 1, height: 14, background: '#1677ff',
+                    display: 'inline-block', width: 2, height: 14, background: '#1677ff',
                     marginLeft: 2, verticalAlign: 'text-bottom',
                     animation: 'typingDot 0.8s infinite',
                   }} />
                 </p>
-                <p style={{ fontSize: 12, color: isDark ? '#555' : '#bbb', margin: '0 0 28px' }}>Claude AI 驱动 · 实时数据分析 · 智能投资问答</p>
+
+                {/* Capability badges */}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', margin: '0 0 28px' }}>
+                  {['AI 大模型驱动', '实时数据', '七层能力', '斜杠命令'].map(tag => (
+                    <span key={tag} style={{
+                      fontSize: 11, padding: '3px 10px', borderRadius: 12,
+                      background: isDark ? 'rgba(22,119,255,0.1)' : 'rgba(22,119,255,0.06)',
+                      color: '#1677ff', border: `1px solid ${isDark ? 'rgba(22,119,255,0.2)' : 'rgba(22,119,255,0.15)'}`,
+                    }}>{tag}</span>
+                  ))}
+                </div>
 
                 {/* Quick questions by category */}
-                <div style={{ width: '100%', maxWidth: 560 }}>
+                <div style={{ width: '100%', maxWidth: 580 }}>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
                     <Segmented
                       value={selectedCategory}
                       onChange={v => setSelectedCategory(v as string)}
                       size="small"
                       options={capabilityCategories.filter(c => !c.isVip || isVip).map(c => ({
-                        label: <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>{c.icon} {c.label}</span>,
+                        label: isMobile ? <span title={c.label} style={{ fontSize: 14, lineHeight: 1 }}>{c.icon}</span>
+                          : <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>{c.icon} {c.label}</span>,
                         value: c.key,
                       }))}
                     />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8 }}>
                     {currentCategory.questions.map((q, i) => (
                       <div
                         key={`${selectedCategory}-${i}`}
                         className="ai-category-card"
                         onClick={() => sendMessage(q.text)}
-                        style={{
-                          borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0',
-                        }}
+                        style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0' }}
                         onMouseEnter={e => {
                           e.currentTarget.style.borderColor = currentCategory.color;
-                          e.currentTarget.style.boxShadow = `0 4px 16px ${currentCategory.color}20`;
+                          e.currentTarget.style.boxShadow = `0 6px 20px ${currentCategory.color}20`;
                         }}
                         onMouseLeave={e => {
                           e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0';
@@ -841,10 +1205,10 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
                         }}
                       >
                         <div style={{
-                          width: 32, height: 32, borderRadius: 8,
+                          width: 34, height: 34, borderRadius: 9,
                           background: currentCategory.gradient,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          flexShrink: 0, fontSize: 14, color: '#fff',
+                          flexShrink: 0, fontSize: 15, color: '#fff',
                         }}>
                           {q.icon}
                         </div>
@@ -856,6 +1220,13 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
                     ))}
                   </div>
                 </div>
+
+                {/* Keyboard shortcuts hint */}
+                <div style={{ marginTop: 24, display: 'flex', gap: 16, fontSize: 11, color: isDark ? '#555' : '#bbb' }}>
+                  <span><kbd style={{ padding: '1px 5px', borderRadius: 3, background: isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0', border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : '#ddd'}`, fontSize: 10 }}>Enter</kbd> 发送</span>
+                  <span><kbd style={{ padding: '1px 5px', borderRadius: 3, background: isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0', border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : '#ddd'}`, fontSize: 10 }}>Shift+Enter</kbd> 换行</span>
+                  <span><kbd style={{ padding: '1px 5px', borderRadius: 3, background: isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0', border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : '#ddd'}`, fontSize: 10 }}>/</kbd> 命令</span>
+                </div>
               </div>
             )}
 
@@ -864,33 +1235,39 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
             )}
 
             {/* Messages */}
-            {messages.map(renderMessage)}
+            {messages.map((msg, idx) => renderMessage(msg, idx))}
 
             {/* Thinking indicator */}
             {loading && messages.length > 0 && messages[messages.length - 1]?.role === 'user' && (
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16 }}>
                 <div style={{
-                  width: 34, height: 34, borderRadius: 11,
+                  width: 36, height: 36, borderRadius: 12,
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   marginRight: 10, flexShrink: 0,
                 }}>
-                  <RobotOutlined style={{ color: '#fff', fontSize: 15 }} />
+                  <RobotOutlined style={{ color: '#fff', fontSize: 16 }} />
                 </div>
-                <div style={{
-                  padding: '12px 16px', borderRadius: '16px 16px 16px 4px',
-                  background: isDark ? 'rgba(255,255,255,0.06)' : '#f7f8fa',
-                  display: 'flex', alignItems: 'center', gap: 8,
-                }}>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {[0, 1, 2].map(i => (
-                      <div key={i} style={{
-                        width: 6, height: 6, borderRadius: '50%', background: '#1677ff',
-                        animation: `typingDot 1.4s ${i * 0.2}s infinite`,
-                      }} />
-                    ))}
+                <div>
+                  <div style={{
+                    padding: '12px 16px', borderRadius: '16px 16px 16px 4px',
+                    background: isDark ? 'rgba(255,255,255,0.06)' : '#f7f8fa',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[0, 1, 2].map(i => (
+                        <div key={i} style={{
+                          width: 6, height: 6, borderRadius: '50%', background: '#1677ff',
+                          animation: `typingDot 1.4s ${i * 0.2}s infinite`,
+                        }} />
+                      ))}
+                    </div>
+                    <span style={{ fontSize: 13, color: isDark ? '#888' : '#999' }}>思考中</span>
                   </div>
-                  <span style={{ fontSize: 13, color: isDark ? '#888' : '#999' }}>思考中</span>
+                  {/* Stop button */}
+                  <div className="ai-stop-btn" onClick={stopGeneration}>
+                    <StopOutlined /> 停止生成
+                  </div>
                 </div>
               </div>
             )}
@@ -898,8 +1275,8 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
             {/* Follow-up suggestions */}
             {!loading && followUps.length > 0 && messages.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4, marginBottom: 8 }}>
-                <span style={{ fontSize: 11, color: isDark ? '#666' : '#aaa', lineHeight: '26px' }}>
-                  <QuestionCircleOutlined style={{ marginRight: 4 }} />试试问问：
+                <span style={{ fontSize: 11, color: isDark ? '#666' : '#aaa', lineHeight: '28px' }}>
+                  <ThunderboltOutlined style={{ marginRight: 4 }} />试试问问：
                 </span>
                 {followUps.map((q, i) => (
                   <div
@@ -997,41 +1374,72 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
             )}
 
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-              <Input.TextArea
-                ref={inputRef}
-                value={input}
-                onChange={e => { setInput(e.target.value); setShowSlashMenu(e.target.value.startsWith('/')); }}
-                onPressEnter={(e) => {
-                  if (!e.shiftKey) { e.preventDefault(); sendMessage(input); }
-                }}
-                placeholder="问我任何投资问题... (Shift+Enter 换行)"
-                autoSize={{ minRows: 1, maxRows: 4 }}
-                disabled={loading}
-                style={{
-                  borderRadius: 12, resize: 'none',
-                  background: isDark ? 'rgba(255,255,255,0.06)' : '#f7f8fa',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e8e8e8'}`,
-                  padding: '8px 12px',
-                }}
-              />
-              <Button
-                type="primary"
-                icon={<SendOutlined />}
-                size="large"
-                onClick={() => sendMessage(input)}
-                loading={loading}
-                disabled={!input.trim()}
-                style={{
-                  borderRadius: 12, width: 44, height: 40, flexShrink: 0,
-                  background: input.trim() ? 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)' : undefined,
-                  border: 'none',
-                  boxShadow: input.trim() ? '0 2px 8px rgba(22,119,255,0.3)' : 'none',
-                }}
-              />
+              <div style={{ flex: 1, position: 'relative' }}>
+                <Input.TextArea
+                  ref={inputRef}
+                  value={input}
+                  onChange={e => { setInput(e.target.value); setShowSlashMenu(e.target.value.startsWith('/')); }}
+                  onPressEnter={(e) => {
+                    if (!e.shiftKey) { e.preventDefault(); sendMessage(input); }
+                  }}
+                  placeholder={loading ? 'AI 正在回复中...' : '问我任何投资问题... (Enter 发送)'}
+                  autoSize={{ minRows: 1, maxRows: 4 }}
+                  disabled={loading}
+                  style={{
+                    borderRadius: 12, resize: 'none',
+                    background: isDark ? 'rgba(255,255,255,0.06)' : '#f7f8fa',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e8e8e8'}`,
+                    padding: '8px 36px 8px 12px',
+                  }}
+                />
+                {/* Clear button */}
+                {input && !loading && (
+                  <CloseOutlined
+                    onClick={() => { setInput(''); setShowSlashMenu(false); }}
+                    style={{
+                      position: 'absolute', right: 10, bottom: 10,
+                      fontSize: 12, color: isDark ? '#666' : '#bbb',
+                      cursor: 'pointer', transition: 'color 0.2s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#1677ff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = isDark ? '#666' : '#bbb'; }}
+                  />
+                )}
+              </div>
+              {loading ? (
+                <Button
+                  type="primary"
+                  icon={<StopOutlined />}
+                  size="large"
+                  onClick={stopGeneration}
+                  style={{
+                    borderRadius: 12, width: 44, height: 40, flexShrink: 0,
+                    background: '#ff4d4f', border: 'none',
+                    boxShadow: '0 2px 8px rgba(255,77,79,0.3)',
+                  }}
+                />
+              ) : (
+                <Button
+                  type="primary"
+                  icon={<SendOutlined />}
+                  size="large"
+                  onClick={() => sendMessage(input)}
+                  disabled={!input.trim()}
+                  style={{
+                    borderRadius: 12, width: 44, height: 40, flexShrink: 0,
+                    background: input.trim() ? 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)' : undefined,
+                    border: 'none',
+                    boxShadow: input.trim() ? '0 2px 8px rgba(22,119,255,0.3)' : 'none',
+                  }}
+                />
+              )}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: isDark ? '#555' : '#ccc' }}>
-              <span>Claude AI 驱动 · 七层能力体系</span>
-              <span>{input.length > 0 ? `${input.length} 字` : 'Enter 发送 · Shift+Enter 换行'}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, fontSize: 11, color: isDark ? '#555' : '#ccc' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>AI 大模型驱动</span>
+                {!isOnline && <span style={{ color: '#ff4d4f' }}>离线</span>}
+              </div>
+              <span>{input.length > 0 ? `${input.length} / 2000` : 'Enter 发送 · Shift+Enter 换行 · / 命令'}</span>
             </div>
           </div>
         </Card>
@@ -1039,6 +1447,7 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
 
       {renderSessionsDrawer()}
       {renderFavoritesDrawer()}
+      {renderMobileSidebar()}
     </div>
- );
+  );
 }

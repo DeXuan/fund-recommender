@@ -564,6 +564,19 @@ async function initDatabase(retries = 3) {
         updated_at TIMESTAMP DEFAULT NOW()
       )`,
       `CREATE INDEX IF NOT EXISTS idx_stock_alerts_user ON stock_alert_rules(user_id)`,
+      // 指数估值历史快照（用于分位数计算）
+      `CREATE TABLE IF NOT EXISTS index_valuation_history (
+        id SERIAL PRIMARY KEY,
+        index_code VARCHAR(10) NOT NULL,
+        index_name VARCHAR(50),
+        trade_date DATE NOT NULL,
+        pe DECIMAL(10, 2),
+        pb DECIMAL(10, 2),
+        price DECIMAL(10, 2),
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(index_code, trade_date)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_valuation_history_code_pe ON index_valuation_history(index_code, pe)`,
       // 指数估值温度缓存
       `CREATE TABLE IF NOT EXISTS index_temperature (
         index_code VARCHAR(20) PRIMARY KEY,

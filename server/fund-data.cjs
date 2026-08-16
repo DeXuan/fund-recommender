@@ -160,7 +160,7 @@ const allFunds = [
   { code: '004856', name: '广发中证全指建筑材料指数A', type: '指数增强', industry: '陶瓷/建材', index: '中证全指建筑材料', managementFee: 1.00, custodyFee: 0.20, serviceFee: 0.00, totalFee: 1.20, scale: 8.90, rating: 3, buySuggestion: '可配置', dailyLimit: 0 },
   { code: '004857', name: '广发中证全指建筑材料指数C', type: '指数增强', industry: '陶瓷/建材', index: '中证全指建筑材料', managementFee: 1.00, custodyFee: 0.20, serviceFee: 0.30, totalFee: 1.50, scale: 5.60, rating: 3, buySuggestion: '费率偏高', dailyLimit: 0 },
   // 人工智能行业基金（补充）
-  { code: '013349', name: '易方达人工智能ETF联接C', type: 'ETF联接', industry: '人工智能', index: '中证人工智能', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 8.50, rating: 4, buySuggestion: '可配置', dailyLimit: 0 },
+  { code: '013349', name: '创金合信大健康混合C', type: '混合型-偏股', industry: '大健康', index: null, managementFee: 1.20, custodyFee: 0.20, serviceFee: 0.50, totalFee: 1.90, scale: 0.62, rating: 3, buySuggestion: '开放申购', dailyLimit: 0 },
   { code: '013350', name: '华夏中证人工智能ETF联接A', type: 'ETF联接', industry: '人工智能', index: '中证人工智能', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 15.20, rating: 5, buySuggestion: '优先配置', dailyLimit: 0 },
   { code: '013351', name: '华夏中证人工智能ETF联接C', type: 'ETF联接', industry: '人工智能', index: '中证人工智能', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.20, totalFee: 0.80, scale: 10.80, rating: 5, buySuggestion: '优先配置', dailyLimit: 0 },
   { code: '515070', name: '华夏中证人工智能ETF', type: 'ETF', industry: '人工智能', index: '中证人工智能', managementFee: 0.50, custodyFee: 0.10, serviceFee: 0.00, totalFee: 0.60, scale: 45.60, rating: 5, buySuggestion: '优先配置', dailyLimit: 0 },
