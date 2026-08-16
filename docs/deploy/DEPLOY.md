@@ -55,7 +55,11 @@
 │   ├── portfolio.cjs     # 持仓管理模块
 │   ├── data-fetcher.cjs  # 数据抓取模块
 │   ├── news-fetcher.cjs  # 新闻抓取模块
+│   ├── calendar-fetcher.cjs # 实时财经日历抓取（集思录）
+│   ├── fund-analysis.cjs  # 基金分析模块
 │   ├── subscription-service.cjs # 订阅会员服务
+│   ├── jobs/
+│   │   └── index.cjs     # 每日定时任务调度中心（QDII/指数估值/全量/板块）
 │   ├── routes/
 │   │   ├── api.cjs               # 主 API 路由
 │   │   ├── funds.cjs             # 基金数据路由
@@ -94,6 +98,13 @@
 │       ├── alipay.cjs         # 支付宝 SDK 封装
 │       └── logger.cjs         # 结构化日志（winston）
 ├── scripts/              # 数据抓取脚本
+│   ├── update-all-funds.cjs          # 全量基金数据更新（支付宝/蚂蚁财富 API）
+│   ├── update-all-funds-full.cjs     # 全量基金数据更新（完整字段）
+│   ├── update-fund-data.cjs          # 基金基础数据更新
+│   ├── update-qdii-funds.cjs         # QDII 基金专项更新（限额 + 1y/3m/1m）
+│   ├── update-index-valuation.cjs    # 指数估值更新（PE/PB + 历史分位）
+│   ├── update-sector-data.cjs        # 行业板块数据更新
+│   ├── fetch-gold-funds.cjs          # 金选基金数据抓取
 ├── .env                  # 环境变量（不上传到仓库）
 ├── package.json
 └── node_modules/
