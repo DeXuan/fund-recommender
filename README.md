@@ -1,11 +1,17 @@
 # 基金推荐助手
 
-[![GitHub stars](https://img.shields.io/github/stars/DeXuan/fund-recommender?style=flat-square&label=Stars&color=blue)](https://github.com/DeXuan/fund-recommender/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/DeXuan/fund-recommender?style=flat-square&label=Forks&color=green)](https://github.com/DeXuan/fund-recommender/network/members)
-[![GitHub license](https://img.shields.io/github/license/DeXuan/fund-recommender?style=flat-square&label=License&color=purple)](https://github.com/DeXuan/fund-recommender)
-[![GitHub issues](https://img.shields.io/github/issues/DeXuan/fund-recommender?style=flat-square&label=Issues&color=orange)](https://github.com/DeXuan/fund-recommender/issues)
+<!-- 动态徽章（实时从 GitHub 读取，无需手动维护） -->
+[![CI Status](https://img.shields.io/github/actions/workflow/status/DeXuan/fund-recommender/test.yml?style=flat-square&logo=github&label=CI)](https://github.com/DeXuan/fund-recommender/actions)
+[![Version](https://img.shields.io/github/package-json/v/DeXuan/fund-recommender?style=flat-square&label=Version&color=blue)](https://github.com/DeXuan/fund-recommender/releases)
+[![Stars](https://img.shields.io/github/stars/DeXuan/fund-recommender?style=flat-square&label=Stars&color=yellow)](https://github.com/DeXuan/fund-recommender/stargazers)
+[![Forks](https://img.shields.io/github/forks/DeXuan/fund-recommender?style=flat-square&label=Forks&color=green)](https://github.com/DeXuan/fund-recommender/network/members)
+[![License](https://img.shields.io/github/license/DeXuan/fund-recommender?style=flat-square&label=License&color=purple)](https://github.com/DeXuan/fund-recommender)
+[![Issues](https://img.shields.io/github/issues/DeXuan/fund-recommender?style=flat-square&label=Issues&color=orange)](https://github.com/DeXuan/fund-recommender/issues)
+[![Last commit](https://img.shields.io/github/last-commit/DeXuan/fund-recommender?style=flat-square&label=Last commit&color=lightgrey)](https://github.com/DeXuan/fund-recommender/commits/master)
+[![Repo size](https://img.shields.io/github/repo-size/DeXuan/fund-recommender?style=flat-square&label=Repo&color=blue)](https://github.com/DeXuan/fund-recommender)
+[![Contributors](https://img.shields.io/github/contributors/DeXuan/fund-recommender?style=flat-square&label=Contributors&color=teal)](https://github.com/DeXuan/fund-recommender/graphs/contributors)
+[![Top language](https://img.shields.io/github/languages/top/DeXuan/fund-recommender?style=flat-square&label=TypeScript)](https://github.com/DeXuan/fund-recommender)
 [![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=white)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Express](https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-4169e1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Capacitor](https://img.shields.io/badge/Capacitor-8-119eff?style=flat-square&logo=capacitor&logoColor=white)](https://capacitorjs.com/)
@@ -373,7 +379,11 @@ fund-recommender/
 │   ├── portfolio.cjs          # 持仓管理模块（含定投、收益地图、组合洞察）
 │   ├── data-fetcher.cjs       # 数据抓取模块（腾讯/新浪/东方财富 API）
 │   ├── news-fetcher.cjs       # 新闻抓取模块
+│   ├── calendar-fetcher.cjs   # 实时财经日历抓取（集思录，30分钟缓存）
+│   ├── fund-analysis.cjs      # 基金诊断分析引擎
 │   ├── subscription-service.cjs # 订阅会员服务
+│   ├── jobs/
+│   │   └── index.cjs          # 定时任务注册中心（QDII/估值/净值/板块等）
 │   ├── routes/
 │   │   ├── api.cjs            # 路由聚合层（薄壳，挂载子路由）
 │   │   ├── funds.cjs          # 基金路由（列表、详情、QDII、金选、易方达）
