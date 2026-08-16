@@ -137,6 +137,7 @@ async function fetchEastmoneyNews() {
         needInteractData: '0',
         page_index: '1',
         page_size: '30',
+        req_trace: '1',
       },
       timeout: 10000,
       headers: {
@@ -146,15 +147,15 @@ async function fetchEastmoneyNews() {
     });
 
     if (!response.data || !response.data.data || !response.data.data.list) {
-      // 尝试备用API
+      // 尝试备用API（公告池）
       return await fetchEastmoneyLiveData();
     }
 
     const items = response.data.data.list;
     return items.map(item => {
       const title = (item.title || '').replace(/<[^>]+>/g, '').trim();
-      const content = (item.digest || item.content || '').replace(/<[^>]+>/g, '').trim();
-      const pubTime = item.showtime || item.publish_time || '';
+      const content = (item.summary || item.digest || item.content || '').replace(/<[^>]+>/g, '').trim();
+      const pubTime = item.showTime || item.showtime || item.publish_time || '';
 
       return {
         id: `em_${item.art_uniqueurl || item.art_code || item.id || Date.now()}`,
