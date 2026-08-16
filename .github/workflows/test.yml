@@ -30,4 +30,4 @@ jobs:
         run: npx vitest run
 
       - name: Backend tests
-        run: node --test "server/__tests__/*.test.cjs"
+        run: node --test server/__tests__/*.test.cjs
