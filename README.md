@@ -23,6 +23,7 @@
 ### 网页版
 
 🔗 **http://111.229.32.106:8686/web/**
+<img width="1909" height="1080" alt="ScreenShot_2026-08-16_163050_508" src="https://github.com/user-attachments/assets/05cca001-7ee3-454b-b8b1-69c88341439a" />
 
 已部署：Ubuntu 服务器 · Nginx 反向代理 + Express 5 + PostgreSQL · PM2 守护 · 每 15 分钟自动更新基金净值 · 集思录实时财经日历。
 
