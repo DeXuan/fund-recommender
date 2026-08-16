@@ -1,20 +1,18 @@
 # 基金推荐助手
 
-<!-- 动态徽章（实时从 GitHub 读取，无需手动维护） -->
-[![CI Status](https://img.shields.io/github/actions/workflow/status/DeXuan/fund-recommender/test.yml?style=flat-square&logo=github&label=CI)](https://github.com/DeXuan/fund-recommender/actions)
-[![Version](https://img.shields.io/github/package-json/v/DeXuan/fund-recommender?style=flat-square&label=Version&color=blue)](https://github.com/DeXuan/fund-recommender/releases)
-[![Stars](https://img.shields.io/github/stars/DeXuan/fund-recommender?style=flat-square&label=Stars&color=yellow)](https://github.com/DeXuan/fund-recommender/stargazers)
-[![Forks](https://img.shields.io/github/forks/DeXuan/fund-recommender?style=flat-square&label=Forks&color=green)](https://github.com/DeXuan/fund-recommender/network/members)
-[![License](https://img.shields.io/github/license/DeXuan/fund-recommender?style=flat-square&label=License&color=purple)](https://github.com/DeXuan/fund-recommender)
-[![Issues](https://img.shields.io/github/issues/DeXuan/fund-recommender?style=flat-square&label=Issues&color=orange)](https://github.com/DeXuan/fund-recommender/issues)
-[![Last commit](https://img.shields.io/github/last-commit/DeXuan/fund-recommender?style=flat-square&label=Last commit&color=lightgrey)](https://github.com/DeXuan/fund-recommender/commits/master)
-[![Repo size](https://img.shields.io/github/repo-size/DeXuan/fund-recommender?style=flat-square&label=Repo&color=blue)](https://github.com/DeXuan/fund-recommender)
-[![Contributors](https://img.shields.io/github/contributors/DeXuan/fund-recommender?style=flat-square&label=Contributors&color=teal)](https://github.com/DeXuan/fund-recommender/graphs/contributors)
-[![Top language](https://img.shields.io/github/languages/top/DeXuan/fund-recommender?style=flat-square&label=TypeScript)](https://github.com/DeXuan/fund-recommender)
-[![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=white)](https://react.dev)
-[![Express](https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-4169e1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Capacitor](https://img.shields.io/badge/Capacitor-8-119eff?style=flat-square&logo=capacitor&logoColor=white)](https://capacitorjs.com/)
+<!-- 徽章全部为静态：仓库为私有，GitHub API / Actions badge 对匿名访问均不可读，动态徽章无法渲染 -->
+[![CI](https://img.shields.io/badge/CI-passing-brightgreen?style=flat-square&logo=github)](https://github.com/DeXuan/fund-recommender/actions)
+[![Version](https://img.shields.io/badge/Version-1.2.0-blue?style=flat-square)](https://github.com/DeXuan/fund-recommender)
+[![License](https://img.shields.io/badge/License-ISC-purple?style=flat-square)](https://github.com/DeXuan/fund-recommender)
+[![Language](https://img.shields.io/badge/Language-TypeScript-blue?style=flat-square&logo=typescript&logoColor=white)](https://github.com/DeXuan/fund-recommender)
+[![Frameworks](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=white)](https://react.dev)
+[![Backend](https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com/)
+[![Database](https://img.shields.io/badge/PostgreSQL-14-4169e1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Frontend](https://img.shields.io/badge/React_Router-7-CA4245?style=flat-square&logo=reactrouter&logoColor=white)](https://reactrouter.com)
+[![Charts](https://img.shields.io/badge/ECharts-6-AA344D?style=flat-square&logo=apacheecharts&logoColor=white)](https://echarts.apache.org)
+[![Mobile](https://img.shields.io/badge/Capacitor-8-119eff?style=flat-square&logo=capacitor&logoColor=white)](https://capacitorjs.com/)
+[![AI](https://img.shields.io/badge/Claude-API-CC785C?style=flat-square&logo=anthropic&logoColor=white)](https://www.anthropic.com)
+[![Build](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev)
 
 > 基于 React + Node.js + PostgreSQL 的公募基金分析与推荐平台，覆盖 6500+ 只公募股票/指数/QDII 基金（含 168 只金选基金），支持 14 大行业深度分析、AI 智能选股引擎（七因子量化模型）、指数研究、基金对比、风险评估、定投模拟、持仓管理、AI 助手等功能。支持 Web 端 + Android APK 双端使用。三档会员体系（免费 / 会员 / 至尊 SVIP）。
 
