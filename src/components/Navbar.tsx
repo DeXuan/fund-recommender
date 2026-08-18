@@ -175,7 +175,7 @@ export default function Navbar() {
             <StockOutlined style={{ fontSize: isMobile ? 17 : 20, color: '#fff' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <span style={{ fontWeight: 700, fontSize: isMobile ? 15 : 17, color: 'var(--primary)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>基金推荐助手</span>
+            <span style={{ fontWeight: 700, fontSize: isMobile ? 15 : 17, color: 'var(--primary)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>个人基金数据看板</span>
             {!isMobile && <span style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.2 }}>智能投资分析平台</span>}
           </div>
         </Link>
