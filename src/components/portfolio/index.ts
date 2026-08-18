@@ -4,4 +4,3 @@ export { TransactionHistoryTab } from './TransactionHistoryTab';
 export { DeepAnalysisTab } from './DeepAnalysisTab';
 export { GoalPlanningTab } from './GoalPlanningTab';
 export { SmartDCATab } from './SmartDCATab';
-export { SellModal } from './SellModal';

@@ -21,7 +21,6 @@ import type { PortfolioHolding, PortfolioSummary, FundRecord } from '../types';
 import { ProBadge } from '../components/stock-picker';
 import ReturnsMap from '../components/ReturnsMap';
 import VIPInsights from '../components/VIPInsights';
-import { SellModal } from '../components/portfolio/SellModal';
 import { TransactionHistoryTab } from '../components/portfolio/TransactionHistoryTab';
 import { DeepAnalysisTab } from '../components/portfolio/DeepAnalysisTab';
 import { GoalPlanningTab } from '../components/portfolio/GoalPlanningTab';
@@ -83,12 +82,6 @@ export default function Portfolio() {
   const [dcaExpectedReturn, setDcaExpectedReturn] = useState(10);
   const [dcaResult, setDcaResult] = useState<any>(null);
 
-  // 卖出弹窗状态
-  const [sellModalOpen, setSellModalOpen] = useState(false);
-  const [sellTarget, setSellTarget] = useState<PortfolioHolding | null>(null);
-  const [sellForm] = Form.useForm();
-  const [sellLoading, setSellLoading] = useState(false);
-
   // 交易历史状态
   const [transactions, setTransactions] = useState<any[]>([]);
   const [txTotal, setTxTotal] = useState(0);
@@ -96,6 +89,9 @@ export default function Portfolio() {
   const [txStats, setTxStats] = useState<any>({});
   const [txFilter, setTxFilter] = useState('all');
   const [txLoading, setTxLoading] = useState(false);
+
+  // 资产类型筛选：代码含字母=招行理财，纯数字=公募基金
+  const [assetFilter, setAssetFilter] = useState<'all' | 'fund' | 'cmb'>('all');
 
   // 深度分析状态
   const [industryData, setIndustryData] = useState<any>(null);
@@ -413,43 +409,6 @@ export default function Portfolio() {
     });
   };
 
-  // 卖出操作
-  const handleSell = (holding: PortfolioHolding) => {
-    setSellTarget(holding);
-    sellForm.resetFields();
-    sellForm.setFieldsValue({
-      sell_price: holding.current_nav || undefined,
-      sell_date: undefined,
-      sell_fee: 0,
-      notes: '',
-    });
-    setSellModalOpen(true);
-  };
-
-  const handleSellSubmit = async () => {
-    if (!sellTarget) return;
-    try {
-      const values = await sellForm.validateFields();
-      setSellLoading(true);
-      const result = await portfolioApi.sell({
-        fund_code: sellTarget.fund_code,
-        shares: values.shares,
-        sell_price: values.sell_price,
-        sell_date: values.sell_date.format('YYYY-MM-DD'),
-        sell_fee: values.sell_fee || 0,
-        notes: values.notes || '',
-      });
-      message.success(`赎回成功！实现盈亏 ¥${result.summary.realizedPnl}`);
-      setSellModalOpen(false);
-      loadData();
-      loadTransactions();
-    } catch (err: any) {
-      message.error(err.message || '卖出失败');
-    } finally {
-      setSellLoading(false);
-    }
-  };
-
   // 交易历史
   const loadTransactions = useCallback(async (page = 1, filter = txFilter) => {
     setTxLoading(true);
@@ -697,13 +656,6 @@ export default function Portfolio() {
           >
             编辑
           </Button>
-          <Button
-            type="link" size="small" icon={<SwapOutlined />}
-            style={{ color: 'var(--warning)' }}
-            onClick={() => handleSell(holding)}
-          >
-            赎回
-          </Button>
           <Popconfirm title="确认删除此基金的所有持仓记录？" onConfirm={async () => {
             try {
               await Promise.all(holding.records.map(r => portfolioApi.deleteRecord(r.id)));
@@ -725,8 +677,13 @@ export default function Portfolio() {
     ? columns.filter((c) => !['total_shares', 'avg_cost_price', 'current_nav'].includes(c.key as string))
     : columns;
 
+  // 按资产类型筛选（招行理财=代码含字母，公募基金=纯数字）
+  const filteredHoldings = assetFilter === 'all'
+    ? holdings
+    : holdings.filter(h => assetFilter === 'cmb' ? !/^\d+$/.test(h.fund_code) : /^\d+$/.test(h.fund_code));
+
   // Flatten records for the table (grouped view)
-  const tableData = holdings.map((h, i) => ({ ...h, key: h.fund_code || i }));
+  const tableData = filteredHoldings.map((h, i) => ({ ...h, key: h.fund_code || i }));
 
   const tabItems = [
     {
@@ -781,6 +738,16 @@ export default function Portfolio() {
         }
         extra={
           <Space wrap>
+            <Segmented
+              value={assetFilter}
+              onChange={(v) => setAssetFilter(v as 'all' | 'fund' | 'cmb')}
+              options={[
+                { label: '全部', value: 'all' },
+                { label: '公募基金', value: 'fund' },
+                { label: '招行理财', value: 'cmb' },
+              ]}
+              size={isMobile ? 'small' : 'middle'}
+            />
             <Button
               icon={<SyncOutlined spin={refreshing} />}
               onClick={handleRefreshNav}
@@ -1596,15 +1563,6 @@ export default function Portfolio() {
         style={{ marginBottom: 0 }}
       />
 
-      {/* 卖出弹窗 */}
-      <SellModal
-        sellModalOpen={sellModalOpen}
-        sellTarget={sellTarget}
-        sellForm={sellForm}
-        sellLoading={sellLoading}
-        onSubmit={handleSellSubmit}
-        onCancel={() => setSellModalOpen(false)}
-      />
-    </div>
+      </div>
   );
 }
