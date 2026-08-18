@@ -22,7 +22,7 @@
 
 ### 网页版
 
-🔗 **http://111.229.32.106:8686/web/**
+🔗 **恭喜发财888.cn** → [https://恭喜发财888.cn/web/](https://xn--888-vw3e05fxyzc07e.cn/web/)
 <img width="1914" height="1080" alt="1" src="https://github.com/user-attachments/assets/b25a258e-66e3-4185-b1de-bfc51d790c1d" />
 <img width="1920" height="1080" alt="2" src="https://github.com/user-attachments/assets/055b6b01-00b6-4249-bd96-b8da4362d82d" />
 <img width="1920" height="1080" alt="3" src="https://github.com/user-attachments/assets/9e923e1c-bc31-4a37-9023-4254e07c9b28" />
@@ -87,7 +87,7 @@
                     └─────────────────┘
 ```
 
-> 当前生产服务器 `111.229.32.106`。旧站：`http://111.229.32.106:8688/web`（`/var/www/jijin`，PM2 `fund-server`，后端 3003）；新站：`http://111.229.32.106:8686/web`（`/var/www/jijin85`，PM2 `fund-server-85`，后端 3303）。
+> 当前生产域名：`https://恭喜发财888.cn`（新站 `/var/www/jijin85`，PM2 `fund-server-85`，后端 3303，nginx 8686）；旧站已停：`/var/www/jijin`，PM2 `fund-server`，后端 3003。
 
 ## 功能模块
 
