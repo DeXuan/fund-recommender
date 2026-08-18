@@ -25,7 +25,7 @@ interface FundDetail {
   holdingDays: number;
   riskLevel: string;
   buyTimingScore: number;
-  diagnosis: string;
+  diagnosis: string | { type: string; text: string }[];
   industry: string;
   assetCategory: string;
 }
@@ -650,7 +650,15 @@ export default function VIPInsights() {
                         {f.riskLevel}
                       </Tag>
                     </td>
-                    <td style={{ padding: '8px 6px', color: isDark ? '#a0a0a0' : '#666', maxWidth: 200 }}>{f.diagnosis}</td>
+                    <td style={{ padding: '8px 6px', color: isDark ? '#a0a0a0' : '#666', maxWidth: 200 }}>
+                      {typeof f.diagnosis === 'string' ? f.diagnosis : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {(f.diagnosis || []).map((d, di) => (
+                            <span key={di} style={{ color: d.type === 'danger' ? 'var(--danger)' : d.type === 'success' ? 'var(--success)' : d.type === 'warning' ? 'var(--warning)' : 'inherit', fontSize: 12 }}>{d.text}</span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
