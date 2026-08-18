@@ -284,7 +284,7 @@ export default function Login() {
     }}>
       <Card style={{ width: 420, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <h2 style={{ margin: 0, color: 'var(--primary)' }}>基金推荐助手</h2>
+          <h2 style={{ margin: 0, color: 'var(--primary)' }}>个人基金数据看板</h2>
           <p style={{ color: isDarkTheme ? '#a0a0a0' : '#666', margin: '8px 0 0' }}>登录后使用理财记账功能</p>
         </div>
 
@@ -364,7 +364,7 @@ export default function Login() {
             <AlipayOutlined style={{ fontSize: 32, color: '#fff' }} />
             <div style={{ color: '#fff', fontSize: 16, fontWeight: 600, marginTop: 8 }}>支付宝授权登录</div>
             <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 4 }}>
-              基金推荐助手 · 安全登录
+              个人基金数据看板 · 安全登录
             </div>
           </div>
 
@@ -409,7 +409,7 @@ export default function Login() {
             <AlipayOutlined style={{ fontSize: 32, color: '#fff' }} />
             <div style={{ color: '#fff', fontSize: 16, fontWeight: 600, marginTop: 8 }}>支付宝扫码登录</div>
             <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 4 }}>
-              基金推荐助手 · 演示模式
+              个人基金数据看板 · 演示模式
             </div>
           </div>
 

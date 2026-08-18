@@ -36,15 +36,28 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const { Title, Text, Paragraph, Link } = Typography;
 
-const APP_VERSION = '1.2.0';
-const APP_BUILD = '20260816';
+const APP_VERSION = '1.2.1';
+const APP_BUILD = '20260818';
 
 const changelog = [
   {
-    version: 'v1.2.0',
-    date: '2026-08-16',
+    version: 'v1.2.1',
+    date: '2026-08-18',
     tag: 'latest' as const,
     color: 'blue',
+    items: [
+      'AI 助手流式输出修复（真 SSE 逐字输出 + 连接复用提速）',
+      'AI 接入备用免费网关，主模型切换为 GLM-4.5-Air（首 token ~0.7s）',
+      '持仓明细新增资产类型筛选（招行理财 / 公募基金，按代码字母区分）',
+      '移除赎回功能入口（暂无该业务）',
+      '正式域名绑定（https://恭喜发财888.cn）、登录 CORS 白名单修复',
+      '品牌更名"个人基金数据看板"、页面底部新增免责声明',
+    ],
+  },
+  {
+    version: 'v1.2.0',
+    date: '2026-08-16',
+    color: 'default',
     items: [
       '实时财经日历接入（集思录数据源，新股/分红/可转债/期货交割）',
       '新闻与持仓行业智能匹配（个人化资讯推送）',
@@ -248,10 +261,10 @@ export default function About() {
             <StockOutlined style={{ fontSize: 44, color: '#fff' }} />
           </div>
           <Title level={3} style={{ marginBottom: 4 }}>
-            基金推荐助手
+            个人基金数据看板
           </Title>
           <Text type="secondary" style={{ fontSize: 15 }}>
-            智能投资分析平台 · 支付宝基金推荐助手
+            智能投资分析平台
           </Text>
           <div style={{ marginTop: 12 }}>
             <Space>
@@ -314,19 +327,13 @@ export default function About() {
           <Col xs={24} sm={12}>
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
               <div>
-                <Text type="secondary">服务器</Text>
-                <div>
-                  <Text copyable style={{ fontSize: 13 }}>
-                    111.229.32.106:3003
-                  </Text>
-                </div>
-              </div>
-              <div>
                 <Text type="secondary">项目仓库</Text>
                 <div>
                   <Space>
                     <GithubOutlined />
-                    <Text>fund-recommender</Text>
+                    <a href="https://github.com/DeXuan/fund-recommender" target="_blank" rel="noopener noreferrer" style={{ color: '#1677ff' }}>
+                      fund-recommender
+                    </a>
                   </Space>
                 </div>
               </div>
