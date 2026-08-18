@@ -1,7 +1,7 @@
 {
   "name": "fund-recommender",
   "version": "1.2.0",
-  "description": "支付宝基金推荐助手",
+  "description": "个人基金数据看板",
   "type": "module",
   "scripts": {
     "start": "node server/index.cjs",
