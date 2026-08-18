@@ -504,39 +504,53 @@ router.post('/api/ai/chat/stream', aiLimiter, async (req, res) => {
     let fullReply = '';
     let streamFailed = false;
 
-    // 模型热切换：主模型失败时依次尝试备用模型
+    // 模型热切换：主模型失败时依次尝试备用模型。
+    // stream:true 若被代理拒绝（如 SSE 无 body），降级为 stream:false 一次取全文再模拟 SSE 输出。
     const models = getModels();
-    let stream = null;
-    let lastErr = null;
+    let completed = false;
     for (const model of models) {
       try {
-        stream = await client.chat.completions.create({
+        const resp = await client.chat.completions.create({
           model,
           max_tokens: 4096,
           stream: true,
           messages: [{ role: 'system', content: fullSystemPrompt }, ...messages],
         });
-        break;
-      } catch (e) {
-        lastErr = e;
-        logger.warn(`[AI Stream] 模型 ${model} 初始化失败: ${e.message}`);
-      }
-    }
-    if (!stream) {
-      throw lastErr || new Error('所有模型均不可用');
-    }
-
-    try {
-      for await (const chunk of stream) {
-        const text = chunk.choices?.[0]?.delta?.content;
+        // 迭代流式 chunk；代理不支持 SSE 时会抛 "no body" 等错误
+        try {
+          for await (const chunk of resp) {
+            const text = chunk.choices?.[0]?.delta?.content;
+            if (text) {
+              fullReply += text;
+              res.write(`data: ${JSON.stringify({ type: 'text', content: text })}\n\n`);
+            }
+          }
+          completed = true;
+          break;
+        } catch (iterErr) {
+          logger.warn(`[AI Stream] 模型 ${model} 流式迭代失败，降级非流式: ${iterErr.message}`);
+        }
+        // 非流式降级：一次请求拿全文
+        const nonStream = await client.chat.completions.create({
+          model,
+          max_tokens: 4096,
+          stream: false,
+          messages: [{ role: 'system', content: fullSystemPrompt }, ...messages],
+        });
+        const text = nonStream.choices?.[0]?.message?.content || '';
         if (text) {
           fullReply += text;
           res.write(`data: ${JSON.stringify({ type: 'text', content: text })}\n\n`);
         }
+        completed = true;
+        break;
+      } catch (e) {
+        logger.warn(`[AI Stream] 模型 ${model} 初始化失败: ${e.message}`);
       }
-    } catch (err) {
+    }
+    if (!completed) {
       streamFailed = true;
-      logger.warn('[AI Stream] 错误:', err.message);
+      logger.warn('[AI Stream] 所有模型均不可用');
       // 规则引擎兜底
       try {
         const fallback = await ruleEngineFallback(message.trim(), userId);

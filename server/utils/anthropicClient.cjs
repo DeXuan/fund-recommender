@@ -1,7 +1,12 @@
 const OpenAI = require('openai');
 const https = require('https');
 
-// 自签证书网关 (如内网 nginx LLM 网关) node fetch 默认拒绝，customFetch 跳过TLS校验
+// 自签证书网关 (如内网 nginx LLM 网关) node fetch 默认拒绝，customFetch 跳过TLS校验。
+// 须保留可读 body 流：SDK 流式 (stream:true) 依赖 resp.body 迭代读取 SSE 分块，
+// 仅缓冲到响应结束会收到 "Attempted to iterate over a response with no body" 错误。
+// 复用 agent：保持到网关的 TLS 连接，避免每次请求新建连接被上游限流/慢启动
+const selfSignedAgent = new https.Agent({ rejectUnauthorized: false, keepAlive: true, maxSockets: 16 });
+
 function selfSignedFetch(url, init = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
@@ -18,17 +23,48 @@ function selfSignedFetch(url, init = {}) {
         hostname: u.hostname, port: u.port, path: u.pathname + u.search,
         method: init.method || 'GET', headers,
         rejectUnauthorized: false,
-        agent: new https.Agent({ rejectUnauthorized: false }),
+        agent: selfSignedAgent,
       },
       (res) => {
+        // 缓冲 + 真实流双模式：json/text 用缓冲（非流式路径），body 暴露可读流（流式路径）。
+        // res.resume() 强制流动：流式路径依赖 body 迭代，非流式路径依赖 chunk 缓冲，
+        // 若等 start() 才流动，SDK 非流式不读 body → 永不结束。
+        // 单一 data handler：chunk 同时入缓冲 + 转发给流 controller（含回放，保证顺序）
         const chunks = [];
-        res.on('data', c => chunks.push(c));
-        res.on('end', () => resolve({
+        let done = false;
+        let waiters = [];
+        let controllerRef = null;
+        const notify = () => { done = true; waiters.forEach(w => w()); waiters = []; };
+        const waitDone = () => (done ? Promise.resolve() : new Promise(r => waiters.push(r)));
+
+        const stream = new ReadableStream({
+          start(controller) {
+            controllerRef = controller;
+            for (const c of chunks) controller.enqueue(c); // 回放在 handler 已收部分，保证流式不丢头
+          },
+          cancel() { controllerRef = null; }, // SDK 提前读完 body 时停止后续 enqueue
+        });
+        res.on('data', c => {
+          chunks.push(c);
+          if (controllerRef) controllerRef.enqueue(c);
+        });
+        res.on('end', () => {
+          notify();
+          if (controllerRef) { controllerRef.close(); controllerRef = null; }
+        });
+        res.on('error', e => {
+          notify();
+          if (controllerRef) { controllerRef.error(e); controllerRef = null; }
+        });
+        res.resume();
+        resolve({
           ok: res.statusCode >= 200 && res.statusCode < 300,
           status: res.statusCode, statusText: res.statusMessage,
-          headers: new Headers(res.headers), json: async () => JSON.parse(Buffer.concat(chunks).toString()),
-          text: async () => Buffer.concat(chunks).toString(),
-        }));
+          headers: new Headers(res.headers),
+          body: stream,
+          json: async () => JSON.parse(await waitDone().then(() => Buffer.concat(chunks).toString())),
+          text: async () => waitDone().then(() => Buffer.concat(chunks).toString()),
+        });
       }
     );
     req.on('error', reject);
