@@ -413,25 +413,25 @@ export default function Home() {
             >
               {/* 核心指标 */}
               <Row gutter={[16, 12]} style={{ marginBottom: 20 }}>
-                <Col span={6}>
+                <Col xs={12} lg={6}>
                   <div style={{ color: 'var(--text-tertiary)', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>总投入</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
                     ¥{totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </div>
                 </Col>
-                <Col span={6}>
+                <Col xs={12} lg={6}>
                   <div style={{ color: 'var(--text-tertiary)', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>当前市值</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
                     ¥{totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </div>
                 </Col>
-                <Col span={6}>
+                <Col xs={12} lg={6}>
                   <div style={{ color: 'var(--text-tertiary)', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>总收益率</div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: getReturnColor(totalReturn), fontFamily: 'var(--font-mono)' }}>
                     {formatReturn(totalReturn)}
                   </div>
                 </Col>
-                <Col span={6}>
+                <Col xs={12} lg={6}>
                   <div style={{ color: 'var(--text-tertiary)', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>风险指数</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ fontSize: 18, fontWeight: 700, color: riskIndex > 70 ? 'var(--danger)' : riskIndex > 40 ? 'var(--warning)' : 'var(--success)', fontFamily: 'var(--font-mono)' }}>
