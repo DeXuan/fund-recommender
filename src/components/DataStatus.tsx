@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Tag, Button, Space, Tooltip, Spin, message } from 'antd';
-import { SyncOutlined, CheckCircleOutlined, StockOutlined, PauseCircleOutlined, RestOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Tag, Button, Space, Tooltip, Spin, message, Grid } from 'antd';
+import { SyncOutlined, CheckCircleOutlined, StockOutlined, PauseCircleOutlined, RestOutlined, ClockCircleOutlined, UpOutlined, DownOutlined } from '@ant-design/icons';
 import { fundApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,6 +12,8 @@ const MARKET_STATE_CONFIG: Record<string, { label: string; color: string; icon: 
 
 export default function DataStatus() {
   const { user } = useAuth();
+  const isMobile = Grid.useBreakpoint().sm === false;
+  const [collapsed, setCollapsed] = useState(true);
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState('');
@@ -102,19 +104,22 @@ export default function DataStatus() {
   const stateConfig = MARKET_STATE_CONFIG[status?.marketState] || MARKET_STATE_CONFIG.holiday;
   const nextLabel = status?.isTrading ? '距收盘' : '距开盘';
 
+  const showFull = !isMobile || !collapsed;
+
   return (
     <div style={{
       display: 'flex',
       alignItems: 'center',
       gap: 12,
-      padding: '8px 16px',
+      padding: isMobile && collapsed ? '6px 16px' : '8px 16px',
       background: 'var(--bg-container)',
       backdropFilter: 'blur(10px)',
       borderRadius: 12,
       fontSize: 12,
       border: '1px solid var(--border-color-light)',
       boxShadow: 'var(--shadow-sm)',
-    }}>
+      cursor: isMobile ? 'pointer' : 'default',
+    }} onClick={isMobile ? () => setCollapsed(c => !c) : undefined}>
       <Space size={12} split={<span style={{ color: 'var(--border-color)' }}>|</span>}>
         {status?.isUpdating ? (
           <Tag icon={<SyncOutlined spin />} color="processing" style={{ margin: 0, borderRadius: 6 }}>
@@ -126,11 +131,13 @@ export default function DataStatus() {
           </Tag>
         )}
 
-        <Tag icon={stateConfig.icon as React.ReactElement} color={stateConfig.color} style={{ margin: 0, borderRadius: 6 }}>
-          {stateConfig.label}
-        </Tag>
+        {showFull && (
+          <Tag icon={stateConfig.icon as React.ReactElement} color={stateConfig.color} style={{ margin: 0, borderRadius: 6 }}>
+            {stateConfig.label}
+          </Tag>
+        )}
 
-        {status?.lastUpdateTime && (
+        {showFull && status?.lastUpdateTime && (
           <Tooltip title={new Date(status.lastUpdateTime).toLocaleString('zh-CN')}>
             <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
               <ClockCircleOutlined style={{ color: 'var(--text-tertiary)' }} />
@@ -139,14 +146,20 @@ export default function DataStatus() {
           </Tooltip>
         )}
 
-        {countdown && (
+        {showFull && countdown && (
           <span style={{ color: 'var(--primary)', fontWeight: 500 }}>
             {nextLabel}: {countdown}
           </span>
         )}
       </Space>
 
-      {isAdmin && (
+      {isMobile && (
+        <span style={{ marginLeft: 'auto', color: 'var(--text-tertiary)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+          {collapsed ? '查看' : '收起'}{collapsed ? <DownOutlined /> : <UpOutlined />}
+        </span>
+      )}
+
+      {isAdmin && (showFull || !isMobile) && (
         <Button
           size="small"
           icon={<SyncOutlined />}
