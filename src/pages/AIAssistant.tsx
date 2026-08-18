@@ -949,7 +949,7 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
   };
 
   return (
-    <div className="fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div className="fade-in" style={{ height: isDrawerMode ? '100%' : `calc(100dvh - ${isMobile ? 108 : 120}px)`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{`
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 20px rgba(102,126,234,0.2); } 50% { box-shadow: 0 0 30px rgba(102,126,234,0.4); } }
