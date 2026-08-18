@@ -1,4 +1,5 @@
 const OpenAI = require('openai');
+const http = require('http');
 const https = require('https');
 
 // 自签证书网关 (如内网 nginx LLM 网关) node fetch 默认拒绝，customFetch 跳过TLS校验。
@@ -6,6 +7,7 @@ const https = require('https');
 // 仅缓冲到响应结束会收到 "Attempted to iterate over a response with no body" 错误。
 // 复用 agent：保持到网关的 TLS 连接，避免每次请求新建连接被上游限流/慢启动
 const selfSignedAgent = new https.Agent({ rejectUnauthorized: false, keepAlive: true, maxSockets: 16 });
+const plainAgent = new http.Agent({ keepAlive: true, maxSockets: 16 });
 
 function selfSignedFetch(url, init = {}) {
   return new Promise((resolve, reject) => {
@@ -18,12 +20,13 @@ function selfSignedFetch(url, init = {}) {
       Object.assign(headers, init.headers);
     }
     if (body) headers['Content-Length'] = String(body.byteLength);
-    const req = https.request(
+    const transport = u.protocol === 'http:' ? http : https;
+    const req = transport.request(
       {
         hostname: u.hostname, port: u.port, path: u.pathname + u.search,
         method: init.method || 'GET', headers,
         rejectUnauthorized: false,
-        agent: selfSignedAgent,
+        agent: u.protocol === 'http:' ? plainAgent : selfSignedAgent,
       },
       (res) => {
         // 缓冲 + 真实流双模式：json/text 用缓冲（非流式路径），body 暴露可读流（流式路径）。
