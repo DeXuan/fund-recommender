@@ -89,7 +89,7 @@ function AnimatedNumber({ value, precision = 2, prefix = '', suffix = '', style 
 }
 
 /* ─── KPI 卡片 ─── */
-function KPICard({ label, value, precision, prefix, suffix, color, icon, onClick, trend }: {
+function KPICard({ label, value, precision, prefix, suffix, color, icon, onClick, trend, changePercent }: {
   label: string;
   value: number | null | undefined;
   precision?: number;
@@ -99,8 +99,10 @@ function KPICard({ label, value, precision, prefix, suffix, color, icon, onClick
   icon?: React.ReactNode;
   onClick?: () => void;
   trend?: 'up' | 'down' | 'flat';
+  changePercent?: number | null;
 }) {
   const displayColor = color || (value != null ? getReturnColor(value) : 'rgba(255,255,255,0.85)');
+  const showChange = changePercent != null && !isNaN(changePercent);
 
   return (
     <div className="kpi-glass" onClick={onClick} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}>
@@ -111,11 +113,15 @@ function KPICard({ label, value, precision, prefix, suffix, color, icon, onClick
       <div style={{ fontSize: 26, fontWeight: 700, color: displayColor, fontFamily: 'var(--font-mono)' }}>
         <AnimatedNumber value={value} precision={precision ?? 2} prefix={prefix} suffix={suffix} />
       </div>
-      {trend && (
+      {showChange ? (
+        <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: getReturnColor(changePercent) }}>
+          {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%
+        </div>
+      ) : trend ? (
         <div style={{ marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
           {trend === 'up' ? <RiseOutlined style={{ color: '#ff4d4f' }} /> : trend === 'down' ? <FallOutlined style={{ color: '#52c41a' }} /> : null}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -125,6 +131,7 @@ export default function Home() {
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const [indices, setIndices] = useState<MarketIndex[]>([]);
+  const [usIndices, setUsIndices] = useState<MarketIndex[]>([]);
   const [sectors, setSectors] = useState<SectorData[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [capitalFlow, setCapitalFlow] = useState<any>(null);
@@ -139,6 +146,7 @@ export default function Home() {
       const promises: Promise<any>[] = [
         fundApi.getMarketIndices(),
         fundApi.getSectors().catch(() => []),
+        fundApi.getUsIndices().catch(() => []),
         fundApi.getIndustryRecommendations(),
         fundApi.getCapitalFlow().catch(() => null),
       ];
@@ -148,10 +156,11 @@ export default function Home() {
       const results = await Promise.all(promises);
       setIndices(results[0]);
       setSectors(results[1]);
-      setRecommendations(results[2]);
-      setCapitalFlow(results[3]);
-      if (user && results[4]) {
-        setPortfolioSummary(results[4]);
+      setRecommendations(results[3]);
+      setCapitalFlow(results[4]);
+      setUsIndices(results[2]);
+      if (user && results[5]) {
+        setPortfolioSummary(results[5]);
       }
       setLastUpdate(new Date());
     } catch (error) {
@@ -184,8 +193,16 @@ export default function Home() {
   }
 
   // Derived data
-  const marketPrices = indices.slice(0, 4).map(i => i.price ?? null);
-  const marketChanges = indices.slice(0, 4).map(i => i.changePercent ?? null);
+  // 投资总览按 code 显式匹配，避免 ORDER BY code 导致的位置错位
+  const findIndex = (code: string) => [...indices, ...usIndices].find(i => i.code === code) || null;
+  const marketTiles: { code: string; label: string; icon: React.ReactNode; target: string }[] = [
+    { code: '000001', label: '上证指数', icon: <StockOutlined />, target: '/funds' },
+    { code: '000300', label: '沪深300', icon: <BarChartOutlined />, target: '/funds' },
+    { code: '000688', label: '科创50', icon: <ThunderboltOutlined />, target: '/industry' },
+    { code: '.DJI', label: '道琼斯', icon: <GlobalOutlined />, target: '/industry' },
+    { code: '.IXIC', label: '纳斯达克', icon: <GlobalOutlined />, target: '/industry' },
+    { code: '.INX', label: '标普500', icon: <GlobalOutlined />, target: '/industry' },
+  ];
   const totalPnl = portfolioSummary?.totalPnl || 0;
   const totalReturn = portfolioSummary?.totalReturn || 0;
   const totalValue = portfolioSummary?.totalValue || 0;
@@ -326,46 +343,22 @@ export default function Home() {
 
         {/* KPI 指标网格 */}
         <Row gutter={[16, 16]}>
-          <Col xs={12} sm={8} md={user ? 4 : 6}>
-            <KPICard
-              label="上证指数"
-              value={marketPrices[0]}
-              precision={2}
-              icon={<StockOutlined />}
-              color="#fff"
-              onClick={() => navigate('/funds')}
-            />
-          </Col>
-          <Col xs={12} sm={8} md={user ? 4 : 6}>
-            <KPICard
-              label="沪深300"
-              value={marketPrices[1]}
-              precision={2}
-              icon={<BarChartOutlined />}
-              color="#fff"
-              onClick={() => navigate('/funds')}
-            />
-          </Col>
-          <Col xs={12} sm={8} md={user ? 4 : 6}>
-            <KPICard
-              label="创业板指"
-              value={marketPrices[2]}
-              precision={2}
-              icon={<RiseOutlined />}
-              color="#fff"
-              onClick={() => navigate('/industry')}
-            />
-          </Col>
-          <Col xs={12} sm={8} md={user ? 4 : 6}>
-            <KPICard
-              label="科创50"
-              value={marketPrices[3]}
-              precision={2}
-              icon={<ThunderboltOutlined />}
-              color="#fff"
-              onClick={() => navigate('/industry')}
-            />
-          </Col>
+          {marketTiles.map(tile => {
+            const idx = findIndex(tile.code);
+            return (
+              <Col xs={12} sm={8} md={user ? 4 : 6} key={tile.code}>
+                <KPICard
+                  label={tile.label}
+                  value={idx?.price ?? null}
+                  precision={2}
+                  changePercent={idx?.changePercent ?? null}
+                  icon={tile.icon}
+                  color="#fff"
+                  onClick={() => navigate(tile.target)}
+                />
+              </Col>
+            );
+          })}
           {user && (
             <>
               <Col xs={12} sm={8} md={4}>

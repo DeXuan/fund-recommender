@@ -62,6 +62,11 @@ export const fundApi = {
     return data.indices || data;
   },
 
+  getUsIndices: async () => {
+    const data = await fetchApi<any>('/market/indices');
+    return data.usIndices || [];
+  },
+
   getSectors: async () => {
     const data = await fetchApi<any>('/market/sectors');
     return data.sectors || data;

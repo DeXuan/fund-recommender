@@ -27,8 +27,10 @@ router.get('/api/market/indices', handler(async (req) => {
     await fundService.initMarketIndices(defaultIndices);
     indices = defaultIndices;
   }
+  const usIndices = await fundService.getUsIndices().catch(() => []);
   return {
     indices,
+    usIndices,
     lastUpdate: req.app.locals.dataUpdateStatus?.lastUpdateTime,
     isTrading: isTradingHours(),
   };

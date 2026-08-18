@@ -56,6 +56,10 @@ async function fetchMarketIndices() {
     { code: '399006', symbol: 'sz399006', name: '创业板指' },
     { code: '000688', symbol: 'sh000688', name: '科创50' },
     { code: '000001', symbol: 'sh000001', name: '上证指数' },
+    // 美股指数：新浪 gb_ 格式，fields[1]=现价, fields[2]=涨跌幅%, fields[4]=涨跌额
+    { code: '.DJI', symbol: 'gb_dji', name: '道琼斯' },
+    { code: '.IXIC', symbol: 'gb_ixic', name: '纳斯达克' },
+    { code: '.INX', symbol: 'gb_inx', name: '标普500' },
   ];
 
   try {
@@ -81,13 +85,23 @@ async function fetchMarketIndices() {
       const config = symbols.find(s => s.symbol === symbol);
       if (!config) continue;
 
-      const prevClose = parseFloat(fields[2]);
-      const current = parseFloat(fields[3]);
+      const isUS = config.code.startsWith('.');
+      // 美股 gb_：fields[1]=现价, fields[2]=涨跌幅%, fields[4]=涨跌额
+      // A股 sh/sz：fields[2]=昨收, fields[3]=现价
+      const current = parseFloat(isUS ? fields[1] : fields[3]);
+      if (!current) continue;
 
-      if (!current || !prevClose) continue;
-
-      const change = current - prevClose;
-      const changePercent = (change / prevClose) * 100;
+      let change, changePercent;
+      if (isUS) {
+        changePercent = parseFloat(fields[2]);
+        change = parseFloat(fields[4]);
+        if (isNaN(change)) change = (changePercent / 100) * current;
+      } else {
+        const prevClose = parseFloat(fields[2]);
+        if (!prevClose) continue;
+        change = current - prevClose;
+        changePercent = (change / prevClose) * 100;
+      }
 
       await fundService.updateMarketIndex(config.code, {
         name: config.name,

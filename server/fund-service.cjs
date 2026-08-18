@@ -433,7 +433,9 @@ async function queryFundsForScoring(filters = {}) {
 
 async function getMarketIndices() {
   const pool = getPool();
-  const result = await pool.query('SELECT * FROM market_indices ORDER BY code');
+  const result = await pool.query(
+    "SELECT * FROM market_indices WHERE code NOT LIKE '.%' ORDER BY code"
+  );
   return result.rows.map(row => ({
     code: row.code,
     name: row.name,
@@ -444,6 +446,28 @@ async function getMarketIndices() {
     pb: row.pb ? parseFloat(row.pb) : null,
     pePercentile: row.pe_percentile ? parseFloat(row.pe_percentile) : null,
     pbPercentile: row.pb_percentile ? parseFloat(row.pb_percentile) : null,
+    valuation: row.valuation,
+    suggestion: row.suggestion,
+    dataDate: row.updated_at,
+  }));
+}
+
+// 美股指数（投资总览展示，无PE/分位估值）
+async function getUsIndices() {
+  const pool = getPool();
+  const result = await pool.query(
+    "SELECT * FROM market_indices WHERE code LIKE '.%' ORDER BY code"
+  );
+  return result.rows.map(row => ({
+    code: row.code,
+    name: row.name,
+    price: row.price ? parseFloat(row.price) : null,
+    change: row.change_amount ? parseFloat(row.change_amount) : null,
+    changePercent: row.change_percent ? parseFloat(row.change_percent) : null,
+    pe: null,
+    pb: null,
+    pePercentile: null,
+    pbPercentile: null,
     valuation: row.valuation,
     suggestion: row.suggestion,
     dataDate: row.updated_at,
@@ -752,6 +776,7 @@ module.exports = {
   updateFundReturns,
   getLatestNav,
   getMarketIndices,
+  getUsIndices,
   updateMarketIndex,
   initMarketIndices,
   getSectorData,
