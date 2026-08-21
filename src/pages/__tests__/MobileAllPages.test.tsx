@@ -52,10 +52,8 @@ vi.mock('../../services/api', () => ({
     getStats: vi.fn().mockResolvedValue({ total: 0, categories: {} }),
     getPersonalNews: vi.fn().mockResolvedValue({ items: [], holdings: [], watchlist: [], matchedIndustries: [] }),
     refresh: vi.fn().mockResolvedValue({}),
-    connectSSE: vi.fn().mockImplementation((onMessage: (d: any) => void) => {
+    connectSSE: vi.fn().mockImplementation(() => {
       const ctrl = new AbortController();
-      const id = setTimeout(() => onMessage && onMessage({ type: 'ping' }), 50);
-      ctrl.signal.addEventListener('abort', () => clearTimeout(id));
       return { signal: ctrl.signal, abort: () => ctrl.abort() };
     }),
   },
