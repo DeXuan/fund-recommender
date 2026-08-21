@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Card, Row, Col, Tag, Space, Alert, Spin, Empty, Badge, Progress, Statistic, Divider, Tooltip } from 'antd';
+import { Card, Row, Col, Tag, Space, Alert, Spin, Empty, Badge, Progress, Divider, Tooltip } from 'antd';
 import {
   CrownOutlined, ThunderboltOutlined, SafetyOutlined, RiseOutlined, FallOutlined,
   BulbOutlined, HeartOutlined, FundOutlined, ExclamationCircleOutlined,
   CheckCircleOutlined, WarningOutlined, StarOutlined, RocketOutlined,
-  DashboardOutlined, LineChartOutlined, PieChartOutlined, BarChartOutlined,
+  DashboardOutlined, PieChartOutlined, BarChartOutlined,
   ArrowUpOutlined, ArrowDownOutlined, InfoCircleOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';

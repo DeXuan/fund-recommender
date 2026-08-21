@@ -1,4 +1,4 @@
-import { Card, Table, Button, Space, Empty, Badge, Popconfirm, Tooltip, message } from 'antd';
+import { Card, Table, Button, Space, Empty, Badge, Popconfirm, Tooltip } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ScheduleOutlined, SyncOutlined, LinkOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 

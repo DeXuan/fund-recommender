@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Card, Row, Col, Button, Modal, Form, Input, InputNumber, Select, Tag, Statistic, message, Popconfirm, Space, Tooltip, Empty, Spin } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, WalletOutlined, BankOutlined, FundOutlined, StockOutlined, HomeOutlined, GlobalOutlined, DollarOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Button, Modal, Form, Input, InputNumber, Select, Tag, message, Popconfirm, Space, Tooltip, Empty, Spin } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, WalletOutlined } from '@ant-design/icons';
 import { portfolioApi } from '../../services/api';
 
 const ACCOUNT_TYPES = [

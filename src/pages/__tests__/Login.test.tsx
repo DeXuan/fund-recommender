@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 
 vi.mock('../../services/api', () => ({
@@ -24,7 +24,6 @@ vi.mock('../../contexts/ThemeContext', () => ({
   useTheme: () => ({ isDark: false }),
 }));
 
-import { authApi } from '../../services/api';
 import Login from '../Login';
 
 describe('Login Page', () => {

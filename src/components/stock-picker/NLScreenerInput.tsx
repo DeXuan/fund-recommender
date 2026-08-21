@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Input, Tag, Spin, Empty, message } from 'antd';
 import { SearchOutlined, CrownOutlined } from '@ant-design/icons';
 import { stockPickerApi } from '../../services/api';
-import FundRatingBadge from './FundRatingBadge';
 
 const exampleQueries = [
   '近1年收益>20%的低费率基金',
@@ -124,7 +123,7 @@ const NLScreenerInput: React.FC<{
             <Empty description="未找到符合条件的基金" />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
-              {results.map((f, i) => (
+              {results.map((f) => (
                 <div key={f.code} style={{
                   padding: '12px 16px', borderRadius: 10,
                   background: isDark ? 'rgba(255,255,255,0.04)' : '#fff',

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Card, Tag, List, Space, Typography, Badge, Spin, Empty, Button, Tooltip, Input, Segmented, message } from 'antd';
+import { Card, Tag, List, Space, Typography, Badge, Spin, Empty, Button, Input, Segmented, message } from 'antd';
 import {
   ThunderboltOutlined,
   ReloadOutlined,
@@ -15,7 +15,6 @@ import {
   ShopOutlined,
   ExclamationCircleOutlined,
   SearchOutlined,
-  LinkOutlined,
 } from '@ant-design/icons';
 import { newsApi } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -51,7 +50,7 @@ export default function NewsFeed({ compact = false, maxItems = 50, showHeader = 
   const [loading, setLoading] = useState(true);
   const [news, setNews] = useState<any[]>([]);
   const [categories, setCategories] = useState<Record<string, any>>({});
-  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterCategory] = useState<string>('all');
   const [filterImpact, setFilterImpact] = useState<string>('medium');
   const [keyword, setKeyword] = useState('');
   const [total, setTotal] = useState(0);
@@ -77,7 +76,7 @@ export default function NewsFeed({ compact = false, maxItems = 50, showHeader = 
       setTotal(data.total);
       setLastFetch(data.lastFetchTime);
       if (data.categories) setCategories(data.categories);
-    } catch (err) {
+    } catch {
       // 静默失败
     } finally {
       setLoading(false);

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Card, Segmented, InputNumber, Row, Col, Tag, Space, Button, Statistic, Table, Alert } from 'antd';
-import { CalculatorOutlined } from '@ant-design/icons';
 import { formatCurrency } from '../../utils/format';
 
 const DCA_FREQ_CONFIG: Record<string, { label: string; amountLabel: string; periodLabel: string; periodsPerYear: number; defaultAmount: number }> = {

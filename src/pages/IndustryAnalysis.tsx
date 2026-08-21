@@ -5,7 +5,6 @@ import { fundApi } from '../services/api';
 import ReactECharts from 'echarts-for-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { getEchartsTheme } from '../utils/echarts-theme';
-import { getValuationColor } from '../utils/format';
 
 interface IndustryFund {
   code: string;

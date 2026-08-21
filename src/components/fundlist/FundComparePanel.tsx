@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Input, AutoComplete, Table, Tag, Button, Space, Spin, Alert, Row, Col, Tooltip, message } from 'antd';
+import { Card, AutoComplete, Table, Tag, Button, Space, Spin, Alert, Row, Col, Tooltip, message } from 'antd';
 import { SearchOutlined, SwapOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { fundApi, fundCompareApi } from '../../services/api';

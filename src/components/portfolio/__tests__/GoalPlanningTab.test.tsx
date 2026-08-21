@@ -12,7 +12,6 @@
  * 8. 推算结果联动当前选中目标
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
 
 // Mock API
 vi.mock('../../../services/api', () => ({
@@ -187,7 +186,6 @@ describe('GoalPlanningTab - 目标规划全流程测试', () => {
   describe('参数修改联动', () => {
     it('should reset calculation result when target changes', () => {
       let goalResult: any = { canReach: true };
-      const newTarget = 2000000;
 
       // Simulate target change
       goalResult = null;

@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { Card, Table, Button, Space, Tag, Tooltip, Empty, Popconfirm, message } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined,
-  DownloadOutlined, SyncOutlined, LinkOutlined, SwapOutlined, WarningOutlined, CheckCircleOutlined,
+  DownloadOutlined, SyncOutlined, LinkOutlined, SwapOutlined,
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import type { PortfolioHolding } from '../../types';

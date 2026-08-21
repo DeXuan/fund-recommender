@@ -5,7 +5,7 @@ import {
   HomeOutlined, FundOutlined, GlobalOutlined, CloudOutlined,
   CalendarOutlined, BankOutlined, RobotOutlined, LineChartOutlined,
   UserOutlined, CrownOutlined, TeamOutlined, DashboardOutlined,
-  BulbOutlined, SwapOutlined, ThunderboltOutlined, SafetyOutlined,
+  BulbOutlined, SwapOutlined, ThunderboltOutlined,
   SearchOutlined, SunOutlined, MoonOutlined,
 } from '@ant-design/icons';
 

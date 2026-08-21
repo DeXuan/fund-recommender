@@ -1,5 +1,3 @@
-import React from 'react';
-
 export interface SlashCommand {
   name: string;
   description: string;

@@ -4,8 +4,6 @@ import { Card, Breadcrumb, Tag, Statistic, Row, Col, Tabs, Descriptions, Progres
 import {
   StarFilled,
   StarOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
   LinkOutlined,
   PlusOutlined,
   AccountBookOutlined,

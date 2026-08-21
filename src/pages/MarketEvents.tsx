@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Tag, Timeline, Select, Space, Typography, Row, Col, Badge, Tooltip, Empty, Spin, Collapse, Button, List } from 'antd';
+import { Tag, Select, Space, Typography, Row, Col, Badge, Tooltip, Empty, Spin, Collapse, Button, List } from 'antd';
 import {
-  CalendarOutlined, FileProtectOutlined, GlobalOutlined, ShopOutlined,
-  BarChartOutlined, BankOutlined, ThunderboltOutlined, FireOutlined,
+  CalendarOutlined,
+  BarChartOutlined, ThunderboltOutlined,
   FilterOutlined, ClockCircleOutlined, BellOutlined, StarOutlined,
   StockOutlined, RiseOutlined, FallOutlined, EyeOutlined, LinkOutlined,
   ReloadOutlined, CheckCircleOutlined,
@@ -13,14 +13,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import NewsFeed from '../components/NewsFeed';
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 const monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-
-const categoryIcons: Record<string, React.ReactNode> = {
-  policy: <FileProtectOutlined />, summit: <GlobalOutlined />, expo: <ShopOutlined />,
-  earnings: <BarChartOutlined />, global: <BankOutlined />, holiday: <CalendarOutlined />, event: <ThunderboltOutlined />,
-};
 
 // 统一的状态标签样式
 const statusTag = (bg: string, color: string, text: string) => (

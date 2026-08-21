@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Card, Row, Col, Statistic, Table, Tag, Tabs, Input, Select, Space, Button, Spin, Progress, Tooltip, Badge, Switch, message, Modal, Form, Popconfirm, Empty } from 'antd';
+import { Card, Row, Col, Statistic, Table, Tag, Tabs, Input, Select, Space, Button, Spin, Progress, Badge, Switch, message, Modal, Form, Popconfirm } from 'antd';
 import {
   DashboardOutlined, DatabaseOutlined, FileTextOutlined, ReloadOutlined,
-  ThunderboltOutlined, HddOutlined, CloudServerOutlined, BugOutlined,
+  HddOutlined, CloudServerOutlined, BugOutlined,
   ClockCircleOutlined, SearchOutlined, ApiOutlined, LineChartOutlined,
   PauseCircleOutlined, PlayCircleOutlined, LaptopOutlined, CloudOutlined,
   AlertOutlined, CheckCircleOutlined, WarningOutlined, CloseCircleOutlined,
   PlusOutlined, DeleteOutlined, EditOutlined, HeartOutlined, BellOutlined,
-  SettingOutlined, ExclamationCircleOutlined, SafetyOutlined,
+  SettingOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { adminApi } from '../../services/api';
@@ -15,7 +15,6 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getEchartsTheme } from '../../utils/echarts-theme';
 
 const { Search } = Input;
-const { TextArea } = Input;
 
 // Gauge chart component
 function GaugeChart({ value, title, color, max }: { value: number; title: string; color: string; max?: number }) {

@@ -20,14 +20,6 @@ const IndexTemperatureCard: React.FC<{ data: TemperatureData; isDark: boolean }>
   const temp = data.temperature;
   const fillPercent = Math.min(100, Math.max(0, temp));
 
-  const gradientColors = [
-    { stop: 0, color: '#1890ff' },
-    { stop: 25, color: '#52c41a' },
-    { stop: 50, color: '#faad14' },
-    { stop: 75, color: '#fa8c16' },
-    { stop: 100, color: '#f5222d' },
-  ];
-
   return (
     <Card
       size="small"

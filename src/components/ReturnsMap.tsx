@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Card, Select, Row, Col, Statistic, Spin, Empty, Tag, Progress, Alert, Tooltip, Badge, Space } from 'antd';
 import {
-  ArrowUpOutlined, ArrowDownOutlined, CalendarOutlined, FundOutlined,
+  CalendarOutlined, FundOutlined,
   ExclamationCircleOutlined, CheckCircleOutlined, BulbOutlined,
-  RiseOutlined, FallOutlined, GlobalOutlined, SafetyOutlined,
+  RiseOutlined, GlobalOutlined, SafetyOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { portfolioApi } from '../services/api';
@@ -88,7 +88,7 @@ export default function ReturnsMap() {
     return <Card title={<><CalendarOutlined style={{ marginRight: 8 }} />收益地图</>} style={{ marginBottom: 24 }}><Empty description="暂无持仓数据" /></Card>;
   }
 
-  const { categories, market, riskProfile, suggestions, totalValue } = insights;
+  const { categories, market, riskProfile, suggestions } = insights;
 
   // 分组：进阶理财 / 稳健理财
   const advanced = categories.filter(c => CATEGORY_META[c.name]?.group === '进阶理财');
@@ -245,7 +245,7 @@ export default function ReturnsMap() {
                   <RiseOutlined style={{ marginRight: 4 }} />进阶理财 <span style={{ fontWeight: 400, color: isDark ? '#6b6b6b' : '#999', fontSize: 11 }}>（高波动·高收益）</span>
                 </div>
                 {advanced.map(cat => (
-                  <CategoryRow key={cat.name} cat={cat} totalValue={totalValue} />
+                  <CategoryRow key={cat.name} cat={cat} />
                 ))}
               </div>
             )}
@@ -256,7 +256,7 @@ export default function ReturnsMap() {
                   <SafetyOutlined style={{ marginRight: 4 }} />稳健理财 <span style={{ fontWeight: 400, color: isDark ? '#6b6b6b' : '#999', fontSize: 11 }}>（低波动·稳健收益）</span>
                 </div>
                 {stable.map(cat => (
-                  <CategoryRow key={cat.name} cat={cat} totalValue={totalValue} />
+                  <CategoryRow key={cat.name} cat={cat} />
                 ))}
               </div>
             )}
@@ -379,7 +379,7 @@ export default function ReturnsMap() {
 }
 
 // 资产类别行组件
-function CategoryRow({ cat, totalValue }: { cat: CategoryData; totalValue: number }) {
+function CategoryRow({ cat }: { cat: CategoryData }) {
   const { isDark } = useTheme();
   const meta = CATEGORY_META[cat.name] || { label: cat.name, color: isDark ? '#6b6b6b' : '#999', icon: null };
   return (

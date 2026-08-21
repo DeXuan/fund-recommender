@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -26,7 +26,7 @@ describe('API Client fetchApi', () => {
     const { fundApi } = await loadApi();
     await fundApi.getMarketIndices();
 
-    const [url, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0];
     expect(options.headers.Authorization).toBe('Bearer test-jwt-token');
   });
 
@@ -39,7 +39,7 @@ describe('API Client fetchApi', () => {
     const { fundApi } = await loadApi();
     await fundApi.getMarketIndices();
 
-    const [url, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0];
     expect(options.headers.Authorization).toBeUndefined();
   });
 
@@ -103,7 +103,7 @@ describe('API Client - Auth API', () => {
     const { authApi } = await loadApi();
     await authApi.login('testuser', 'password123');
 
-    const [url, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0];
     expect(options.method).toBe('POST');
     expect(JSON.parse(options.body)).toEqual({ username: 'testuser', password: 'password123' });
   });
@@ -117,7 +117,7 @@ describe('API Client - Auth API', () => {
     const { authApi } = await loadApi();
     await authApi.register('newuser', 'password123', 'New User');
 
-    const [url, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0];
     expect(options.method).toBe('POST');
     expect(JSON.parse(options.body)).toEqual({ username: 'newuser', password: 'password123', nickname: 'New User' });
   });

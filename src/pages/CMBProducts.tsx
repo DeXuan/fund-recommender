@@ -33,11 +33,6 @@ const statusColor: Record<string, string> = {
   '已到期': 'red', '募集中': 'cyan',
 };
 
-const riskColor: Record<string, string> = {
-  'R1': 'green', 'R2': 'blue', 'R3': 'orange', 'R4': 'red', 'R5': 'magenta',
-  '稳健型': 'blue', '平衡型': 'orange', '进取型': 'red', '保守型': 'green',
-};
-
 function formatReturnNode(val: number | null): React.ReactNode {
   if (val === null || val === undefined) return <Text type="secondary">-</Text>;
   const color = getReturnColor(val);

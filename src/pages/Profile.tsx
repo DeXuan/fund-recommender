@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Card, Avatar, Typography, Button, Form, Input, message, Tabs, Table, Tag, Space, Descriptions, Spin, Modal, Row, Col, Statistic, Divider, Upload,
+  Card, Avatar, Typography, Button, Form, Input, message, Tabs, Table, Tag, Space, Descriptions, Spin, Modal, Row, Col, Statistic, Divider,
 } from 'antd';
 import {
-  UserOutlined, EditOutlined, SafetyOutlined, CrownOutlined, KeyOutlined, HistoryOutlined, CameraOutlined, CheckCircleOutlined, CloseCircleOutlined, LockOutlined, MobileOutlined, MailOutlined, CalendarOutlined, StarOutlined,
+  UserOutlined, EditOutlined, SafetyOutlined, CrownOutlined, KeyOutlined, HistoryOutlined, LockOutlined, MobileOutlined, CalendarOutlined, StarOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';

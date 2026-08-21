@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Card, Row, Col, Tag, Spin, Space, Tooltip, Button, Select, Empty } from 'antd';
-import { BarChartOutlined, RiseOutlined, FallOutlined, InfoCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Tag, Spin, Space, Button, Select, Empty } from 'antd';
+import { BarChartOutlined, ReloadOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { fundApi } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { getEchartsTheme } from '../utils/echarts-theme';
-import { Link } from 'react-router-dom';
 
 interface IndexValuation {
   code: string;

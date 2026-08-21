@@ -1,5 +1,4 @@
 import { useRef, useEffect, type ReactNode, type CSSProperties } from 'react';
-import { Card } from 'antd';
 import gsap from 'gsap';
 import { useTheme } from '../contexts/ThemeContext';
 

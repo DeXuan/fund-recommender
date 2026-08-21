@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Steps, Radio, Button, Progress, Space, Spin, Row, Col, Statistic, Alert, message } from 'antd';
+import { Card, Steps, Radio, Button, Progress, Space, Row, Col, Statistic, Alert, message } from 'antd';
 import { fundApi, portfolioApi } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 

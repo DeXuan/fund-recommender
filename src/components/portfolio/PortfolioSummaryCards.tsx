@@ -11,7 +11,7 @@ interface Props {
   getHoldingDays: (h: PortfolioHolding) => number;
 }
 
-export function PortfolioSummaryCards({ summary, holdings, txStats, isDark, getHoldingDays }: Props) {
+export function PortfolioSummaryCards({ summary, holdings, txStats, getHoldingDays }: Props) {
   return (
     <>
       <Row gutter={[16, 16]} style={{ marginBottom: 12 }}>

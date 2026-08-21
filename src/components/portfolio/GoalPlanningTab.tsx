@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Card, InputNumber, Row, Col, Slider, Button, Statistic, Alert, Modal, Form, Input, message, Popconfirm, Tag, Tooltip, Badge } from 'antd';
-import { CalculatorOutlined, CheckCircleOutlined, WarningOutlined, TrophyOutlined, ClockCircleOutlined, PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, BellOutlined, AimOutlined } from '@ant-design/icons';
+import { useState, useEffect } from 'react';
+import { Card, InputNumber, Row, Col, Slider, Button, Statistic, Alert, Modal, Form, Input, message, Popconfirm, Tag, Tooltip } from 'antd';
+import { CalculatorOutlined, CheckCircleOutlined, WarningOutlined, TrophyOutlined, ClockCircleOutlined, PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, AimOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { fundApi } from '../../services/api';
 import { getEchartsTheme } from '../../utils/echarts-theme';

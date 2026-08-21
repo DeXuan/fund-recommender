@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Drawer, Badge, Button, Grid } from 'antd';
+import { Drawer, Grid } from 'antd';
 import { RobotOutlined, CloseOutlined, CustomerServiceOutlined, ExpandOutlined } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AIAssistant from '../pages/AIAssistant';

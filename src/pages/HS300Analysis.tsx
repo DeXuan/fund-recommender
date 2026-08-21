@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { fundApi } from '../services/api';
-import type { HS300Analysis as HS300AnalysisType, HS300Fund, HS300Holding } from '../types';
+import type { HS300Analysis as HS300AnalysisType } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 
 export default function HS300Analysis() {

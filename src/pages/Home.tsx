@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Card, Row, Col, Table, Tag, Statistic, Spin, Space, Modal, message, Tooltip } from 'antd';
+import { Card, Row, Col, Table, Tag, Statistic, Spin, Modal, message, Tooltip } from 'antd';
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
   FundOutlined,
-  SafetyOutlined,
-  CalculatorOutlined,
   BarChartOutlined,
   StockOutlined,
   BankOutlined,
@@ -20,7 +18,6 @@ import {
   ThunderboltOutlined,
   RiseOutlined,
   FallOutlined,
-  InfoCircleOutlined,
   DashboardOutlined,
   BulbOutlined,
   CheckCircleOutlined,
@@ -214,12 +211,6 @@ export default function Home() {
     ? Math.min(100, Math.round(30 + holdings.length * 5 + Math.abs(totalReturn) * 2))
     : 0;
 
-  // Today's P&L estimate (approximate from total return change)
-  const todayPnl = totalPnl * 0.003; // rough estimate
-
-  // Monthly return estimate
-  const monthlyReturn = totalReturn * 0.15; // rough estimate
-
   // Upcoming DCA plans count (placeholder)
 
   const trophyColors = ['#f5a623', '#b0b0b0', '#cd7f32'];
@@ -272,7 +263,7 @@ export default function Home() {
     { to: '/portfolio', icon: <PieChartOutlined />, label: '我的持仓', desc: '投资组合管理', color: '#36cfc9' },
   ];
 
-  const getGaugeOption = (name: string, percentile: number, valuation: string) => ({
+  const getGaugeOption = (name: string, percentile: number) => ({
     series: [{
       type: 'gauge',
       startAngle: 200,
@@ -697,7 +688,7 @@ export default function Home() {
                 </div>
                 <ReactECharts
                   theme={getEchartsTheme(isDark)}
-                  option={getGaugeOption(index.name, index.pePercentile ?? 50, index.valuation)}
+                  option={getGaugeOption(index.name, index.pePercentile ?? 50)}
                   style={{ height: 160 }}
                   opts={{ renderer: 'svg' }}
                 />

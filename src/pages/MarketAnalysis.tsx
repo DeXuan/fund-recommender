@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, Tabs, Table, Tag, Progress, Timeline, Spin, Alert, Row, Col } from 'antd';
 import { fundApi } from '../services/api';
-import { formatReturn, getReturnColor, getValuationColor } from '../utils/format';
+import { getValuationColor } from '../utils/format';
 import ReactECharts from 'echarts-for-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { getEchartsTheme } from '../utils/echarts-theme';

@@ -109,8 +109,7 @@ describe('Sortino Ratio Calculation (stock-picker)', () => {
   });
 
   it('should handle risk-free rate correctly in downside calculation', () => {
-    // Returns slightly below risk-free rate
-    const dailyRf = 2 / 250; // ~0.008% per day
+    // Returns below risk-free rate
     const returns = [0.005, -0.002, 0.003, -0.001, 0.004]; // some below dailyRf
     const sortino = calculateSortino(returns, 5);
 
