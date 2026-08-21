@@ -22,7 +22,7 @@
 
 ### 网页版
 
-🔗 **恭喜发财888.cn** → [https://恭喜发财888.cn:8080/web/](https://xn--888-vw3e05fxyzc07e.cn:8080/web/)
+🔗 **恭喜发财888.cn** → [https://恭喜发财888.cn:8686/web/](https://xn--888-vw3e05fxyzc07e.cn:8686/web/)
 <img width="1914" height="1080" alt="1" src="https://github.com/user-attachments/assets/b25a258e-66e3-4185-b1de-bfc51d790c1d" />
 <img width="1920" height="1080" alt="2" src="https://github.com/user-attachments/assets/055b6b01-00b6-4249-bd96-b8da4362d82d" />
 <img width="1920" height="1080" alt="3" src="https://github.com/user-attachments/assets/9e923e1c-bc31-4a37-9023-4254e07c9b28" />
