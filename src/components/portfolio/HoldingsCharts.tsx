@@ -7,10 +7,11 @@ interface Props {
   holdings: PortfolioHolding[];
   summary: PortfolioSummary | null;
   benchmarkData: any[];
+  portfolioDailyReturns?: any[];
   isDark: boolean;
 }
 
-export function HoldingsCharts({ holdings, summary, benchmarkData, isDark }: Props) {
+export function HoldingsCharts({ holdings, summary, benchmarkData, portfolioDailyReturns, isDark }: Props) {
   const pieOption = holdings.length > 0 ? {
     tooltip: { trigger: 'item', formatter: '{b}: {d}%' },
     legend: { bottom: 0, type: 'scroll' },
@@ -101,7 +102,21 @@ export function HoldingsCharts({ holdings, summary, benchmarkData, isDark }: Pro
                 {
                   name: '我的持仓',
                   type: 'line',
-                  data: benchmarkData.map(() => summary?.totalReturn || 0),
+                  data: (() => {
+                    if (!portfolioDailyReturns || portfolioDailyReturns.length < 2) return benchmarkData.map(() => summary?.totalReturn || 0);
+                    const initialValue = portfolioDailyReturns[0].value;
+                    const returnMap: Record<string, number> = {};
+                    let cumReturn = 0;
+                    for (const d of portfolioDailyReturns) {
+                      cumReturn = initialValue > 0 ? ((d.value - initialValue) / initialValue) * 100 : 0;
+                      returnMap[d.date] = parseFloat(cumReturn.toFixed(2));
+                    }
+                    let lastVal = 0;
+                    return benchmarkData.map(d => {
+                      if (returnMap[d.date] !== undefined) lastVal = returnMap[d.date];
+                      return lastVal;
+                    });
+                  })(),
                   lineStyle: { width: 2, color: '#1677ff' },
                   itemStyle: { color: '#1677ff' },
                   showSymbol: false,

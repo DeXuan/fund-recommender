@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, Row, Col, Table, Tag, Spin, Alert, Empty, Progress } from 'antd';
-import { WarningOutlined, CheckCircleOutlined, PieChartOutlined, FundOutlined } from '@ant-design/icons';
+import { WarningOutlined, PieChartOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { portfolioApi } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -63,8 +63,8 @@ export default function PortfolioOverlap() {
       } else {
         setData(result);
       }
-    } catch (e: any) {
-      setError(e.message || '加载失败');
+    } catch (e: unknown) {
+      setError((e as Error).message || '加载失败');
     } finally {
       setLoading(false);
     }

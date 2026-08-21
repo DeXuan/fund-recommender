@@ -1,0 +1,10 @@
+const express = require('express');
+const { authMiddleware, adminMiddleware } = require('../../auth.cjs');
+const router = express.Router();
+router.use(authMiddleware, adminMiddleware);
+router.use(require('./users.cjs'));
+router.use(require('./audit.cjs'));
+router.use(require('./settings.cjs'));
+router.use(require('./alerts.cjs'));
+router.use(require('./monitoring.cjs'));
+module.exports = router;

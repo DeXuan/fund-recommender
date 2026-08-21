@@ -1,21 +1,11 @@
 const express = require('express');
 const logger = require('../../utils/logger.cjs');
-const multer = require('multer');
 const iconv = require('iconv-lite');
 const { getPool } = require('../../db.cjs');
 const { authMiddleware } = require('../../auth.cjs');
+const { upload } = require('../../utils/upload.cjs');
 
 const router = express.Router();
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 512 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype !== 'text/csv' && !file.originalname.endsWith('.csv')) {
-      return cb(new Error('只允许上传CSV文件'));
-    }
-    cb(null, true);
-  },
-});
 
 router.use(authMiddleware);
 

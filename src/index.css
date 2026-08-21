@@ -482,8 +482,8 @@ a:hover {
   }
 }
 
-/* 手机端适配 (折叠屏外屏 374px ~ 平放手机 430px) */
-@media (max-width: 767px) {
+/* 手机端适配 (折叠屏外屏 374px ~ 折叠屏展开 852px ~ 平板 1024px) */
+@media (max-width: 1199px) {
   body {
     overflow-x: hidden;
   }

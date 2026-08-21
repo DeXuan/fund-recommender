@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
-  Card, Input, Button, Tag, Spin, Tooltip, Popconfirm, message, Drawer, Empty, Segmented, Badge, Grid,
+  Card, Input, Button, Tag, Spin, Tooltip, Popconfirm, message, Drawer, Empty, Segmented, Grid,
 } from 'antd';
 import {
   SendOutlined, RobotOutlined, UserOutlined, FundOutlined,
@@ -16,15 +16,15 @@ import {
   CalendarOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled,
   ReloadOutlined, StopOutlined, EditOutlined, ThunderboltOutlined,
-  SoundOutlined, ClearOutlined,
 } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { aiApi } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { parseSlashCommand, SLASH_COMMANDS } from '../utils/slash-commands';
+import { renderStructuredData } from '../components/ai-assistant/RenderHelpers';
+import { CodeBlock as CodeBlockComp } from '../components/ai-assistant/CodeBlock';
 
 interface Message {
   id: number | string;
@@ -129,14 +129,6 @@ const capabilityCategories = [
     ],
   },
 ];
-
-function safeParseTime(ts: string): string {
-  try {
-    const d = new Date(ts);
-    if (isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-  } catch { return ''; }
-}
 
 function relativeTime(ts: string): string {
   try {
@@ -398,8 +390,8 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
         args,
       );
       streamDoneRef.current = true;
-    } catch (e: any) {
-      if (e.name === 'AbortError') {
+    } catch (e: unknown) {
+      if ((e as Error).name === 'AbortError') {
         // User stopped generation
         if (streamedContent) {
           setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: streamedContent + '\n\n*[已停止生成]*' } : m));
@@ -514,127 +506,6 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
     });
   };
 
-  // Render fund cards
-  const renderFundList = (funds: any[]) => {
-    if (!funds?.length) return null;
-    return (
-      <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
-        {funds.slice(0, 6).map((f: any) => (
-          <Link key={f.code} to={`/funds/${f.code}`} style={{ textDecoration: 'none' }}>
-            <div className="ai-fund-card" style={{
-              padding: '10px 14px', borderRadius: 10,
-              background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(22,119,255,0.04)',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(22,119,255,0.12)'}`,
-              transition: 'all 0.2s', cursor: 'pointer',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: isDark ? '#e8e8e8' : '#1f1f1f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {f.name}
-                    {f.isGoldSelected && <Tag color="gold" style={{ marginLeft: 4, fontSize: 10, lineHeight: '16px' }}>金选</Tag>}
-                  </div>
-                  <div style={{ fontSize: 11, color: isDark ? '#6b6b6b' : '#999', fontFamily: 'monospace' }}>{f.code}</div>
-                </div>
-                <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 15, color: (f.return1y || 0) >= 0 ? '#ff4d4f' : '#52c41a' }}>
-                  {(f.return1y || 0) >= 0 ? '+' : ''}{f.return1y?.toFixed(2)}%
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 12, fontSize: 11, color: isDark ? '#6b6b6b' : '#888' }}>
-                <span>费率 {f.totalFee?.toFixed(2)}%</span>
-                <span>规模 {f.scale?.toFixed(1)}亿</span>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-    );
-  };
-
-  const renderIndices = (data: any) => {
-    if (!data?.indices) return null;
-    return (
-      <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
-        {data.indices.map((idx: any) => (
-          <div key={idx.code} style={{
-            padding: '10px 12px', borderRadius: 10,
-            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(22,119,255,0.04)',
-            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(22,119,255,0.1)'}`,
-          }}>
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{idx.name}</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>{idx.price?.toFixed(2)}</span>
-              <span style={{ fontWeight: 600, color: idx.changePercent >= 0 ? '#ff4d4f' : '#52c41a' }}>
-                {idx.changePercent >= 0 ? '+' : ''}{idx.changePercent?.toFixed(2)}%
-              </span>
-            </div>
-            {idx.pePercentile != null && (
-              <Tag color={idx.pePercentile < 30 ? 'green' : idx.pePercentile < 70 ? 'blue' : 'red'} style={{ fontSize: 11, marginTop: 4 }}>
-                PE分位 {idx.pePercentile}%
-              </Tag>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderIndustries = (data: any) => {
-    if (!data?.industries) return null;
-    return (
-      <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {data.industries.map((ind: string) => (
-          <Link key={ind} to={`/industry?name=${encodeURIComponent(ind)}`}>
-            <Tag color="blue" style={{ cursor: 'pointer', borderRadius: 12, padding: '2px 12px' }}>{ind}</Tag>
-          </Link>
-        ))}
-      </div>
-    );
-  };
-
-  const renderStructuredData = (data: any) => {
-    if (!data) return null;
-    if (Array.isArray(data)) return renderFundList(data);
-    if (data.type === 'indices' || data.type === 'valuation') return renderIndices(data);
-    if (data.type === 'industries') return renderIndustries(data);
-    return null;
-  };
-
-  // Code block with copy button
-  const CodeBlock = ({ children, className, ...props }: any) => {
-    const [copied, setCopied] = useState(false);
-    const isInline = !className;
-    if (isInline) return <code className={className} {...props}>{children}</code>;
-    const codeText = String(children).replace(/\n$/, '');
-    return (
-      <div style={{ position: 'relative' }}>
-        <div style={{
-          position: 'absolute', top: 8, right: 8, zIndex: 1,
-          display: 'flex', gap: 4,
-        }}>
-          <span style={{
-            fontSize: 11, color: isDark ? '#666' : '#999', padding: '2px 8px',
-            borderRadius: 4, background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-            userSelect: 'none',
-          }}>
-            {className?.replace('language-', '') || 'code'}
-          </span>
-          <span
-            onClick={() => { navigator.clipboard.writeText(codeText); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-            style={{
-              fontSize: 11, color: copied ? '#52c41a' : (isDark ? '#888' : '#999'),
-              padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
-              background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-              transition: 'color 0.2s',
-            }}
-          >
-            {copied ? '已复制' : '复制'}
-          </span>
-        </div>
-        <code className={className} {...props}>{children}</code>
-      </div>
-    );
-  };
-
   // Render message
   const renderMessage = (msg: Message, idx: number) => {
     const isUser = msg.role === 'user';
@@ -693,7 +564,7 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
                   <div className="markdown-body" style={{ color: 'inherit', fontSize: 14 }}>
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
-                      components={{ code: CodeBlock }}
+                      components={{ code: (props: any) => <CodeBlockComp {...props} isDark={isDark} /> }}
                     >
                       {msg.content}
                     </ReactMarkdown>
@@ -707,7 +578,7 @@ export default function AIAssistant({ isDrawerMode = false }: { isDrawerMode?: b
                     )}
                   </div>
                 )}
-                {renderStructuredData(msg.data)}
+                {renderStructuredData(msg.data, isDark)}
               </div>
 
               {/* Message actions */}

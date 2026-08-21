@@ -8,11 +8,14 @@ export default defineConfig(({ mode }) => {
   return {
     base: isCapacitor ? './' : '/web/',
     plugins: [react()],
+    esbuild: {
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
+    },
     server: {
       port: 8866,
       proxy: {
         '/api': {
-          target: 'http://localhost:3003',
+          target: 'http://localhost:3303',
           changeOrigin: true,
         },
       },

@@ -2,7 +2,7 @@
 
 <!-- 徽章全部为静态：仓库为私有，GitHub API / Actions badge 对匿名访问均不可读，动态徽章无法渲染 -->
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen?style=flat-square&logo=github)](https://github.com/DeXuan/fund-recommender/actions)
-[![Version](https://img.shields.io/badge/Version-1.2.0-blue?style=flat-square)](https://github.com/DeXuan/fund-recommender)
+[![Version](https://img.shields.io/badge/Version-1.3.0-blue?style=flat-square)](https://github.com/DeXuan/fund-recommender)
 [![License](https://img.shields.io/badge/License-ISC-purple?style=flat-square)](https://github.com/DeXuan/fund-recommender)
 [![Language](https://img.shields.io/badge/Language-TypeScript-blue?style=flat-square&logo=typescript&logoColor=white)](https://github.com/DeXuan/fund-recommender)
 [![Frameworks](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=white)](https://react.dev)
@@ -377,11 +377,11 @@ bash /var/www/fix-permission.sh  # 修复 403 权限错误
 fund-recommender/
 ├── server/
 │   ├── index.cjs              # Express 入口，启动 + 中间件 + 调度
-│   ├── db.cjs                 # PostgreSQL 数据库初始化（25 张表）
+│   ├── db.cjs                 # PostgreSQL 数据库初始化（31 张表，迁移管理）
 │   ├── fund-service.cjs       # 基金数据服务层（含分页 + 收益率缓存）
 │   ├── fund-data.cjs          # 基金种子数据（200+ 只，覆盖 14 个行业）
 │   ├── auth.cjs               # 认证模块（JWT + 支付宝 OAuth + 管理员权限校验）
-│   ├── admin.cjs              # 管理后台模块（用户管理、审计日志、系统监控）
+│   ├── admin.cjs              # 管理后台模块（已拆分为 routes/admin/，此文件保留兼容）
 │   ├── portfolio.cjs          # 持仓管理模块（含定投、收益地图、组合洞察）
 │   ├── data-fetcher.cjs       # 数据抓取模块（腾讯/新浪/东方财富 API）
 │   ├── news-fetcher.cjs       # 新闻抓取模块
@@ -487,7 +487,12 @@ fund-recommender/
 │   │   ├── CustomFactorPanel.tsx  # 自定义因子权重面板
 │   │   ├── CorrelationHeatmap.tsx # 相关性热力图
 │   │   ├── PickHistoryTab.tsx     # 选股历史标签页
-│   │   └── ProBadge.tsx          # PRO/SVIP 徽章
+│   │   ├── ProBadge.tsx          # PRO/SVIP 徽章
+│   │   ├── chartOptions.tsx      # 图表配置纯函数（v1.3.0 提取）
+│   │   └── StockPickerHeader.tsx  # Hero 头部组件（v1.3.0 提取）
+│   ├── ai-assistant/          # AI 助手子组件（v1.3.0 新增）
+│   │   ├── RenderHelpers.tsx      # renderFundList/renderIndices 等渲染辅助
+│   │   └── CodeBlock.tsx          # 代码块组件
 │   ├── pages/                 # 页面组件（懒加载）
 │   │   ├── Home.tsx           # 首页看板
 │   │   ├── FundList.tsx       # 基金列表
@@ -797,6 +802,55 @@ fund-recommender/
 > 详细的安全漏洞修复记录请参阅 [SECURITY_FIX_LOG.md](./docs/security/SECURITY_FIX_LOG.md)。
 
 ## 版本更新记录
+
+### v1.3.0 (2026-08-21) — 第四轮代码质量优化（7 项）
+
+**超大页面拆分**
+- `Portfolio.tsx`：1568→721 行（-54%），重写接入 16 个已有子组件
+- `StockPicker.tsx`：1448→1107 行（-23%），提取 chartOptions 纯函数 + Header 组件
+- `AIAssistant.tsx`：1453→1334 行（-8%），提取 RenderHelpers + CodeBlock
+
+**测试补充**
+- `fund-service.test.cjs`：76 个测试，100% 行覆盖（语句 100%、分支 86.72%、函数 100%）
+- `payment.spec.ts`：10 个支付/订阅 E2E 测试 × 7 机型 = 70 测试
+- 全量 E2E：308 测试通过（7 机型，13.6 分钟）
+
+**类型安全**
+- 7 个页面文件 18 处 `catch(e: any)` → `catch(e: unknown)` + `(e as Error).message`
+
+**CI/CD 增强**
+- 覆盖率报告 + 阈值（lines 18%、functions 8%、branches 8%、statements 16%）
+- E2E 测试在 CI 中运行（desktop 项目）+ artifact 上传
+
+**项目规模**
+- 前端：25,269 行代码（.tsx/.ts），50 个 React 组件，23 个页面
+- 后端：17,719 行代码（.cjs）
+- 总计：42,988 行代码，670 个测试（单元 362 + E2E 308）
+- 综合评分：8.9/10
+
+### v1.2.1 (2026-08-21) — 三轮优化 + E2E 多机型测试（20 项）
+
+**架构拆分**
+- `admin.cjs` 1809行 → 6 个路由文件 + helpers + metrics（消除循环依赖）
+- `api.ts` 消除 101 处 `any` 类型，新增 16 个 DTO 类型接口
+
+**性能优化**
+- N+1 查询全部消除：6 处批量优化（unnest + ANY）
+- 优雅关闭：SIGTERM/SIGINT 释放数据库连接池
+- 生产环境连接池 max=20
+
+**安全加固**
+- AI 助手 7 个路由认证缺失修复 + SQL 所有权校验
+- Dockerfile 非 root 用户
+- ESLint 规则收紧（no-unused-vars + rules-of-hooks 为 error）
+
+**E2E 测试**
+- Playwright + 7 种机型（Desktop + 6 手机含折叠屏）
+- 223 个测试全通过
+- 修复荣耀 Magic V6 展开屏水平溢出
+
+**项目规模**
+- 88+ API 端点，31 张数据库表，670 个测试
 
 ### v1.2.0 (2026-08-16) — 实时财经日历 + 基金池优化 + 数据管道扩展
 

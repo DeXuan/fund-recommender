@@ -900,20 +900,29 @@ async function updatePortfolioPnl(allFunds) {
       logger.info(`[持仓] 从API获取 ${missingCodes.length} 只基金净值: ${missingCodes.join(',')}`);
       try {
         const batchNav = await fetchFundNavBatch(missingCodes);
+        const navInsertCodes = [];
+        const navInsertNavs = [];
+        const navInsertTotalNavs = [];
+        const navInsertDates = [];
         for (const [code, val] of batchNav) {
           if (val.nav > 0) {
             navMap.set(code, val.nav);
-            // 持久化到 fund_nav 表，下次不需要再请求API
-            try {
-              await pool.query(
-                `INSERT INTO fund_nav (fund_code, nav, total_nav, nav_date)
-                 VALUES ($1, $2, $3, $4)
-                 ON CONFLICT (fund_code, nav_date) DO UPDATE SET nav = EXCLUDED.nav`,
-                [code, val.nav, val.totalNav || val.nav, val.navDate || new Date().toISOString().split('T')[0]]
-              );
-            } catch (e) {
-              // 忽略写入失败，净值仍在内存中可用
-            }
+            navInsertCodes.push(code);
+            navInsertNavs.push(val.nav);
+            navInsertTotalNavs.push(val.totalNav || val.nav);
+            navInsertDates.push(val.navDate || new Date().toISOString().split('T')[0]);
+          }
+        }
+        if (navInsertCodes.length > 0) {
+          try {
+            await pool.query(
+              `INSERT INTO fund_nav (fund_code, nav, total_nav, nav_date)
+               SELECT * FROM unnest($1::text[], $2::numeric[], $3::numeric[], $4::date[])
+               ON CONFLICT (fund_code, nav_date) DO UPDATE SET nav = EXCLUDED.nav`,
+              [navInsertCodes, navInsertNavs, navInsertTotalNavs, navInsertDates]
+            );
+          } catch (e) {
+            // 忽略写入失败，净值仍在内存中可用
           }
         }
         logger.info(`[持仓] API获取成功 ${batchNav.size} 只，最终覆盖 ${navMap.size}/${heldCodes.length} 只基金`);
@@ -922,10 +931,15 @@ async function updatePortfolioPnl(allFunds) {
       }
     }
 
-    // 逐条更新持仓记录
+    // 批量更新持仓记录
     let updated = 0;
     let validated = 0;
     const warnings = [];
+    const updateIds = [];
+    const updateNavs = [];
+    const updateMVs = [];
+    const updatePnls = [];
+    const updatePpcts = [];
 
     for (const record of recordsResult.rows) {
       const currentNav = navMap.get(record.fund_code);
@@ -946,14 +960,29 @@ async function updatePortfolioPnl(allFunds) {
         warnings.push(`${record.fund_code}(${record.fund_name}): ${validation.errors.join('; ')}`);
       }
 
-      // 使用校验后的值写入
+      // 使用校验后的值收集批量更新
       const { marketValue, pnl, pnlPercent } = validation.values;
+      updateIds.push(record.id);
+      updateNavs.push(currentNav);
+      updateMVs.push(marketValue);
+      updatePnls.push(pnl);
+      updatePpcts.push(pnlPercent);
+    }
 
-      await pool.query(
-        `UPDATE fund_records SET current_nav = $1, market_value = $2, pnl = $3, pnl_percent = $4, nav_updated_at = NOW() WHERE id = $5`,
-        [currentNav, marketValue, pnl, pnlPercent, record.id]
+    // 单条 SQL 批量 UPDATE
+    if (updateIds.length > 0) {
+      const result = await pool.query(
+        `UPDATE fund_records SET
+           current_nav = v.nav,
+           market_value = v.mv,
+           pnl = v.pnl,
+           pnl_percent = v.pp,
+           nav_updated_at = NOW()
+         FROM unnest($1::int[], $2::numeric[], $3::numeric[], $4::numeric[], $5::numeric[]) AS v(id, nav, mv, pnl, pp)
+         WHERE fund_records.id = v.id`,
+        [updateIds, updateNavs, updateMVs, updatePnls, updatePpcts]
       );
-      updated++;
+      updated = result.rowCount;
     }
 
     if (warnings.length > 0) {
@@ -1673,4 +1702,10 @@ module.exports = {
   discoverGoldFundsFromAlipay,
   fetchAllCuratedFundsData,
   GOLD_FUND_CODES,
+  estimatePercentile,
+  getValuationByPercentile,
+  validatePortfolioValues,
+  classifyGoldCategory,
+  inferIndustry,
+  estimateRating,
 };

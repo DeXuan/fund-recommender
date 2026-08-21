@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Select, Button, Table, Tag, Typography, Space, Spin, Divider, message } from 'antd';
+import { Card, Select, Button, Table, Tag, Typography, Space, Divider, message } from 'antd';
 import { BarChartOutlined, LockOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { useNavigate } from 'react-router-dom';
@@ -26,8 +26,8 @@ export default function FundCompare() {
     try {
       const data = await fundCompareApi.analyze(codes);
       setBasicData(data);
-    } catch (e: any) {
-      message.error(e.message || '对比失败');
+    } catch (e: unknown) {
+      message.error((e as Error).message || '对比失败');
     } finally {
       setLoading(false);
     }
@@ -39,11 +39,11 @@ export default function FundCompare() {
     try {
       const data = await fundCompareApi.premiumAnalyze(codes);
       setPremiumData(data);
-    } catch (e: any) {
-      if (e.message?.includes('会员')) {
+    } catch (e: unknown) {
+      if ((e as Error).message?.includes('会员')) {
         message.warning('此功能需要开通会员');
       } else {
-        message.error(e.message || '深度对比失败');
+        message.error((e as Error).message || '深度对比失败');
       }
     } finally {
       setPremiumLoading(false);

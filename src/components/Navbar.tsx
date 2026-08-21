@@ -5,8 +5,6 @@ import {
   HomeOutlined,
   FundOutlined,
   GlobalOutlined,
-  SafetyOutlined,
-  CalculatorOutlined,
   MenuOutlined,
   StockOutlined,
   BarChartOutlined,
@@ -26,7 +24,6 @@ import {
   BankOutlined,
   DashboardOutlined,
   TeamOutlined,
-  SettingOutlined,
   CalendarOutlined,
   ThunderboltOutlined,
   CrownOutlined,
@@ -36,17 +33,19 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { alertsApi, authApi } from '../services/api';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const { useBreakpoint } = Grid;
 
-const navItems = [
-  { key: '/', label: '首页', icon: <HomeOutlined /> },
-  { key: '/funds', label: '基金列表', icon: <FundOutlined /> },
-  { key: '/industry', label: '行业分析', icon: <BarChartOutlined /> },
-  { key: '/qdii', label: 'QDII基金', icon: <GlobalOutlined /> },
-  { key: '/cmb-products', label: '招行理财', icon: <BankOutlined /> },
-  { key: '/events', label: '事件日历', icon: <CalendarOutlined /> },
-  { key: '/ai-assistant', label: 'AI助手', icon: <RobotOutlined /> },
+const navItems = (t: (key: string) => string) => [
+  { key: '/', label: t('nav.home'), icon: <HomeOutlined /> },
+  { key: '/funds', label: t('nav.fundList'), icon: <FundOutlined /> },
+  { key: '/industry', label: t('nav.industry'), icon: <BarChartOutlined /> },
+  { key: '/qdii', label: t('nav.qdii'), icon: <GlobalOutlined /> },
+  { key: '/cmb-products', label: t('nav.cmbProducts'), icon: <BankOutlined /> },
+  { key: '/events', label: t('nav.events'), icon: <CalendarOutlined /> },
+  { key: '/ai-assistant', label: t('nav.aiAssistant'), icon: <RobotOutlined /> },
 ];
 
 const DISMISSED_KEY = 'dismissed_alerts';
@@ -73,9 +72,10 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const screens = useBreakpoint();
-  const isMobile = !screens.md;
+  const isMobile = !screens.xl;
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { t } = useTranslation();
   const [alerts, setAlerts] = useState<any[]>([]);
   const [pwdModalOpen, setPwdModalOpen] = useState(false);
   const [pwdLoading, setPwdLoading] = useState(false);
@@ -122,14 +122,14 @@ export default function Navbar() {
   };
 
   const allNavItems = [
-    ...navItems,
+    ...navItems(t),
     ...(user ? [
-      { key: '/portfolio', label: '理财记账', icon: <AccountBookOutlined /> },
-      { key: '/stock-picker', label: 'AI选股', icon: <FundOutlined /> },
+      { key: '/portfolio', label: t('nav.portfolio'), icon: <AccountBookOutlined /> },
+      { key: '/stock-picker', label: t('nav.stockPicker'), icon: <FundOutlined /> },
     ] : []),
     ...(user?.role === 'admin' ? [
-      { key: '/admin/users', label: '用户管理', icon: <TeamOutlined /> },
-      { key: '/admin/monitor', label: '系统监控', icon: <DashboardOutlined /> },
+      { key: '/admin/users', label: t('nav.adminUsers'), icon: <TeamOutlined /> },
+      { key: '/admin/monitor', label: t('nav.adminMonitor'), icon: <DashboardOutlined /> },
     ] : []),
   ];
 
@@ -273,6 +273,7 @@ export default function Navbar() {
                 {isDark ? '☀️' : '🌙'}
               </Button>
             </Tooltip>
+            <LanguageSwitcher />
             <Button
               type="text"
               icon={<MenuOutlined />}
@@ -322,6 +323,7 @@ export default function Navbar() {
                   {isDark ? '☀️' : '🌙'}
                 </Button>
               </Tooltip>
+              <LanguageSwitcher />
               {user ? (
                 <>
                 <Dropdown

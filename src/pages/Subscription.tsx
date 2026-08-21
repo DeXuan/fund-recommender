@@ -16,7 +16,7 @@ export default function Subscription() {
   const [loading, setLoading] = useState(true);
   const [qrModal, setQrModal] = useState(false);
   const [qrBase64, setQrBase64] = useState('');
-  const [outTradeNo, setOutTradeNo] = useState('');
+  const [, setOutTradeNo] = useState('');
   const [paying, setPaying] = useState(false);
   const [paySuccess, setPaySuccess] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -35,8 +35,8 @@ export default function Subscription() {
       setPlans(plansRes.plans);
       setStatus(statusRes);
       setOrders(ordersRes.orders);
-    } catch (e: any) {
-      message.error(e.message || '加载失败');
+    } catch (e: unknown) {
+      message.error((e as Error).message || '加载失败');
     } finally {
       setLoading(false);
     }
@@ -76,8 +76,8 @@ export default function Subscription() {
           console.error('查询订单状态失败:', e);
         }
       }, 3000);
-    } catch (e: any) {
-      message.error(e.message || '创建订单失败');
+    } catch (e: unknown) {
+      message.error((e as Error).message || '创建订单失败');
     } finally {
       setPaying(false);
     }

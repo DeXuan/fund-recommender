@@ -16,21 +16,28 @@ router.get('/api/alerts', authMiddleware, handler(async (req) => {
   const pool = getPool();
   const alerts = [];
 
-  // 1. 持仓基金净值大幅波动
+  // 1. 持仓基金净值大幅波动（批量查询最新净值）
   const holdings = await pool.query(
     `SELECT DISTINCT fund_code, fund_name FROM fund_records WHERE user_id = $1`,
     [req.user.id]
   );
   const heldCodes = new Set(holdings.rows.map(h => h.fund_code));
 
-  for (const h of holdings.rows) {
-    const navResult = await pool.query(
-      `SELECT return_1w, return_1m FROM fund_nav WHERE fund_code = $1 ORDER BY nav_date DESC LIMIT 1`,
-      [h.fund_code]
+  if (holdings.rows.length > 0) {
+    const navResults = await pool.query(
+      `SELECT DISTINCT ON (fund_code) fund_code, return_1w, return_1m
+       FROM fund_nav
+       WHERE fund_code = ANY($1)
+       ORDER BY fund_code, nav_date DESC`,
+      [holdings.rows.map(h => h.fund_code)]
     );
-    if (navResult.rows.length > 0) {
-      const return1w = parseFloat(navResult.rows[0].return_1w || 0);
-      const return1m = parseFloat(navResult.rows[0].return_1m || 0);
+    const navMap = new Map(navResults.rows.map(r => [r.fund_code, r]));
+
+    for (const h of holdings.rows) {
+      const nav = navMap.get(h.fund_code);
+      if (!nav) continue;
+      const return1w = parseFloat(nav.return_1w || 0);
+      const return1m = parseFloat(nav.return_1m || 0);
       if (return1w < -5) {
         alerts.push({
           type: 'nav_drop', level: 'warning',

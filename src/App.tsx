@@ -7,10 +7,11 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import DataStatus from './components/DataStatus';
 import ErrorBoundary from './components/ErrorBoundary';
-import GsapEnhancer from './components/GsapEnhancer';
-import FloatingChat from './components/FloatingChat';
-import ParticleCanvas from './components/ParticleCanvas';
-import CommandPalette from './components/CommandPalette';
+
+const GsapEnhancer = lazy(() => import('./components/GsapEnhancer'));
+const FloatingChat = lazy(() => import('./components/FloatingChat'));
+const ParticleCanvas = lazy(() => import('./components/ParticleCanvas'));
+const CommandPalette = lazy(() => import('./components/CommandPalette'));
 
 const Home = lazy(() => import('./pages/Home'));
 const FundList = lazy(() => import('./pages/FundList'));
@@ -95,8 +96,8 @@ function App() {
     <Router basename={import.meta.env.VITE_CAPACITOR === 'true' ? '' : '/web'}>
       <AuthProvider>
         <Layout style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
-          <ParticleCanvas />
-          <GsapEnhancer />
+          <Suspense fallback={null}><ParticleCanvas /></Suspense>
+          <Suspense fallback={null}><GsapEnhancer /></Suspense>
           <Navbar />
           <div role="status" aria-live="polite" aria-label="数据状态" style={{ position: 'sticky', top: 64, zIndex: 99, padding: isMobile ? '6px 12px' : '8px 24px', background: 'var(--bg-primary)', backdropFilter: 'blur(8px)', borderBottom: '1px solid var(--border-color-light)' }}>
             <DataStatus />
@@ -107,8 +108,8 @@ function App() {
             </ErrorBoundary>
           </Layout.Content>
           <Footer />
-          <FloatingChat />
-          <CommandPalette />
+          <Suspense fallback={null}><FloatingChat /></Suspense>
+          <Suspense fallback={null}><CommandPalette /></Suspense>
         </Layout>
       </AuthProvider>
     </Router>

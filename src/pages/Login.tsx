@@ -135,8 +135,8 @@ export default function Login() {
       await login(values.username, values.password);
       message.success('登录成功');
       navigate('/', { replace: true });
-    } catch (e: any) {
-      message.error(e.message || '登录失败');
+    } catch (e: unknown) {
+      message.error((e as Error).message || '登录失败');
     } finally {
       setLoading(false);
     }
@@ -148,8 +148,8 @@ export default function Login() {
       await register(values.username, values.password, values.nickname);
       message.success('注册成功');
       navigate('/', { replace: true });
-    } catch (e: any) {
-      message.error(e.message || '注册失败');
+    } catch (e: unknown) {
+      message.error((e as Error).message || '注册失败');
     } finally {
       setLoading(false);
     }
@@ -213,8 +213,8 @@ export default function Login() {
         setMockModalOpen(false);
         await initDemoAndRedirect();
       }, 1000);
-    } catch (e: any) {
-      message.error(e.message || '登录失败');
+    } catch (e: unknown) {
+      message.error((e as Error).message || '登录失败');
       setMockScanning(false);
     }
   };
@@ -325,8 +325,8 @@ export default function Login() {
                 setUser(data.user);
                 message.success('以游客身份体验');
                 await initDemoAndRedirect();
-              } catch (e: any) {
-                message.error(e.message || '游客登录失败');
+              } catch (e: unknown) {
+                message.error((e as Error).message || '游客登录失败');
               }
             }}
           >

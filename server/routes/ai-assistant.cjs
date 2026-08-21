@@ -8,6 +8,7 @@ const { getPool } = require('../db.cjs');
 const fundService = require('../fund-service.cjs');
 const { getClient, getModels } = require('../utils/anthropicClient.cjs');
 const { buildContext } = require('../services/aiContextProvider.cjs');
+const { authMiddleware } = require('../auth.cjs');
 
 // 安全的 HTML 清理：转义 HTML 实体而非简单剥离标签（防止 XSS 变体绕过）
 function sanitizeHtml(str) {
@@ -185,7 +186,7 @@ function generateSessionId() {
 
 // 获取用户ID（支持匿名）
 function getUserId(req) {
-  return req.user?.id || null;
+  return req?.user?.id || null;
 }
 
 // 安全的基金过滤器：处理 type 和 industry 字段可能不匹配的情况
@@ -592,7 +593,7 @@ router.post('/api/ai/chat/stream', aiLimiter, async (req, res) => {
     res.end();
 
     req.on('close', () => {
-      try { stream.controller?.abort(); } catch {}
+      try { resp?.controller?.abort(); } catch {}
     });
 
   } catch (error) {
@@ -705,7 +706,7 @@ router.post('/api/ai/chat', aiLimiter, async (req, res) => {
 });
 
 // 获取聊天历史记录（分页）
-router.get('/api/ai/history', async (req, res) => {
+router.get('/api/ai/history', authMiddleware, async (req, res) => {
   try {
     const pool = getPool();
     const userId = getUserId(req);
@@ -758,7 +759,7 @@ router.get('/api/ai/history', async (req, res) => {
 });
 
 // 获取会话列表
-router.get('/api/ai/sessions', async (req, res) => {
+router.get('/api/ai/sessions', authMiddleware, async (req, res) => {
   try {
     const pool = getPool();
     const userId = getUserId(req);
@@ -791,7 +792,7 @@ router.get('/api/ai/sessions', async (req, res) => {
 });
 
 // 消息反馈（点赞/点踩）
-router.post('/api/ai/feedback', async (req, res) => {
+router.post('/api/ai/feedback', authMiddleware, async (req, res) => {
   try {
     const pool = getPool();
     const userId = getUserId(req);
@@ -801,10 +802,9 @@ router.post('/api/ai/feedback', async (req, res) => {
       return res.status(400).json({ error: '参数无效' });
     }
 
-    // 存储到 chat_history 的 data 字段中（通过更新）
     await pool.query(
-      `UPDATE chat_history SET data = COALESCE(data, '{}')::jsonb || $1 WHERE id = $2`,
-      [JSON.stringify({ feedback: rating }), messageId]
+      `UPDATE chat_history SET data = COALESCE(data, '{}')::jsonb || $1 WHERE id = $2 AND user_id = $3`,
+      [JSON.stringify({ feedback: rating }), messageId, userId]
     );
 
     res.json({ success: true });
@@ -815,7 +815,7 @@ router.post('/api/ai/feedback', async (req, res) => {
 });
 
 // 收藏消息
-router.post('/api/ai/favorites', async (req, res) => {
+router.post('/api/ai/favorites', authMiddleware, async (req, res) => {
   try {
     const pool = getPool();
     const userId = getUserId(req);
@@ -832,40 +832,17 @@ router.post('/api/ai/favorites', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     logger.error('收藏失败:', error.message);
-    // 如果表不存在，尝试创建
-    if (error.message.includes('relation') && error.message.includes('does not exist')) {
-      try {
-        const pool = getPool();
-        await pool.query(`CREATE TABLE IF NOT EXISTS ai_favorites (
-          id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, message_id BIGINT NOT NULL,
-          session_id TEXT, content TEXT, created_at TIMESTAMP DEFAULT NOW(),
-          UNIQUE(user_id, message_id)
-        )`);
-        await pool.query(
-          `INSERT INTO ai_favorites (user_id, message_id, session_id, content) VALUES ($1, $2, $3, $4)`,
-          [userId, messageId, sessionId || '', content || '']
-        );
-        return res.json({ success: true });
-      } catch (e2) {
-        logger.error('创建收藏表失败:', e2.message);
-      }
-    }
+    // 表由迁移系统管理，不再运行时建表
     res.status(500).json({ error: '收藏失败' });
   }
 });
 
 // 获取收藏列表
-router.get('/api/ai/favorites', async (req, res) => {
+router.get('/api/ai/favorites', authMiddleware, async (req, res) => {
   try {
     const pool = getPool();
     const userId = getUserId(req);
     if (!userId) return res.json({ favorites: [] });
-
-    // 先检查表是否存在
-    const tableCheck = await pool.query(
-      `SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'ai_favorites')`
-    );
-    if (!tableCheck.rows[0].exists) return res.json({ favorites: [] });
 
     const result = await pool.query(
       `SELECT id, message_id, session_id, content, created_at FROM ai_favorites WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
@@ -879,7 +856,7 @@ router.get('/api/ai/favorites', async (req, res) => {
 });
 
 // 取消收藏
-router.delete('/api/ai/favorites/:messageId', async (req, res) => {
+router.delete('/api/ai/favorites/:messageId', authMiddleware, async (req, res) => {
   try {
     const pool = getPool();
     const userId = getUserId(req);
@@ -897,7 +874,7 @@ router.delete('/api/ai/favorites/:messageId', async (req, res) => {
 });
 
 // 清空聊天记录
-router.delete('/api/ai/history', async (req, res) => {
+router.delete('/api/ai/history', authMiddleware, async (req, res) => {
   try {
     const pool = getPool();
     const userId = getUserId(req);
@@ -906,7 +883,7 @@ router.delete('/api/ai/history', async (req, res) => {
     if (userId) {
       await pool.query('DELETE FROM chat_history WHERE user_id = $1', [userId]);
     } else if (sessionId) {
-      await pool.query('DELETE FROM chat_history WHERE session_id = $1', [sessionId]);
+      await pool.query('DELETE FROM chat_history WHERE session_id = $1 AND user_id = $2', [sessionId, userId]);
     }
 
     res.json({ success: true });
@@ -917,3 +894,6 @@ router.delete('/api/ai/history', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.sanitizeHtml = sanitizeHtml;
+module.exports.generateSessionId = generateSessionId;
+module.exports.getUserId = getUserId;

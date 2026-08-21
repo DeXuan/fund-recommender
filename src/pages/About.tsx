@@ -15,7 +15,6 @@ import {
 import {
   StockOutlined,
   SafetyOutlined,
-  RocketOutlined,
   DatabaseOutlined,
   CloudServerOutlined,
   MobileOutlined,
@@ -26,25 +25,37 @@ import {
   LockOutlined,
   ThunderboltOutlined,
   GlobalOutlined,
-  RobotOutlined,
-  BankOutlined,
-  FundOutlined,
-  BarChartOutlined,
   ApartmentOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../contexts/ThemeContext';
 
-const { Title, Text, Paragraph, Link } = Typography;
+const { Title, Text } = Typography;
 
-const APP_VERSION = '1.2.1';
-const APP_BUILD = '20260818';
+const APP_VERSION = '1.3.0';
+const APP_BUILD = '20260821';
 
 const changelog = [
   {
-    version: 'v1.2.1',
-    date: '2026-08-18',
+    version: 'v1.3.0',
+    date: '2026-08-21',
     tag: 'latest' as const,
     color: 'blue',
+    items: [
+      '第四轮代码质量优化（7 项），综合评分提升至 8.9/10',
+      'Portfolio.tsx 拆分 1568→721 行（-54%），接入 16 个已有子组件',
+      'StockPicker.tsx 拆分 1448→1107 行（-23%），提取图表配置纯函数',
+      'AIAssistant.tsx 拆分 1453→1334 行（-8%），提取渲染辅助模块',
+      '新增 fund-service 单元测试 76 个（覆盖率语句 100%）',
+      '新增支付/订阅 E2E 测试 10 个（7 机型全通过）',
+      'catch(e:any) → catch(e:unknown) 类型安全修复（18 处）',
+      'CI/CD 流水线增强 + 覆盖率门槛 + E2E 集成',
+      '全量测试 670 个通过（单元 362 + E2E 308）',
+    ],
+  },
+  {
+    version: 'v1.2.1',
+    date: '2026-08-18',
+    color: 'default',
     items: [
       'AI 助手流式输出修复（真 SSE 逐字输出 + 连接复用提速）',
       'AI 接入备用免费网关，主模型切换为 GLM-4.5-Air（首 token ~0.7s）',
@@ -210,14 +221,20 @@ const techStack = {
     { name: '集思录 API', desc: '实时财经日历事件' },
     { name: '支付宝 API', desc: 'OAuth 登录 & 扫码支付' },
   ],
+  testing: [
+    { name: 'Vitest 3', desc: '前端单元测试（128 个）' },
+    { name: 'node:test', desc: '后端单元测试（234 个）' },
+    { name: 'Playwright', desc: 'E2E 测试（308 个 / 7 机型）' },
+    { name: 'GitHub Actions', desc: 'CI/CD 流水线' },
+  ],
 };
 
 const stats = [
-  { title: '前端代码', value: '27,498', suffix: '行' },
-  { title: '后端代码', value: '18,579', suffix: '行' },
+  { title: '前端代码', value: '25,269', suffix: '行' },
+  { title: '后端代码', value: '17,719', suffix: '行' },
   { title: 'API 端点', value: '123', suffix: '个' },
   { title: '基金数量', value: '6,569', suffix: '只' },
-  { title: 'React 组件', value: '46', suffix: '个' },
+  { title: 'React 组件', value: '50', suffix: '个' },
   { title: '页面路由', value: '23', suffix: '个' },
 ];
 
@@ -525,6 +542,36 @@ export default function About() {
               children: (
                 <Row gutter={[12, 12]}>
                   {techStack.data.map((t) => (
+                    <Col xs={12} sm={8} key={t.name}>
+                      <div
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: 10,
+                          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+                          border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                        }}
+                      >
+                        <Text strong style={{ fontSize: 13 }}>{t.name}</Text>
+                        <br />
+                        <Text type="secondary" style={{ fontSize: 12 }}>{t.desc}</Text>
+                      </div>
+                    </Col>
+                  ))}
+                </Row>
+              ),
+            },
+            {
+              key: 'testing',
+              label: (
+                <Space>
+                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                  <Text strong>测试工具</Text>
+                  <Tag>{techStack.testing.length} 项</Tag>
+                </Space>
+              ),
+              children: (
+                <Row gutter={[12, 12]}>
+                  {techStack.testing.map((t) => (
                     <Col xs={12} sm={8} key={t.name}>
                       <div
                         style={{

@@ -637,19 +637,21 @@ async function seedFunds(funds) {
 // 批量更新基金经理
 async function updateFundManagers(managerMap) {
   const pool = getPool();
-  let updatedCount = 0;
-  for (const [code, manager] of Object.entries(managerMap)) {
-    try {
-      const result = await pool.query(
-        'UPDATE funds SET manager = $1 WHERE code = $2 AND (manager IS NULL OR manager = \'\')',
-        [manager, code]
-      );
-      if (result.rowCount > 0) updatedCount++;
-    } catch (e) {
-      logger.warn(`更新基金经理失败 ${code}:`, e.message);
-    }
+  const entries = Object.entries(managerMap);
+  if (entries.length === 0) return;
+  const codes = entries.map(([code]) => code);
+  const managers = entries.map(([, manager]) => manager);
+  try {
+    const result = await pool.query(
+      `UPDATE funds SET manager = v.mgr
+       FROM unnest($1::text[], $2::text[]) AS v(code, mgr)
+       WHERE funds.code = v.code AND (funds.manager IS NULL OR funds.manager = '')`,
+      [codes, managers]
+    );
+    logger.info(`[基金经理] 更新 ${result.rowCount} 只基金的经理信息`);
+  } catch (e) {
+    logger.warn('[基金经理] 批量更新失败:', e.message);
   }
-  logger.info(`[基金经理] 更新 ${updatedCount} 只基金的经理信息`);
 }
 
 // 更新单只基金的详情（经理、费率、规模等）

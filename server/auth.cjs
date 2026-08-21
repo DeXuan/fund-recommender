@@ -20,35 +20,11 @@ if (!JWT_SECRET || JWT_SECRET === 'change-me-to-a-random-string-at-least-32-char
   process.exit(1);
 }
 
-// Rate limiting for auth endpoints (with TTL cleanup)
-const authRateLimitMap = new Map();
+// Rate limiting for auth endpoints — 使用共享 rate-limiter
+const { createRateLimit } = require('./utils/rate-limiter.cjs');
 function authRateLimit(windowMs, max) {
-  return (req, res, next) => {
-    const ip = req.ip || req.connection.remoteAddress;
-    const now = Date.now();
-    const record = authRateLimitMap.get(ip) || { count: 0, resetTime: now + windowMs };
-    if (now > record.resetTime) {
-      record.count = 0;
-      record.resetTime = now + windowMs;
-    }
-    record.count++;
-    authRateLimitMap.set(ip, record);
-    if (record.count > max) {
-      return res.status(429).json({ error: '请求过于频繁，请稍后再试' });
-    }
-    next();
-  };
+  return createRateLimit(windowMs, max, 'auth');
 }
-
-// Evict stale auth rate limit entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, record] of authRateLimitMap) {
-    if (now > record.resetTime + 60000) {
-      authRateLimitMap.delete(ip);
-    }
-  }
-}, 5 * 60 * 1000);
 
 const strictLimit = authRateLimit(60 * 1000, 10);
 
@@ -210,10 +186,10 @@ function parseUserAgent(ua) {
   else if (ua.includes('Edg')) browser = 'Edge';
   else if (ua.includes('MSIE') || ua.includes('Trident')) browser = 'IE';
   if (ua.includes('Windows')) os = 'Windows';
-  else if (ua.includes('Mac OS')) os = 'macOS';
-  else if (ua.includes('Linux')) os = 'Linux';
   else if (ua.includes('Android')) { os = 'Android'; device = 'Mobile'; }
   else if (ua.includes('iPhone') || ua.includes('iPad')) { os = 'iOS'; device = 'Mobile'; }
+  else if (ua.includes('Mac OS')) os = 'macOS';
+  else if (ua.includes('Linux')) os = 'Linux';
   if (ua.includes('Mobile') && device !== 'Mobile') device = 'Mobile';
   return { browser, os, device };
 }
@@ -749,36 +725,40 @@ setInterval(() => {
   }
 }, 2 * 60 * 1000);
 
+async function getSubscriptionTier(req) {
+  if (!req.user || !req.user.id) return { tier: 'free', isPremium: false };
+  if (req.user.role === 'admin') return { tier: 'admin', isPremium: true };
+  const now = Date.now();
+  const cached = subCache.get(req.user.id);
+  if (cached && now < cached.ttl) {
+    return { tier: cached.tier || 'free', isPremium: cached.isPremium };
+  }
+  let tier = 'free';
+  let isPremium = false;
+  try {
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT subscription_status, subscription_end, subscription_tier FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    const row = result.rows[0];
+    tier = row?.subscription_tier || 'free';
+    const hasLegacyPremium = row && row.subscription_status === 'premium' && row.subscription_end && new Date(row.subscription_end) > new Date();
+    const hasTierPremium = tier === 'premium' || tier === 'svip';
+    isPremium = hasLegacyPremium || hasTierPremium;
+    subCache.set(req.user.id, { isPremium, tier, ttl: now + SUB_CACHE_TTL });
+  } catch (e) {
+    logger.warn(`[subscription] DB check failed: ${e.message}`);
+  }
+  return { tier, isPremium };
+}
+
 async function subscriptionMiddleware(req, res, next) {
   if (!req.user || !req.user.id) {
     return res.status(403).json({ error: '需要登录', code: 'LOGIN_REQUIRED' });
   }
+  const { tier, isPremium } = await getSubscriptionTier(req);
   if (req.user.role === 'admin') return next();
-  const now = Date.now();
-  const cached = subCache.get(req.user.id);
-  let isPremium = false;
-  let tier = 'free';
-  if (cached && now < cached.ttl) {
-    isPremium = cached.isPremium;
-    tier = cached.tier || 'free';
-  } else {
-    try {
-      const pool = getPool();
-      const result = await pool.query(
-        'SELECT subscription_status, subscription_end, subscription_tier FROM users WHERE id = $1',
-        [req.user.id]
-      );
-      const row = result.rows[0];
-      tier = row?.subscription_tier || 'free';
-      // 兼容旧版 premium 状态 + 新版 tier 字段
-      const hasLegacyPremium = row && row.subscription_status === 'premium' && row.subscription_end && new Date(row.subscription_end) > new Date();
-      const hasTierPremium = tier === 'premium' || tier === 'svip';
-      isPremium = hasLegacyPremium || hasTierPremium;
-      subCache.set(req.user.id, { isPremium, tier, ttl: now + SUB_CACHE_TTL });
-    } catch (e) {
-      logger.warn(`[subscriptionMiddleware] DB check failed: ${e.message}`);
-    }
-  }
   if (!isPremium) {
     return res.status(403).json({ error: '此功能需要开通会员', code: 'SUBSCRIPTION_REQUIRED' });
   }
@@ -791,29 +771,8 @@ async function svipMiddleware(req, res, next) {
   if (!req.user || !req.user.id) {
     return res.status(403).json({ error: '需要登录', code: 'LOGIN_REQUIRED' });
   }
+  const { tier } = await getSubscriptionTier(req);
   if (req.user.role === 'admin') return next();
-  const now = Date.now();
-  const cached = subCache.get(req.user.id);
-  let tier = 'free';
-  if (cached && now < cached.ttl) {
-    tier = cached.tier || 'free';
-  } else {
-    try {
-      const pool = getPool();
-      const result = await pool.query(
-        'SELECT subscription_status, subscription_end, subscription_tier FROM users WHERE id = $1',
-        [req.user.id]
-      );
-      const row = result.rows[0];
-      tier = row?.subscription_tier || 'free';
-      const hasLegacyPremium = row && row.subscription_status === 'premium' && row.subscription_end && new Date(row.subscription_end) > new Date();
-      const hasTierPremium = tier === 'premium' || tier === 'svip';
-      const isPremium = hasLegacyPremium || hasTierPremium;
-      subCache.set(req.user.id, { isPremium, tier, ttl: now + SUB_CACHE_TTL });
-    } catch (e) {
-      logger.warn(`[svipMiddleware] DB check failed: ${e.message}`);
-    }
-  }
   if (tier !== 'premium' && tier !== 'svip') {
     return res.status(403).json({ error: '此功能需要开通会员', code: 'SUBSCRIPTION_REQUIRED' });
   }
@@ -826,25 +785,8 @@ async function svipExclusiveMiddleware(req, res, next) {
   if (!req.user || !req.user.id) {
     return res.status(403).json({ error: '需要登录', code: 'LOGIN_REQUIRED' });
   }
+  const { tier } = await getSubscriptionTier(req);
   if (req.user.role === 'admin') return next();
-  const now = Date.now();
-  const cached = subCache.get(req.user.id);
-  let tier = 'free';
-  if (cached && now < cached.ttl) {
-    tier = cached.tier || 'free';
-  } else {
-    try {
-      const pool = getPool();
-      const result = await pool.query(
-        'SELECT subscription_tier FROM users WHERE id = $1',
-        [req.user.id]
-      );
-      tier = result.rows[0]?.subscription_tier || 'free';
-      subCache.set(req.user.id, { isPremium: tier !== 'free', tier, ttl: now + SUB_CACHE_TTL });
-    } catch (e) {
-      logger.warn(`[svipExclusiveMiddleware] DB check failed: ${e.message}`);
-    }
-  }
   if (tier !== 'svip') {
     return res.status(403).json({ error: '此功能需要开通至尊SVIP', code: 'SVIP_REQUIRED' });
   }
@@ -858,3 +800,5 @@ module.exports.adminMiddleware = adminMiddleware;
 module.exports.subscriptionMiddleware = subscriptionMiddleware;
 module.exports.svipMiddleware = svipMiddleware;
 module.exports.svipExclusiveMiddleware = svipExclusiveMiddleware;
+module.exports.parseUserAgent = parseUserAgent;
+module.exports.authRateLimit = authRateLimit;

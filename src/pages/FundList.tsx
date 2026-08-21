@@ -428,11 +428,11 @@ export default function FundList() {
     try {
       const data = await fundCompareApi.premiumAnalyze(selectedCodes);
       setPremiumData(data);
-    } catch (e: any) {
-      if (e.message?.includes('会员')) {
+    } catch (e: unknown) {
+      if ((e as Error).message?.includes('会员')) {
         message.warning('深度分析需要开通会员');
       } else {
-        message.error(e.message || '深度分析失败');
+        message.error((e as Error).message || '深度分析失败');
       }
     } finally {
       setPremiumLoading(false);

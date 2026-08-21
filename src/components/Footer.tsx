@@ -1,7 +1,9 @@
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 export default function Footer() {
   const { isDark } = useTheme();
+  const { t } = useTranslation();
   const border = isDark ? '#262626' : '#f0f0f0';
   const text2 = isDark ? '#a0a0a0' : '#595959';
   const text3 = isDark ? '#6b6b6b' : '#bfbfbf';
@@ -25,10 +27,10 @@ export default function Footer() {
           color: text3,
           lineHeight: 1.8,
         }}>
-          本站为个人技术学习与非商业演示项目，仅展示个人基金净值等数据以便本人查看，不构成任何投资建议，亦不提供基金推荐或买卖指导。投资有风险，决策需谨慎。
+          {t('footer.disclaimer')}
         </div>
         <div style={{ fontSize: 15, fontWeight: 600, color: text2, marginBottom: 8 }}>
-          关于个人基金数据看板
+          {t('footer.about')}
         </div>
         <div style={{ fontSize: 13, color: text3, marginBottom: 4 }}>
           Fund-recommender
@@ -41,7 +43,7 @@ export default function Footer() {
             rel="noopener noreferrer"
             style={{ color: isDark ? '#4096ff' : '#1677ff', textDecoration: 'none' }}
           >
-            微博@Mcmirror
+            {t('footer.copyright')}
           </a>
         </div>
       </div>

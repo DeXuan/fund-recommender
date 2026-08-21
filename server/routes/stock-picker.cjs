@@ -166,14 +166,18 @@ router.post('/api/stock-picker/backtest', authMiddleware, subscriptionMiddleware
     };
     const benchmarkFundCode = benchmarkCode && BENCHMARKS[benchmarkCode] ? benchmarkCode : '110020';
 
-    // 获取每只基金的净值历史
+    // 获取每只基金的净值历史（批量查询）
     const fundHistories = {};
-    for (const code of codes.slice(0, 10)) {
-      const navRes = await pool.query(
-        'SELECT nav, nav_date FROM fund_nav WHERE fund_code = $1 ORDER BY nav_date DESC LIMIT $2',
-        [code, limit]
+    const backtestCodes = codes.slice(0, 10);
+    if (backtestCodes.length > 0) {
+      const allNavRes = await pool.query(
+        `SELECT fund_code, nav, nav_date FROM fund_nav
+         WHERE fund_code = ANY($1) ORDER BY nav_date DESC LIMIT $2`,
+        [backtestCodes, limit * backtestCodes.length]
       );
-      fundHistories[code] = navRes.rows.reverse();
+      for (const code of backtestCodes) {
+        fundHistories[code] = allNavRes.rows.filter(r => r.fund_code === code).reverse();
+      }
     }
 
     // 获取基准净值
