@@ -1,0 +1,12 @@
+#!/bin/sh
+# Pre-commit hook: lint staged .ts/.tsx/.cjs files
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|cjs|js)$')
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+echo "[pre-commit] Linting staged files..."
+echo "$STAGED" | xargs npx eslint --quiet || {
+  echo "[pre-commit] Lint failed. Fix errors and re-stage, or use --no-verify to skip."
+  exit 1
+}
+echo "[pre-commit] All checks passed."

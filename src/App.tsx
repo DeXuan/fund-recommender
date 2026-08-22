@@ -36,6 +36,8 @@ const AIAssistant = lazy(() => import('./pages/AIAssistant'));
 const FundDiagnosis = lazy(() => import('./pages/FundDiagnosis'));
 const ValuationCenter = lazy(() => import('./pages/ValuationCenter'));
 const PortfolioOverlap = lazy(() => import('./pages/PortfolioOverlap'));
+
+const MobileTabBar = lazy(() => import('./components/MobileTabBar'));
 const About = lazy(() => import('./pages/About'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -80,6 +82,7 @@ function AppRoutes() {
         <Route path="/fund-diagnosis/:code" element={<ProtectedRoute><FundDiagnosis /></ProtectedRoute>} />
         <Route path="/valuation-center" element={<ProtectedRoute><ValuationCenter /></ProtectedRoute>} />
         <Route path="/portfolio-overlap" element={<ProtectedRoute><PortfolioOverlap /></ProtectedRoute>} />
+        <Route path="/reports" element={<Navigate to="/portfolio" replace />} />
         <Route path="/admin/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
         <Route path="/admin/monitor" element={<AdminRoute><SystemMonitor /></AdminRoute>} />
         <Route path="/about" element={<About />} />
@@ -102,12 +105,13 @@ function App() {
           <div role="status" aria-live="polite" aria-label="数据状态" style={{ position: 'sticky', top: 64, zIndex: 99, padding: isMobile ? '6px 12px' : '8px 24px', background: 'var(--bg-primary)', backdropFilter: 'blur(8px)', borderBottom: '1px solid var(--border-color-light)' }}>
             <DataStatus />
           </div>
-          <Layout.Content role="main" aria-label="主要内容" style={{ maxWidth: 1800, margin: '0 auto', padding: isMobile ? '12px 12px' : '20px 24px', width: '100%' }}>
+          <Layout.Content role="main" aria-label="主要内容" style={{ maxWidth: 1800, margin: '0 auto', padding: isMobile ? '12px 12px 68px' : '20px 24px', width: '100%' }}>
             <ErrorBoundary>
               <AppRoutes />
             </ErrorBoundary>
           </Layout.Content>
           <Footer />
+          {isMobile && <Suspense fallback={null}><MobileTabBar /></Suspense>}
           <Suspense fallback={null}><FloatingChat /></Suspense>
           <Suspense fallback={null}><CommandPalette /></Suspense>
         </Layout>

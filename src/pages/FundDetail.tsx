@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Card, Breadcrumb, Tag, Statistic, Row, Col, Tabs, Descriptions, Progress, Button, Spin, Space, Alert, Modal, Form, Input, InputNumber, DatePicker, message } from 'antd';
+import { Card, Breadcrumb, Tag, Statistic, Row, Col, Tabs, Descriptions, Progress, Button, Space, Alert, Modal, Form, Input, InputNumber, DatePicker, message, Segmented, Skeleton } from 'antd';
 import {
   StarFilled,
   StarOutlined,
@@ -8,13 +8,12 @@ import {
   PlusOutlined,
   AccountBookOutlined,
 } from '@ant-design/icons';
-import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { fundApi, portfolioApi, watchlistApi } from '../services/api';
 import { formatReturn, getReturnColor, getValuationText, getValuationColor } from '../utils/format';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { getEchartsTheme } from '../utils/echarts-theme';
+import ChartWithToolbar from '../components/ChartWithToolbar';
 
 interface FundDetailType {
   code: string;
@@ -69,6 +68,7 @@ export default function FundDetail() {
   const [fund, setFund] = useState<FundDetailType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [chartType, setChartType] = useState<string>('line');
   const [addToPortfolioOpen, setAddToPortfolioOpen] = useState(false);
   const [portfolioForm] = Form.useForm();
   const [isWatched, setIsWatched] = useState(false);
@@ -124,7 +124,26 @@ export default function FundDetail() {
   };
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>;
+    return (
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px' }}>
+        <Skeleton active paragraph={{ rows: 1 }} style={{ marginBottom: 16 }} />
+        <Card style={{ marginBottom: 16 }}>
+          <Skeleton active avatar paragraph={{ rows: 2 }} />
+        </Card>
+        <Row gutter={16}>
+          <Col xs={24} lg={16}>
+            <Card>
+              <Skeleton active paragraph={{ rows: 8 }} />
+            </Card>
+          </Col>
+          <Col xs={24} lg={8}>
+            <Card>
+              <Skeleton active paragraph={{ rows: 4 }} />
+            </Card>
+          </Col>
+        </Row>
+      </div>
+    );
   }
 
   if (!fund) {
@@ -165,6 +184,38 @@ export default function FundDetail() {
       },
       lineStyle: { color: '#1677ff', width: 2 },
       itemStyle: { color: '#1677ff' },
+    }],
+    grid: { top: 20, right: 20, bottom: 30, left: 60 },
+  };
+
+  const navHistory = fund.performanceHistory || [];
+  const candlestickData = navHistory.map((d, i) => {
+    const close = d.nav;
+    const open = i > 0 ? navHistory[i - 1].nav : close;
+    return [open, close, Math.max(open, close), Math.min(open, close)];
+  });
+  const candlestickOption = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any) => {
+        const p = params[0];
+        const [open, close] = p.value;
+        const change = ((close - open) / open * 100).toFixed(2);
+        const color = close >= open ? '#ff4d4f' : '#52c41a';
+        return `${p.axisValue}<br/>开: ${open.toFixed(4)}<br/>收: ${close.toFixed(4)}<br/>涨跌: <span style="color:${color}">${change}%</span>`;
+      },
+    },
+    xAxis: { type: 'category', data: navHistory.map(d => d.date) },
+    yAxis: { type: 'value', scale: true },
+    series: [{
+      data: candlestickData,
+      type: 'candlestick',
+      itemStyle: {
+        color: '#ff4d4f',
+        color0: '#52c41a',
+        borderColor: '#ff4d4f',
+        borderColor0: '#52c41a',
+      },
     }],
     grid: { top: 20, right: 20, bottom: 30, left: 60 },
   };
@@ -343,7 +394,7 @@ export default function FundDetail() {
         <div>
           {fund.topHoldings && fund.topHoldings.length > 0 ? (
             <div>
-              <ReactECharts theme={getEchartsTheme(isDark)} option={holdingsChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
+              <ChartWithToolbar title="持仓分布" option={holdingsChartOption} height={300} />
               <h4 style={{ margin: '16px 0 12px' }}>前十大持仓明细</h4>
               {fund.topHoldings.map((holding, index) => (
                 <div key={index} style={{
@@ -373,7 +424,12 @@ export default function FundDetail() {
         <div>
           {fund.performanceHistory && fund.performanceHistory.length > 0 ? (
             <div>
-              <ReactECharts theme={getEchartsTheme(isDark)} option={navChartOption} style={{ height: 300 }} opts={{ renderer: 'svg' }} />
+              <ChartWithToolbar
+                title="历史业绩"
+                option={chartType === 'candlestick' ? candlestickOption : navChartOption}
+                height={300}
+                extra={<Segmented options={[{ label: '折线图', value: 'line' }, { label: 'K线图', value: 'candlestick' }]} value={chartType} onChange={setChartType} />}
+              />
               <Alert type="info" message="历史业绩不代表未来表现，仅供参考。基金有风险，投资需谨慎。" style={{ marginTop: 16 }} />
             </div>
           ) : (

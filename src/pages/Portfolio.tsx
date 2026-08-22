@@ -10,7 +10,7 @@ import {
   SyncOutlined, LinkOutlined, FundOutlined, SafetyOutlined,
   CalculatorOutlined, CrownOutlined, SwapOutlined, LineChartOutlined,
   TrophyOutlined, ExperimentOutlined, WalletOutlined,
-  ArrowUpOutlined, ArrowDownOutlined,
+  ArrowUpOutlined, ArrowDownOutlined, PieChartOutlined, FileTextOutlined,
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -21,6 +21,9 @@ import ReturnsMap from '../components/ReturnsMap';
 import VIPInsights from '../components/VIPInsights';
 import { TransactionHistoryTab } from '../components/portfolio/TransactionHistoryTab';
 import { DeepAnalysisTab } from '../components/portfolio/DeepAnalysisTab';
+import { BacktestTab } from '../components/portfolio/BacktestTab';
+import { AllocationAdviceTab } from '../components/portfolio/AllocationAdviceTab';
+import { ReportTab } from '../components/portfolio/ReportTab';
 import { GoalPlanningTab } from '../components/portfolio/GoalPlanningTab';
 import { SmartDCATab } from '../components/portfolio/SmartDCATab';
 import { HoldingsDiagnosis } from '../components/portfolio/HoldingsDiagnosis';
@@ -32,6 +35,8 @@ import { AddEditRecordModal } from '../components/portfolio/AddEditRecordModal';
 import { DCAModal } from '../components/portfolio/DCAModal';
 import { DCAPlansPanel } from '../components/portfolio/DCAPlansPanel';
 import { HoldingsCharts } from '../components/portfolio/HoldingsCharts';
+import HealthScore from '../components/HealthScore';
+import AlertLinesPanel from '../components/AlertLinesPanel';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -553,6 +558,17 @@ export default function Portfolio() {
             )}
           </Card>
 
+          {holdings.length > 0 && (
+            <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+              <Col xs={24} lg={12}>
+                <HealthScore />
+              </Col>
+              <Col xs={24} lg={12}>
+                <AlertLinesPanel holdings={holdings.map(h => ({ fund_code: h.fund_code, fund_name: h.fund_name }))} />
+              </Col>
+            </Row>
+          )}
+
           {holdings.length > 0 && <ReturnsMap />}
 
           {holdings.length > 0 && (
@@ -666,6 +682,21 @@ export default function Portfolio() {
       key: 'goal',
       label: <span><TrophyOutlined style={{ marginRight: 6 }} />目标规划</span>,
       children: <GoalPlanningTab isDark={isDark} summary={summary} />,
+    },
+    {
+      key: 'report',
+      label: <span><FileTextOutlined style={{ marginRight: 6 }} />投资报告</span>,
+      children: <ReportTab />,
+    },
+    {
+      key: 'backtest',
+      label: <span><LineChartOutlined style={{ marginRight: 6 }} />组合回测</span>,
+      children: <BacktestTab holdings={holdings.map(h => ({ fund_code: h.fund_code, fund_name: h.fund_name }))} />,
+    },
+    {
+      key: 'allocation',
+      label: <span><PieChartOutlined style={{ marginRight: 6 }} />资产配置建议</span>,
+      children: <AllocationAdviceTab />,
     },
     {
       key: 'assets',

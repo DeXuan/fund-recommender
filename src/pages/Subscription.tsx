@@ -158,7 +158,7 @@ export default function Subscription() {
         ) : (
           <div style={{ textAlign: 'center', padding: 20 }}>
             {qrBase64 ? (
-              <img src={qrBase64} alt="支付宝二维码" style={{ width: 260, height: 260 }} />
+              <img src={qrBase64} alt="支付宝二维码" loading="lazy" style={{ width: 260, height: 260 }} />
             ) : (
               <div style={{ width: 260, height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isDark ? '#1f1f1f' : '#f5f5f5', margin: '0 auto' }}>
                 <Text type="secondary">二维码生成中...</Text>

@@ -20,5 +20,17 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: (id: string) => {
+            if (id.includes('node_modules/echarts') || id.includes('node_modules/echarts-for-react')) return 'echarts';
+            if (id.includes('node_modules/antd') || id.includes('node_modules/@ant-design/icons')) return 'antd';
+            if (id.includes('node_modules/react-markdown') || id.includes('node_modules/rehype-raw') || id.includes('node_modules/remark-gfm')) return 'markdown';
+            if (id.includes('node_modules/gsap')) return 'gsap';
+          },
+        },
+      },
+    },
   }
 })

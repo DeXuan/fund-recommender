@@ -80,3 +80,14 @@ scripts/shots/
 disable_gold_old.py
 scripts/check-*.cjs
 scripts/count-junk.cjs
+
+# ÁÙÊ±ÎÄ¼ş
+.backend-pid
+.frontend-pid
+cmb_products_backup.json
+fix-nginx.sh
+server-update.tar.gz
+playwright-report/
+test-results/
+start-backend.ps1
+start-vite.ps1

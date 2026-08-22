@@ -31,15 +31,33 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const { Title, Text } = Typography;
 
-const APP_VERSION = '1.3.0';
-const APP_BUILD = '20260821';
+const APP_VERSION = '1.4.0';
+const APP_BUILD = '20260822';
 
 const changelog = [
   {
-    version: 'v1.3.0',
-    date: '2026-08-21',
+    version: 'v1.4.0',
+    date: '2026-08-22',
     tag: 'latest' as const,
     color: 'blue',
+    items: [
+      '对标养基宝 APP 第二轮优化：持仓预警线、组合回测、资产配置建议',
+      '持仓预警线：止盈/止损设置 + 触发状态展示 + 接近预警',
+      '组合回测：加权组合净值计算 + 年化收益/最大回撤/夏普/卡玛比率',
+      '资产配置建议：基于风险画像生成目标配置 + 当前 vs 建议差距分析',
+      '全面分析优化 12 项：401 自动跳转、可见性轮询、导出路径、统一 API 等',
+      'vite manualChunks 分割（echarts/antd/markdown 独立 chunk）',
+      '无障碍增强：MobileTabBar aria 标签、PullToRefresh aria-busy',
+      '消除 FundList/FundComparePanel 重复类型定义',
+      '投资报告集成到持仓页面（Tab 形式），移除独立入口',
+      '期间净值变化表格新增基金名称列',
+      '后端代码全量同步部署，修复 svipExclusiveMiddleware 全局拦截 bug',
+    ],
+  },
+  {
+    version: 'v1.3.0',
+    date: '2026-08-21',
+    color: 'default',
     items: [
       '第四轮代码质量优化（7 项），综合评分提升至 8.9/10',
       'Portfolio.tsx 拆分 1568→721 行（-54%），接入 16 个已有子组件',
@@ -230,12 +248,12 @@ const techStack = {
 };
 
 const stats = [
-  { title: '前端代码', value: '25,269', suffix: '行' },
-  { title: '后端代码', value: '17,719', suffix: '行' },
-  { title: 'API 端点', value: '123', suffix: '个' },
+  { title: '前端代码', value: '26,500', suffix: '行' },
+  { title: '后端代码', value: '18,200', suffix: '行' },
+  { title: 'API 端点', value: '130', suffix: '个' },
   { title: '基金数量', value: '6,569', suffix: '只' },
-  { title: 'React 组件', value: '50', suffix: '个' },
-  { title: '页面路由', value: '23', suffix: '个' },
+  { title: 'React 组件', value: '55', suffix: '个' },
+  { title: '页面路由', value: '22', suffix: '个' },
 ];
 
 export default function About() {

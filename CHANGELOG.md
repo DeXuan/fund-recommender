@@ -4,6 +4,41 @@
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-08-22
+
+### Added
+- `server/migrations/004_portfolio_alert_lines.cjs` — 持仓预警线建表迁移
+- `server/routes/portfolio/alert-lines.cjs` — 预警线 CRUD API（止盈/止损设置）
+- `server/routes/portfolio/backtest.cjs` — 组合回测 API（加权净值/年化收益/最大回撤/夏普/卡玛/波动率）
+- `server/routes/portfolio/allocation-advice.cjs` — 资产配置建议 API（风险画像 + 目标配置 + 差距分析）
+- `src/components/AlertLinesPanel.tsx` — 预警线管理组件（设置/触发状态/接近预警）
+- `src/components/portfolio/BacktestTab.tsx` — 组合回测组件（基金选择/权重/时间范围/图表/8项统计）
+- `src/components/portfolio/AllocationAdviceTab.tsx` — 资产配置建议组件（饼图/差距表/调仓建议）
+- `src/components/portfolio/ReportTab.tsx` — 投资报告组件（从独立页面提取为 Tab 组件）
+- `src/components/fundlist/types.ts` — 共享 CompareFund 接口（消除重复类型定义）
+- `docs/ANALYSIS-OPTIMIZATION.md` — 全面分析与优化执行日志
+
+### Changed
+- `src/services/api.ts`：401 时派发 `auth:unauthorized` 事件自动跳转登录页；`exportTransactions` 使用 `API_BASE` 替代硬编码；新增 backtest/getAllocationAdvice/getAlertLines 等 API 方法
+- `src/contexts/AuthContext.tsx`：监听 `auth:unauthorized` 事件清除用户状态；useEffect 依赖标注
+- `src/components/Navbar.tsx`：轮询可见性优化（`document.visibilityState`）；移除投资报告独立入口
+- `src/pages/Login.tsx`：支付宝二维码获取改用 `authApi.getAlipayQrcode()` 统一 API
+- `vite.config.ts`：添加 `manualChunks` 函数分割 echarts/antd/markdown/gsap
+- `src/components/MobileTabBar.tsx`：添加 aria-label/aria-current 无障碍标签；移除投资报告入口
+- `src/components/PullToRefresh.tsx`：添加 aria-busy 无障碍状态
+- `src/pages/Portfolio.tsx`：新增"组合回测""资产配置建议""投资报告"三个 Tab
+- `src/pages/FundList.tsx`：使用共享 CompareFund 接口消除重复类型
+- `src/components/fundlist/FundComparePanel.tsx`：使用共享 CompareFund 接口
+- `src/pages/FundDetail.tsx`：移除未使用的 Spin 导入
+- `src/pages/About.tsx`：版本号 v1.4.0、更新日志、统计数据刷新
+- `src/App.tsx`：`/reports` 路由重定向到 `/portfolio`
+- `server/routes/portfolio/reports.cjs`：nav_changes 新增 fund_name 字段
+- `package.json`：添加 dayjs 显式依赖；版本号升至 1.4.0
+
+### Fixed
+- `server/routes/portfolio/alert-lines.cjs`：修复 SQL 语法错误（`!CORRECTED!` 占位符 + `ORDER BY?`）
+- 服务器后端代码全量同步，修复 `svipExclusiveMiddleware` 全局拦截导致报告 API 返回 403 的 bug
+
 ## [1.3.0] — 2026-08-21
 
 ### Added

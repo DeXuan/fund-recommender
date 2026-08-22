@@ -6,50 +6,7 @@ import ReactECharts from 'echarts-for-react';
 import { fundApi, fundCompareApi } from '../../services/api';
 import { getEchartsTheme } from '../../utils/echarts-theme';
 import { formatReturn, getReturnColor, getValuationText } from '../../utils/format';
-
-interface Fund {
-  code: string;
-  name: string;
-  type: string;
-  company: string;
-  index: string;
-  industry: string;
-  managementStyle?: string;
-  nav: number;
-  return1y: number;
-  return6m: number;
-  return3m: number;
-  return1m: number;
-  return1w: number;
-  managementFee: number;
-  custodyFee: number;
-  serviceFee: number;
-  totalFee: number;
-  scale: number;
-  institutionHold: number;
-  individualHold: number;
-  rating: number;
-  pe: number;
-  pb: number;
-  pePercentile: number;
-  pbPercentile: number;
-  valuation: string;
-  dailyLimit?: number;
-  purchaseFee?: number;
-  purchaseFeeDiscount?: number;
-  redeemFee?: { period: string; rate: number }[];
-  purchaseStatus?: string;
-  riskLevel?: string;
-  fundManager?: string;
-  share?: string;
-  shareChange?: string;
-  suitableFor?: string;
-  investmentAdvice?: string;
-  recommendation?: string;
-  topHoldings?: { name: string; percentage: number }[];
-  isGoldSelected?: boolean;
-  manager?: string;
-}
+import type { CompareFund as Fund } from './types';
 
 interface FundComparePanelProps {
   selectedCodes: string[];

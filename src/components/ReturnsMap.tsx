@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, Select, Row, Col, Statistic, Spin, Empty, Tag, Progress, Alert, Tooltip, Badge, Space } from 'antd';
+import { Card, Select, Row, Col, Statistic, Spin, Empty, Tag, Progress, Alert, Tooltip, Badge, Space, Modal, Table } from 'antd';
 import {
   CalendarOutlined, FundOutlined,
   ExclamationCircleOutlined, CheckCircleOutlined, BulbOutlined,
@@ -58,6 +58,7 @@ export default function ReturnsMap() {
   const [insights, setInsights] = useState<InsightsData | null>(null);
   const [mapData, setMapData] = useState<ReturnsMapData | null>(null);
   const [year, setYear] = useState(new Date().getFullYear());
+  const [dailyModal, setDailyModal] = useState<{ open: boolean; date: string; data: any[]; total: number; loading: boolean }>({ open: false, date: '', data: [], total: 0, loading: false });
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -110,13 +111,25 @@ export default function ReturnsMap() {
         formatter: (params: any) => {
           const [date, value] = params.data;
           const color = value >= 0 ? '#cf1322' : '#3f8600';
-          return `<div style="font-size:13px"><div style="font-weight:600;margin-bottom:4px">${date}</div><div>当日收益: <span style="color:${color};font-weight:600">${value >= 0 ? '+' : ''}¥${value.toLocaleString()}</span></div></div>`;
+          return `<div style="font-size:13px"><div style="font-weight:600;margin-bottom:4px">${date}</div><div>当日收益: <span style="color:${color};font-weight:600">${value >= 0 ? '+' : ''}¥${value.toLocaleString()}</span></div><div style="margin-top:4px;color:#999;font-size:11px">点击查看明细</div></div>`;
         },
       },
       visualMap: { show: true, min: -maxAbs, max: maxAbs, orient: 'horizontal', left: 'center', bottom: 6, itemWidth: 14, itemHeight: 120, text: ['盈利', '亏损'], textStyle: { fontSize: 11, color: isDark ? '#a0a0a0' : '#666' }, inRange: { color: ['#237804', '#3f8600', '#52c41a', '#d9d9d9', '#ff7875', '#ff4d4f', '#cf1322'] } },
       calendar: { top: 30, left: 50, right: 30, bottom: 60, cellSize: ['auto', 15], range: String(year), itemStyle: { borderWidth: 2, borderColor: '#fff' }, splitLine: { show: true }, yearLabel: { show: false }, monthLabel: { nameMap: monthNames, fontSize: 11, color: isDark ? '#a0a0a0' : '#666' }, dayLabel: { nameMap: ['日', '一', '二', '三', '四', '五', '六'], fontSize: 10, color: isDark ? '#6b6b6b' : '#999' } },
-      series: [{ type: 'heatmap', coordinateSystem: 'calendar', data: heatData }],
+      series: [{ type: 'heatmap', coordinateSystem: 'calendar', data: heatData, emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } } }],
     };
+  };
+
+  const handleCalendarClick = async (params: any) => {
+    if (!params.data) return;
+    const [date] = params.data;
+    setDailyModal({ open: true, date, data: [], total: 0, loading: true });
+    try {
+      const detail = await portfolioApi.getDailyDetail(date);
+      setDailyModal({ open: true, date, data: detail.funds || [], total: detail.total_pnl || 0, loading: false });
+    } catch {
+      setDailyModal({ open: true, date, data: [], total: 0, loading: false });
+    }
   };
 
   // 资产分类饼图
@@ -203,7 +216,7 @@ export default function ReturnsMap() {
               <Col span={6}><Statistic title="最大单日亏损" value={mapData.summary.maxLoss} precision={2} prefix="¥" valueStyle={{ fontSize: 16, color: '#3f8600' }} /></Col>
               <Col span={6}><Statistic title="交易天数" value={mapData.summary.totalDays} suffix="天" valueStyle={{ fontSize: 16 }} /></Col>
             </Row>
-            <ReactECharts option={getCalendarOption()} theme={getEchartsTheme(isDark)} style={{ height: 180, width: '100%' }} opts={{ renderer: 'svg' }} />
+            <ReactECharts option={getCalendarOption()} theme={getEchartsTheme(isDark)} style={{ height: 180, width: '100%' }} opts={{ renderer: 'svg' }} onEvents={{ click: handleCalendarClick }} />
           </>
         ) : (
           <Empty description={`${year}年暂无收益数据`} />
@@ -374,6 +387,43 @@ export default function ReturnsMap() {
           </Card>
         </Col>
       </Row>
+
+      <Modal
+        open={dailyModal.open}
+        onCancel={() => setDailyModal({ ...dailyModal, open: false })}
+        footer={null}
+        title={`${dailyModal.date} 收益明细`}
+        width={600}
+      >
+        {dailyModal.loading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+        ) : dailyModal.data.length === 0 ? (
+          <Empty description="当日无收益数据" />
+        ) : (
+          <>
+            <div style={{ marginBottom: 16, textAlign: 'center' }}>
+              <span style={{ fontSize: 14, color: 'var(--text-tertiary)' }}>当日总收益: </span>
+              <span style={{ fontSize: 20, fontWeight: 700, color: dailyModal.total >= 0 ? '#cf1322' : '#3f8600' }}>
+                {dailyModal.total >= 0 ? '+' : ''}¥{dailyModal.total.toFixed(2)}
+              </span>
+            </div>
+            <Table
+              size="small"
+              pagination={false}
+              dataSource={dailyModal.data}
+              rowKey="fund_code"
+              columns={[
+                { title: '基金', dataIndex: 'fund_name', key: 'fund_name', ellipsis: true },
+                { title: '份额', dataIndex: 'shares', key: 'shares', align: 'right' as const, render: (v: number) => v.toFixed(2) },
+                { title: '前日净值', dataIndex: 'prev_nav', key: 'prev_nav', align: 'right' as const, render: (v: number) => v.toFixed(4) },
+                { title: '当日净值', dataIndex: 'curr_nav', key: 'curr_nav', align: 'right' as const, render: (v: number) => v.toFixed(4) },
+                { title: '盈亏', dataIndex: 'pnl', key: 'pnl', align: 'right' as const, render: (v: number) => <span style={{ color: v >= 0 ? '#cf1322' : '#3f8600', fontWeight: 600 }}>{v >= 0 ? '+' : ''}¥{v.toFixed(2)}</span> },
+                { title: '涨跌幅', dataIndex: 'pnl_percent', key: 'pnl_percent', align: 'right' as const, render: (v: number) => <Tag color={v >= 0 ? 'red' : 'green'}>{v >= 0 ? '+' : ''}{v.toFixed(2)}%</Tag> },
+              ]}
+            />
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

@@ -10,50 +10,11 @@ import { useTheme } from '../contexts/ThemeContext';
 import { getEchartsTheme } from '../utils/echarts-theme';
 import { formatReturn, getReturnColor, getValuationText } from '../utils/format';
 import { HS300AnalysisPanel } from '../components/fundlist/HS300AnalysisPanel';
+import type { CompareFund } from '../components/fundlist/types';
 
-interface Fund {
-  code: string;
-  name: string;
-  type: string;
-  company: string;
-  index: string;
-  industry: string;
-  nav: number;
-  return1y: number;
-  return6m: number;
-  return3m: number;
-  return1m: number;
-  return1w: number;
-  managementFee: number;
-  custodyFee: number;
-  serviceFee: number;
-  totalFee: number;
-  scale: number;
-  institutionHold: number;
-  individualHold: number;
-  rating: number;
-  pe: number;
-  pb: number;
-  pePercentile: number;
-  pbPercentile: number;
-  valuation: string;
+interface Fund extends CompareFund {
   trend: string;
   logic: string;
-  dailyLimit?: number;
-  purchaseFee?: number;
-  purchaseFeeDiscount?: number;
-  redeemFee?: { period: string; rate: number }[];
-  purchaseStatus?: string;
-  riskLevel?: string;
-  fundManager?: string;
-  share?: string;
-  shareChange?: string;
-  suitableFor?: string;
-  investmentAdvice?: string;
-  recommendation?: string;
-  topHoldings?: { name: string; percentage: number }[];
-  isGoldSelected?: boolean;
-  manager?: string;
 }
 
 export default function FundList() {
@@ -77,6 +38,23 @@ export default function FundList() {
   const [showGoldStats, setShowGoldStats] = useState(false);
   const [fetchingGold, setFetchingGold] = useState(false);
   const [industries, setIndustries] = useState<string[]>([]);
+
+  // 搜索历史
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('fund_search_history');
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
+  const saveSearchHistory = useCallback((keyword: string) => {
+    const trimmed = keyword.trim();
+    if (!trimmed) return;
+    setSearchHistory(prev => {
+      const next = [trimmed, ...prev.filter(s => s !== trimmed)].slice(0, 8);
+      try { localStorage.setItem('fund_search_history', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   // 多因子筛选状态
   const [showFilters, setShowFilters] = useState(false);
@@ -297,7 +275,20 @@ export default function FundList() {
     setCompareError(null);
     try {
       const data = await fundApi.compareFunds(selectedCodes);
-      setCompareData(Array.isArray(data) ? data.filter((f: Fund | null) => f && f.code) : []);
+      const funds = Array.isArray(data) ? data.filter((f: Fund | null) => f && f.code) : [];
+      try {
+        const analyze = await fundCompareApi.analyze(selectedCodes);
+        if (analyze?.results) {
+          const riskMap: Record<string, any> = {};
+          for (const r of analyze.results) {
+            if (r.riskMetrics) riskMap[r.code] = r.riskMetrics;
+          }
+          for (const f of funds) {
+            if (riskMap[f.code]) (f as any).riskMetrics = riskMap[f.code];
+          }
+        }
+      } catch { }
+      setCompareData(funds);
     } catch (error) {
       console.error('加载对比数据失败:', error);
       setCompareData([]);
@@ -490,6 +481,12 @@ export default function FundList() {
       { key: 'return3m', label: '近3月收益', ...Object.fromEntries(compareData.map(f => [f.code, safeNum(f, 'return3m')])) },
       { key: 'return1m', label: '近1月收益', ...Object.fromEntries(compareData.map(f => [f.code, safeNum(f, 'return1m')])) },
       { key: 'return1w', label: '近1周收益', ...Object.fromEntries(compareData.map(f => [f.code, safeNum(f, 'return1w')])) },
+
+      { key: '_group_risk', label: '风险指标', ...entries('_group') },
+      { key: 'volatility', label: '年化波动率(%)', ...Object.fromEntries(compareData.map(f => [f.code, (f as any).riskMetrics ? (f as any).riskMetrics.volatility : '-'])) },
+      { key: 'maxDrawdown', label: '最大回撤(%)', ...Object.fromEntries(compareData.map(f => [f.code, (f as any).riskMetrics ? (f as any).riskMetrics.maxDrawdown : '-'])) },
+      { key: 'sharpeRatio', label: '夏普比率', ...Object.fromEntries(compareData.map(f => [f.code, (f as any).riskMetrics ? (f as any).riskMetrics.sharpeRatio : '-'])) },
+      { key: 'calmarRatio', label: '卡玛比率', ...Object.fromEntries(compareData.map(f => [f.code, (f as any).riskMetrics ? (f as any).riskMetrics.calmarRatio : '-'])) },
 
       { key: '_group_fee', label: '费率详情', ...entries('_group') },
       { key: 'managementFee', label: '管理费率/年', ...Object.fromEntries(compareData.map(f => [f.code, safeNum(f, 'managementFee')])) },
@@ -851,13 +848,34 @@ export default function FundList() {
       <Card style={{ marginBottom: 16 }}>
         <Space size={16} wrap>
           <Input.Search
-            placeholder="搜索基金名称或代码..."
+            placeholder="搜索基金名称、代码或基金经理..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onSearch={(v) => saveSearchHistory(v)}
             style={{ width: isMobile ? '100%' : 300 }}
             allowClear
             prefix={<SearchOutlined />}
           />
+          {searchHistory.length > 0 && !search && (
+            <div style={{ width: '100%', marginTop: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginRight: 8 }}>最近搜索:</span>
+              {searchHistory.map((kw) => (
+                <Tag
+                  key={kw}
+                  style={{ cursor: 'pointer', marginBottom: 4 }}
+                  onClick={() => { setSearch(kw); saveSearchHistory(kw); }}
+                >
+                  {kw}
+                </Tag>
+              ))}
+              <Tag
+                style={{ cursor: 'pointer', marginBottom: 4, color: 'var(--text-tertiary)' }}
+                onClick={() => { setSearchHistory([]); localStorage.removeItem('fund_search_history'); }}
+              >
+                清除
+              </Tag>
+            </div>
+          )}
           <Select
             value={industry}
             onChange={setIndustry}

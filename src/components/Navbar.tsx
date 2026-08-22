@@ -106,8 +106,10 @@ export default function Navbar() {
         }).catch(() => {});
       };
       fetchAlerts();
-      // 每3分钟刷新提醒（与新闻抓取同步）
-      const interval = setInterval(fetchAlerts, 3 * 60 * 1000);
+      // 每3分钟刷新提醒（与新闻抓取同步），页面不可见时暂停
+      const interval = setInterval(() => {
+        if (document.visibilityState === 'visible') fetchAlerts();
+      }, 3 * 60 * 1000);
       return () => clearInterval(interval);
     }
   }, [user]);

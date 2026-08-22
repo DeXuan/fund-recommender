@@ -319,13 +319,13 @@ async function getAllFundsWithNav(filters = {}) {
     }
   }
   if (filters.search) {
-    query += ` AND (code ILIKE $${paramIndex} OR name ILIKE $${paramIndex})`;
+    query += ` AND (code ILIKE $${paramIndex} OR name ILIKE $${paramIndex} OR manager ILIKE $${paramIndex})`;
     params.push(`%${filters.search}%`);
     paramIndex++;
   }
   if (filters.manager) {
-    query += ` AND manager = $${paramIndex++}`;
-    params.push(filters.manager);
+    query += ` AND manager ILIKE $${paramIndex++}`;
+    params.push(`%${filters.manager}%`);
   }
   if (filters.goldOnly) {
     query += ` AND is_gold_selected = true`;

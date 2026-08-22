@@ -1,0 +1,17 @@
+{
+  "name": "个人基金数据看板",
+  "short_name": "基金看板",
+  "description": "基金推荐与投资组合管理",
+  "start_url": "/web/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1677ff",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -571,8 +571,9 @@ export interface PickHistoryListResponse {
 }
 
 export interface FundCompareAnalyzeResponse {
-  funds: Fund[];
-  navHistories: Record<string, Array<{ date: string; nav: number }>>;
+  results: Array<{ code: string; riskMetrics?: { volatility: number; maxDrawdown: number; sharpeRatio: number; calmarRatio: number } }>;
+  attribution: Record<string, unknown>;
+  recommendation: Record<string, unknown>;
 }
 
 export interface FundComparePremiumResponse {

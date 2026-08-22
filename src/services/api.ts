@@ -18,6 +18,7 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   if (!response.ok) {
     if (response.status === 401) {
       localStorage.removeItem('token');
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     }
     // Try to extract server error message from response body
     let errorMsg = `API error: ${response.status}`;
@@ -488,10 +489,13 @@ export const portfolioApi = {
     const token = localStorage.getItem('token');
     const query = new URLSearchParams();
     if (params) Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
-    const res = await fetch(`/api/portfolio/transactions/export?${query.toString()}`, {
+    const res = await fetch(`${API_BASE}/portfolio/transactions/export?${query.toString()}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    if (!res.ok) throw new Error('导出失败');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: '导出失败' }));
+      throw new Error(err.error || '导出失败');
+    }
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -500,6 +504,51 @@ export const portfolioApi = {
     a.click();
     window.URL.revokeObjectURL(url);
   },
+
+  // 周报月报
+  getReport: (period: string, date?: string) => {
+    const query = new URLSearchParams({ period });
+    if (date) query.append('date', date);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return fetchApi<any>(`/portfolio/report?${query.toString()}`);
+  },
+  getReportList: (period: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fetchApi<any>(`/portfolio/reports?period=${period}`),
+  getPositionRanking: (period: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fetchApi<any>(`/portfolio/position-ranking?period=${period}`),
+  getHealthScore: () =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fetchApi<any>('/portfolio/health-score'),
+  getDailyDetail: (date: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fetchApi<any>(`/portfolio/daily-detail?date=${date}`),
+
+  // 持仓预警线
+  getAlertLines: () =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fetchApi<any[]>('/portfolio/alert-lines'),
+  setAlertLine: (data: { fund_code: string; fund_name?: string; take_profit?: number | null; stop_loss?: number | null }) =>
+    fetchApi<{ success: boolean }>('/portfolio/alert-lines', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteAlertLine: (fund_code: string) =>
+    fetchApi<{ success: boolean }>(`/portfolio/alert-lines/${fund_code}`, { method: 'DELETE' }),
+
+  // 组合回测
+  backtest: (data: { funds: Array<{ fund_code: string; weight: number }>; start_date: string; end_date: string; initial_capital?: number }) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fetchApi<any>('/portfolio/backtest', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // 资产配置建议
+  getAllocationAdvice: () =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fetchApi<any>('/portfolio/allocation-advice'),
 };
 
 export const watchlistApi = {

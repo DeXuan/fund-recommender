@@ -13,8 +13,8 @@ const config: CapacitorConfig = {
     },
   },
   server: {
-    androidScheme: 'http',
-    cleartext: true,
+    androidScheme: 'https',
+    cleartext: false,
     allowNavigation: [API_HOST],
   },
   plugins: {

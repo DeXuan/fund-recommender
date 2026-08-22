@@ -27,6 +27,7 @@ import ReactECharts from 'echarts-for-react';
 import { fundApi, portfolioApi } from '../services/api';
 import { formatReturn, getReturnColor } from '../utils/format';
 import TiltCard from '../components/TiltCard';
+import PullToRefresh from '../components/PullToRefresh';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { getEchartsTheme } from '../utils/echarts-theme';
@@ -185,9 +186,9 @@ export default function Home() {
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 400, gap: 16 }}>
         <Spin size="large" />
         <span style={{ color: 'var(--text-tertiary)', fontSize: 14 }}>加载市场数据中...</span>
-      </div>
-    );
-  }
+    </div>
+  );
+}
 
   // Derived data
   // 投资总览按 code 显式匹配，避免 ORDER BY code 导致的位置错位
@@ -292,6 +293,7 @@ export default function Home() {
   });
 
   return (
+    <PullToRefresh onRefresh={loadData}>
     <div>
       {/* ═══════════════ 1. 核心指标头部看板 ═══════════════ */}
       <Card
@@ -438,7 +440,8 @@ export default function Home() {
                         style={{ borderRadius: 8, border: `1px solid ${isDark ? '#333' : '#f0f0f0'}`, transition: 'all 0.2s' }}
                         hoverable
                       >
-                        <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--primary)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.fund_name}</div>
+                        <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--primary)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.fund_name}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6 }}>{h.fund_code}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                           <span style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
                             ¥{h.market_value?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
@@ -452,6 +455,11 @@ export default function Home() {
                   </Col>
                 ))}
               </Row>
+              {holdings.length > 6 && (
+                <div style={{ textAlign: 'center', marginTop: 12 }}>
+                  <Link to="/portfolio" style={{ color: 'var(--primary)', fontSize: 13 }}>查看全部 {holdings.length} 只持仓 <RightOutlined /></Link>
+                </div>
+              )}
             </Card>
           </Col>
 
@@ -839,5 +847,6 @@ export default function Home() {
         </Card>
       )}
     </div>
+    </PullToRefresh>
   );
 }

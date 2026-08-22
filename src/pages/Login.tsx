@@ -161,8 +161,7 @@ export default function Login() {
     setAlipayStatus('loading');
 
     try {
-      const res = await fetch('/api/auth/alipay/qrcode');
-      const data = await res.json();
+      const data = await authApi.getAlipayQrcode();
 
       if (data.mock) {
         // 模拟模式：弹出模拟扫码弹窗

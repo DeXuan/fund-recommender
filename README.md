@@ -2,7 +2,7 @@
 
 <!-- 徽章全部为静态：仓库为私有，GitHub API / Actions badge 对匿名访问均不可读，动态徽章无法渲染 -->
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen?style=flat-square&logo=github)](https://github.com/DeXuan/fund-recommender/actions)
-[![Version](https://img.shields.io/badge/Version-1.3.0-blue?style=flat-square)](https://github.com/DeXuan/fund-recommender)
+[![Version](https://img.shields.io/badge/Version-1.4.0-blue?style=flat-square)](https://github.com/DeXuan/fund-recommender)
 [![License](https://img.shields.io/badge/License-ISC-purple?style=flat-square)](https://github.com/DeXuan/fund-recommender)
 [![Language](https://img.shields.io/badge/Language-TypeScript-blue?style=flat-square&logo=typescript&logoColor=white)](https://github.com/DeXuan/fund-recommender)
 [![Frameworks](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=white)](https://react.dev)

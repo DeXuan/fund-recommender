@@ -238,6 +238,80 @@ router.get('/summary', async (req, res) => {
   }
 });
 
+// GET /api/portfolio/daily-detail?date=YYYY-MM-DD — 某日各基金收益明细
+router.get('/daily-detail', async (req, res) => {
+  try {
+    const pool = getPool();
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ error: '缺少 date 参数' });
+
+    const targetDate = date;
+    const prevDateResult = await pool.query(
+      'SELECT MAX(nav_date) as prev_date FROM fund_nav WHERE nav_date < $1',
+      [targetDate]
+    );
+    const prevDate = prevDateResult.rows[0]?.prev_date;
+    if (!prevDate) return res.json({ date: targetDate, funds: [], total_pnl: 0 });
+
+    const holdingsResult = await pool.query(
+      `SELECT fund_code, fund_name, shares, cost_price, buy_date
+       FROM fund_records
+       WHERE user_id = $1 AND (record_type IS NULL OR record_type = 'buy') AND shares > 0 AND buy_date <= $2
+       ORDER BY fund_code`,
+      [req.user.id, targetDate]
+    );
+    if (holdingsResult.rows.length === 0) return res.json({ date: targetDate, funds: [], total_pnl: 0 });
+
+    const fundCodes = [...new Set(holdingsResult.rows.map(r => r.fund_code))];
+    const navResult = await pool.query(
+      `SELECT fund_code, nav, nav_date FROM fund_nav
+       WHERE fund_code = ANY($1) AND nav_date IN ($2, $3)
+       ORDER BY fund_code, nav_date`,
+      [fundCodes, prevDate, targetDate]
+    );
+
+    const navMap = {};
+    for (const r of navResult.rows) {
+      if (!navMap[r.fund_code]) navMap[r.fund_code] = {};
+      navMap[r.fund_code][r.nav_date] = parseFloat(r.nav);
+    }
+
+    const grouped = {};
+    for (const r of holdingsResult.rows) {
+      if (!grouped[r.fund_code]) grouped[r.fund_code] = { fund_code: r.fund_code, fund_name: r.fund_name, shares: 0 };
+      grouped[r.fund_code].shares += parseFloat(r.shares);
+    }
+
+    const funds = Object.values(grouped).map(g => {
+      const prevNav = navMap[g.fund_code]?.[prevDate] || 0;
+      const currNav = navMap[g.fund_code]?.[targetDate] || 0;
+      const pnl = g.shares * (currNav - prevNav);
+      const pnlPercent = prevNav > 0 ? ((currNav - prevNav) / prevNav) * 100 : 0;
+      return {
+        fund_code: g.fund_code,
+        fund_name: g.fund_name,
+        shares: parseFloat(g.shares.toFixed(2)),
+        prev_nav: parseFloat(prevNav.toFixed(4)),
+        curr_nav: parseFloat(currNav.toFixed(4)),
+        pnl: parseFloat(pnl.toFixed(2)),
+        pnl_percent: parseFloat(pnlPercent.toFixed(2)),
+      };
+    }).filter(f => f.prev_nav > 0 && f.curr_nav > 0);
+
+    const totalPnl = funds.reduce((s, f) => s + f.pnl, 0);
+
+    res.json({
+      date: targetDate,
+      prev_date: prevDate,
+      funds: funds.sort((a, b) => b.pnl - a.pnl),
+      total_pnl: parseFloat(totalPnl.toFixed(2)),
+    });
+  } catch (error) {
+    logger.error('获取每日明细失败:', error.message);
+    res.status(500).json({ error: '获取每日明细失败' });
+  }
+});
+
 // POST /api/portfolio/refresh-nav — 手动刷新当前用户持仓的净值和盈亏
 router.post('/refresh-nav', async (req, res) => {
   try {
