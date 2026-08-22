@@ -11,9 +11,9 @@ function createDataUpdateStatus() {
   return { lastUpdateTime: null, nextUpdateTime: null, isUpdating: false, updateCount: 0, error: null, lastReturnUpdateDate: null };
 }
 
-function buildDoUpdate({ allFunds, dataUpdateStatus, fetchUpdateAllFundData, updateAllFundReturns, updatePortfolioPnl }) {
+function buildDoUpdate({ allFunds, dataUpdateStatus, updateAllFundData, updateAllFundReturns, updatePortfolioPnl }) {
   return async function doUpdateAllFundData() {
-    try { await fetchUpdateAllFundData(allFunds, dataUpdateStatus, () => true, getNextUpdateTime, () => updateAllFundReturns(allFunds)); }
+    try { await updateAllFundData(allFunds, dataUpdateStatus, () => true, getNextUpdateTime, () => updateAllFundReturns(allFunds)); }
     catch (err) { logger.warn(`[自动更新] 主更新任务异常: ${err.message}`); }
     try { await updatePortfolioPnl(allFunds); } catch (err) { logger.warn(`[持仓] 自动更新持仓盈亏失败: ${err.message}`); }
   };
@@ -39,7 +39,7 @@ function startNewsFetching(fetchAllNews) {
 
 async function startBackgroundTasks(options) {
   const { allFunds, fundManagerMap, fundService, defaultIndices, fetchAllNews, fetchYiFangDaFundData,
-    fetchGoldFundData, fetchCapitalFlow, fetchUpdateAllFundData, updateAllFundReturns,
+    fetchGoldFundData, fetchCapitalFlow, updateAllFundData, updateAllFundReturns,
     updatePortfolioPnl, runDailyDataUpdate, dataUpdateStatus } = options;
 
   try {
@@ -63,7 +63,7 @@ async function startBackgroundTasks(options) {
       try { await fundService.updateFundManagers(fundManagerMap); } catch (e) { logger.error(`[经理] 更新失败: ${e.message}`); }
       try { await fundService.initMarketIndices(defaultIndices); } catch (e) { logger.error(`[指数] 初始化失败: ${e.message}`); }
 
-      const doUpdate = buildDoUpdate({ allFunds, dataUpdateStatus, fetchUpdateAllFundData, updateAllFundReturns, updatePortfolioPnl });
+      const doUpdate = buildDoUpdate({ allFunds, dataUpdateStatus, updateAllFundData, updateAllFundReturns, updatePortfolioPnl });
       startAutoUpdate(doUpdate, dataUpdateStatus);
       fetchCapitalFlow().finally(() => setTimeout(() => fetchCapitalFlow(), 5 * 60 * 1000));
       startNewsFetching(fetchAllNews);

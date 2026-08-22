@@ -57,13 +57,18 @@ function createStatusRoute(dataUpdateStatus) {
 }
 
 // 手动触发数据更新
-function createUpdateRoute(updateAllFundData) {
+function createUpdateRoute(dataUpdateStatus, updateAllFundData) {
   router.post('/api/update', authMiddleware, adminMiddleware, async (req, res) => {
-    if (req.app.locals.dataUpdateStatus?.isUpdating) {
+    if (dataUpdateStatus?.isUpdating) {
       return res.json({ success: false, message: '数据更新正在进行中' });
     }
-    updateAllFundData();
-    res.json({ success: true, message: '数据更新已启动' });
+    try {
+      updateAllFundData();
+      res.json({ success: true, message: '数据更新已启动' });
+    } catch (e) {
+      logger.error('触发更新失败:', e.message);
+      res.status(500).json({ error: '触发更新失败: ' + e.message });
+    }
   });
 }
 

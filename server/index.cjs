@@ -7,7 +7,7 @@ const fundService = require('./fund-service.cjs');
 const { handleSSEConnection } = require('./news-fetcher.cjs');
 const { fetchAllNews } = require('./news-fetcher.cjs');
 const {
-  fetchCapitalFlow, fetchUpdateAllFundData, updateAllFundReturns,
+  fetchCapitalFlow, updateAllFundData, updateAllFundReturns,
   updatePortfolioPnl, runDailyDataUpdate,
   fetchYiFangDaFundData, fetchGoldFundData, fetchAllCuratedFundsData, defaultIndices,
 } = require('./data-fetcher.cjs');
@@ -54,7 +54,7 @@ app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/admin', adminRoutes);
 app.use(portfolioAnalysisRoutes);
 createStatusRoute(dataUpdateStatus);
-createUpdateRoute(() => fetchUpdateAllFundData(allFunds, dataUpdateStatus, isTradingDay, getNextUpdateTime, () => updateAllFundReturns(allFunds)));
+createUpdateRoute(dataUpdateStatus, () => updateAllFundData(allFunds, dataUpdateStatus, isTradingDay, getNextUpdateTime, () => updateAllFundReturns(allFunds)));
 createYiFangDaRoute(fetchYiFangDaFundData);
 createGoldFundRoute(fetchGoldFundData);
 createNewsRefreshRoute(fetchAllNews);
@@ -96,4 +96,4 @@ process.on('unhandledRejection', (reason) => { logger.error(`未处理Promise re
 
 // ---- 启动 ----
 app.listen(PORT, '0.0.0.0', () => { logger.info(`[服务器] 运行在 http://0.0.0.0:${PORT}`); });
-startBackgroundTasks({ allFunds, fundManagerMap, fundService, defaultIndices, fetchAllNews, fetchYiFangDaFundData, fetchGoldFundData, fetchCapitalFlow, fetchUpdateAllFundData, updateAllFundReturns, updatePortfolioPnl, runDailyDataUpdate, dataUpdateStatus });
+startBackgroundTasks({ allFunds, fundManagerMap, fundService, defaultIndices, fetchAllNews, fetchYiFangDaFundData, fetchGoldFundData, fetchCapitalFlow, updateAllFundData, updateAllFundReturns, updatePortfolioPnl, runDailyDataUpdate, dataUpdateStatus });

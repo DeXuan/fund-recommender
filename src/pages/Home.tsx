@@ -672,32 +672,44 @@ export default function Home() {
         style={{ marginBottom: 20, borderRadius: 12 }}
       >
         <Row gutter={[16, 16]}>
-          {indices.map((index) => (
-            <Col xs={24} sm={12} key={index.code}>
-              <Card
-                size="small"
-                style={{ marginBottom: 0, borderRadius: 10, border: `1px solid ${isDark ? '#333' : '#f0f0f0'}`, cursor: 'pointer' }}
-                hoverable
-                onClick={() => navigate('/funds')}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{index.name}</strong>
-                  <Tag color={index.valuation.includes('低') ? 'green' : index.valuation.includes('高') ? 'red' : 'blue'} style={{ borderRadius: 6, fontWeight: 500, fontSize: 12 }}>
-                    {index.valuation}
-                  </Tag>
-                </div>
-                <ReactECharts
-                  theme={getEchartsTheme(isDark)}
-                  option={getGaugeOption(index.name, index.pePercentile ?? 50)}
-                  style={{ height: 160 }}
-                  opts={{ renderer: 'svg' }}
-                />
-                <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                  PE分位: <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{index.pePercentile}%</span> | {index.suggestion}
-                </div>
-              </Card>
-            </Col>
-          ))}
+          {marketTiles.map((tile) => {
+            const idx = findIndex(tile.code);
+            const pePercentile = idx?.pePercentile ?? null;
+            const valuation = idx?.valuation || '';
+            const suggestion = idx?.suggestion || '暂无估值数据';
+            return (
+              <Col xs={24} sm={12} md={8} key={tile.code}>
+                <Card
+                  size="small"
+                  style={{ marginBottom: 0, borderRadius: 10, border: `1px solid ${isDark ? '#333' : '#f0f0f0'}`, cursor: 'pointer' }}
+                  hoverable
+                  onClick={() => navigate(tile.target)}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{tile.label}</strong>
+                    {valuation && (
+                      <Tag color={valuation.includes('低') ? 'green' : valuation.includes('高') ? 'red' : 'blue'} style={{ borderRadius: 6, fontWeight: 500, fontSize: 12 }}>
+                        {valuation}
+                      </Tag>
+                    )}
+                  </div>
+                  <ReactECharts
+                    theme={getEchartsTheme(isDark)}
+                    option={getGaugeOption(tile.label, pePercentile ?? 50)}
+                    style={{ height: 160 }}
+                    opts={{ renderer: 'svg' }}
+                  />
+                  <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                    {pePercentile !== null ? (
+                      <>PE分位: <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{pePercentile}%</span> | {suggestion}</>
+                    ) : (
+                      <span style={{ color: 'var(--text-tertiary)' }}>{suggestion}</span>
+                    )}
+                  </div>
+                </Card>
+              </Col>
+            );
+          })}
         </Row>
       </Card>
 
