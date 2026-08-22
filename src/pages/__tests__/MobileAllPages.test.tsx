@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { render } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 
@@ -121,7 +121,8 @@ import FundDiagnosis from '../FundDiagnosis';
 import FundDetail from '../FundDetail';
 
 describe('移动端 (412px) 全页面渲染', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers(); });
+  afterAll(() => { vi.useRealTimers(); });
 
   const cases: Array<[string, React.ReactElement]> = [
     ['首页 Home', <Home />],
