@@ -7,6 +7,25 @@
     <meta name="theme-color" content="#1677ff" />
     <link rel="manifest" href="/manifest.json" />
     <title>个人基金数据看板</title>
+  <style>
+    html{background:#f5f5f5}
+    html.dark-boot{background:#141414}
+    #root:empty::before{content:"";position:fixed;top:50%;left:50%;width:32px;height:32px;
+      margin:-16px 0 0 -16px;border:3px solid rgba(22,119,255,.15);border-top-color:#1677ff;
+      border-radius:50%;z-index:9;animation:bootspin .8s linear infinite}
+    #root:empty{background:inherit}
+    @keyframes bootspin{to{transform:rotate(360deg)}}
+  </style>
+  <script>
+  (function(){try{
+    var t=localStorage.getItem("theme");
+    if(t!=="dark"&&t!=="light"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}
+    var h=document.documentElement;
+    h.setAttribute("data-theme",t);
+    if(t==="dark")h.classList.add("dark-boot");
+  }catch(e){}})();
+  </script>
+
   </head>
   <body>
     <div id="root"></div>
