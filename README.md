@@ -2,7 +2,7 @@
 
 <!-- 徽章全部为静态：仓库为私有，GitHub API / Actions badge 对匿名访问均不可读，动态徽章无法渲染 -->
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen?style=flat-square&logo=github)](https://github.com/DeXuan/fund-recommender/actions)
-[![Version](https://img.shields.io/badge/Version-1.4.0-blue?style=flat-square)](https://github.com/DeXuan/fund-recommender)
+[![Version](https://img.shields.io/badge/Version-1.4.1-blue?style=flat-square)](https://github.com/DeXuan/fund-recommender)
 [![License](https://img.shields.io/badge/License-ISC-purple?style=flat-square)](https://github.com/DeXuan/fund-recommender)
 [![Language](https://img.shields.io/badge/Language-TypeScript-blue?style=flat-square&logo=typescript&logoColor=white)](https://github.com/DeXuan/fund-recommender)
 [![Frameworks](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=white)](https://react.dev)
@@ -271,6 +271,45 @@ npm run build        # tsc 类型检查 + vite 构建 → dist/
 npm run preview      # 本地预览构建产物
 ```
 
+### 首屏性能约定
+
+首屏只预加载 3 个 chunk（`rolldown-runtime` / `antd` / `index`），其余全部按路由懒加载。
+以下两条规则务必遵守，否则会把大依赖重新拖回首屏：
+
+1. **不要在 `src/main.tsx` 里 import `echarts` 或 `utils/echarts-theme`。**
+   ECharts 全量约 1.1 MB，一旦被入口引用就会进入 `index.html` 的 `modulepreload` 清单。
+   暗色主题改为在图表首次渲染时通过 `getEchartsTheme()` 惰性注册。
+2. **不要给"只被懒加载页面使用"的依赖单独配 `manualChunks`。**
+   `react-markdown` 曾被单独拆成 `markdown` chunk，结果把入口也需要的模块一起卷了进去，
+   导致 150 KB 白白进入首屏预加载。现在它随 `AIAssistant` 页面 chunk 一起加载。
+
+改动构建配置后自检：
+
+```bash
+grep -o 'assets/[a-zA-Z0-9_.-]*\.js' dist/index.html | sort -u
+# 期望只有 3 个：antd-*.js / index-*.js / rolldown-runtime-*.js
+```
+
+## 测试
+
+```bash
+npm run test         # 前端 vitest (128) + 后端 node:test (234)
+npm run test:server  # 只跑后端
+npm run lint         # eslint
+```
+
+前端测试在 jsdom 环境下运行。Node 22+ 内置的 `localStorage` 全局 getter 在不带
+`--localstorage-file` 启动时返回 `undefined`，且优先级高于 jsdom 的实现，会让所有用例在
+import 阶段崩溃，因此 `src/test/setup.ts` 会在加载 i18n 之前注入一份内存实现。
+`src/i18n/index.ts` 读取语言偏好时也做了防御式兜底，避免运行时存储不可用导致白屏。
+
+## 刷新防白闪（pre-paint）
+
+`index.html` 在 `<head>` 内联了一段脚本与样式，在 React 挂载前就根据
+`localStorage.theme`（无偏好时跟随 `prefers-color-scheme`）写好 `data-theme` 和
+`html.dark-boot`，并由 `#root:empty::before` 显示一个主题色一致的加载圈。
+效果：深色模式下刷新不会再出现一瞬间的白屏闪光。
+
 ## Android APK 构建
 
 项目支持通过 Capacitor 打包为 Android APK，适配红米 K60 等安卓设备。
@@ -341,7 +380,6 @@ ALLOWED_ORIGINS=...,http://localhost,https://localhost
 当前生产快照：**6569 只基金 / 47.5 万条净值**，板块/估值数据 T 日更新。
 
 ## 部署
-## 部署
 
 项目支持多种部署方式，详见 [DEPLOY.md](./docs/deploy/DEPLOY.md)。
 
@@ -386,6 +424,22 @@ bash /var/www/fix-permission.sh  # 修复 403 权限错误
 | 生产环境 | 正式上线 | `ENABLE_MOCK_AUTH=false`，HTTPS，pm2 守护 |
 
 详见 [DEPLOY.md](./docs/deploy/DEPLOY.md) 中的「多环境部署方案」章节。
+
+### 生产环境检查清单
+
+上线后逐项确认（本仓库已在生产环境实测通过）：
+
+| 检查项 | 命令 / 方法 | 期望 |
+|--------|-------------|------|
+| 安全响应头 | `curl -I https://<域名>/web/` | 含 `X-Frame-Options` / `X-Content-Type-Options` / `Referrer-Policy` |
+| 首屏 chunk | `grep modulepreload dist/index.html` | 仅 3 个（见「首屏性能约定」） |
+| 私钥权限 | `ls -ld keys/ && ls -l keys/*` | 目录 `700`，私钥文件 `600` |
+| CORS 白名单 | `.env` 的 `ALLOWED_ORIGINS` | 必须包含前端实际访问的域名（含端口），否则登录返回 500 |
+| 数据时效 | `node scripts/check-data-status.cjs` | 各表最新日期为最近交易日 |
+| 服务存活 | `pm2 list` | `fund-server-*` 均为 online |
+
+> **nginx 注意：** `location /web/` 块内一旦出现自己的 `add_header`，server 级的 `add_header`
+> 会全部失效（nginx 的继承规则）。安全头必须写在 `location` 块内，或改用 `include` 片段统一注入。
 
 ## 项目结构
 

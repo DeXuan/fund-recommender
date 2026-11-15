@@ -4,6 +4,29 @@
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-11-16
+
+### Fixed
+- **首屏性能：ECharts 移出预加载链路** — 删除 `src/main.tsx` 中对 `utils/echarts-theme` 的静态引用，改为图表首次渲染时经 `getEchartsTheme()` 惰性注册暗色主题。`dist/index.html` 的 `modulepreload` 从 4 条降到 3 条，首屏少传 1.1 MB。
+- **首屏性能：移除 `markdown` 手动分包** — `manualChunks` 把 `react-markdown` 单独拆块时，连带入口所需的模块一起卷了进去，导致 150 KB 白进首屏预加载。现随 `AIAssistant` 懒加载页一起加载。
+- **测试在 Node 22+ 全线崩溃** — Node 内置的 `localStorage` 全局 getter 不带 `--localstorage-file` 时返回 `undefined` 且优先级高于 jsdom 实现，导致 11 个测试套件在 import 阶段即 TypeError。`src/test/setup.ts` 在加载 i18n 前注入内存实现。
+- **`src/i18n/index.ts` 存储读取无兜底** — 存储被禁用（隐私模式/企业策略）时会让整个应用白屏，改为 try/catch + 可选链。
+- **后端测试断言过时** — `manager 过滤` 用例仍断言精确匹配 `AND manager =`，实际实现早已改为模糊匹配 `manager ILIKE '%…%'`，按现状修正测试。
+- **README 重复的 `## 部署` 标题** — 连续两行重复，删掉一条。
+
+### Added
+- README 新增「首屏性能约定」「测试」「刷新防白闪（pre-paint）」「生产环境检查清单」四节，记录构建红线与上线核对项。
+- README 记录 nginx `add_header` 继承陷阱：`location` 块内自带 `add_header` 会使 server 级安全头全部失效。
+
+### Security
+- `/web/` 补回 `X-Frame-Options` / `X-Content-Type-Options` / `Referrer-Policy`（此前因上述继承陷阱丢失）。
+- `keys/` 目录权限收至 `700`，私钥文件 `600`。
+
+### Verified
+- 前端 128/128、后端 234/234 全部通过。
+- 生产实测：登录 200，`/api/market/*` 与 `/api/portfolio/summary` 全 200，持仓页 5652 节点正常渲染（¥1,732,130.90 / +0.12%），图表 canvas 有实际绘制像素，暗色主题 39 段文字中 32 段为浅色（证明惰性注册生效），深色刷新 `body` 背景为 `rgb(20,20,20)` 无白闪。
+
+
 ## [1.4.0] — 2026-08-22
 
 ### Added

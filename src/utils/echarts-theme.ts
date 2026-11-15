@@ -40,6 +40,8 @@ const darkTheme = {
 
 let registered = false;
 
+// 惰性注册：本模块只在含图表的组件里被引用，echarts 全量不再随入口 main.tsx 一起首屏加载。
+// 任何 ReactECharts 渲染前都会先经由 getEchartsTheme() 触发这里完成注册。
 export function registerEchartsDarkTheme() {
   if (!registered) {
     echarts.registerTheme('dark', darkTheme);
@@ -48,5 +50,6 @@ export function registerEchartsDarkTheme() {
 }
 
 export function getEchartsTheme(isDark: boolean): string {
+  if (isDark) registerEchartsDarkTheme();
   return isDark ? 'dark' : undefined as any;
 }

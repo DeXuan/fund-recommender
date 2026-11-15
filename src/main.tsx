@@ -4,13 +4,14 @@ import { ConfigProvider, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import enUS from 'antd/locale/en_US'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
-import { registerEchartsDarkTheme } from './utils/echarts-theme'
 import { ANTD_THEME_TOKEN, getDarkAwareTokens } from './constants/theme'
 import './i18n'
 import App from './App'
 import './index.css'
 
-registerEchartsDarkTheme()
+// 注意：不要在这里静态引入 echarts / echarts-theme。
+// 入口一旦引用，echarts 全量（约 1.1MB）会被打入首屏预加载链路。
+// 暗色主题改由图表组件首次渲染时通过 utils/echarts-theme 的 getEchartsTheme() 惰性注册。
 
 function ThemedApp() {
   const { isDark } = useTheme()

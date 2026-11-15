@@ -303,8 +303,9 @@ describe('getAllFundsWithNav', () => {
   it('manager 过滤', async () => {
     queryImpl = (sql) => (sql.includes('COUNT') ? { rows: [{ count: '0' }] } : { rows: [] });
     await getAllFundsWithNav({ manager: '张三' });
-    assert.ok(queries[1].sql.includes('AND manager ='));
-    assert.ok(queries[1].params.includes('张三'));
+    // 经理名走模糊匹配（ILIKE 包含式），与 fund-service.cjs 的实现保持一致
+    assert.ok(queries[1].sql.includes('AND manager ILIKE'));
+    assert.ok(queries[1].params.includes('%张三%'));
   });
 
   it('goldOnly 过滤', async () => {

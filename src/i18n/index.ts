@@ -130,7 +130,17 @@ const resources = {
   },
 };
 
-const savedLang = localStorage.getItem('i18n-lang') || 'zh-CN';
+// 防御式读取：隐私模式/被策略禁用的存储、以及某些运行时（如未开 --localstorage-file 的 Node 22+）
+// 会让 localStorage 不可用甚至为 undefined，这里不能让它把整个应用带崩。
+function readSavedLang(): string {
+  try {
+    return globalThis.localStorage?.getItem('i18n-lang') || 'zh-CN';
+  } catch {
+    return 'zh-CN';
+  }
+}
+
+const savedLang = readSavedLang();
 
 i18n.use(initReactI18next).init({
   resources,

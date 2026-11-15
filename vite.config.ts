@@ -26,7 +26,8 @@ export default defineConfig(({ mode }) => {
           manualChunks: (id: string) => {
             if (id.includes('node_modules/echarts') || id.includes('node_modules/echarts-for-react')) return 'echarts';
             if (id.includes('node_modules/antd') || id.includes('node_modules/@ant-design/icons')) return 'antd';
-            if (id.includes('node_modules/react-markdown') || id.includes('node_modules/rehype-raw') || id.includes('node_modules/remark-gfm')) return 'markdown';
+            // react-markdown 全家桶只被懒加载的 AIAssistant 使用，不要单独拆 manualChunk：
+            // 单独拆块会把入口也需要的模块一并卷进去，导致 150KB 被首屏 modulepreload。
             if (id.includes('node_modules/gsap')) return 'gsap';
           },
         },
