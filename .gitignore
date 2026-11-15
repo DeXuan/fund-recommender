@@ -57,6 +57,9 @@ make-zip.ps1
 # 临时脚本和数据
 scripts/**/*.py
 scripts/*.py
+# 抜取脚本（cmb 等）需要纳入版本管理
+!scripts/update-cmb-nav-session.py
+!scripts/update-cmb-nav-api.py
 scripts/*.json
 scripts/*.csv
 scripts/run_batch*.cmd

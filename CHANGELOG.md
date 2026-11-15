@@ -4,6 +4,29 @@
 
 ## [Unreleased]
 
+## [1.4.2] — 2026-11-16
+
+### Fixed
+- **招行理财数据长期停更（严重）** — 定时任务用 `spawn('python', ...)`，但生产服务器只有 `python3`，从 8 月起每天以 `spawn python ENOENT` 静默失败，`cmb_products` / `cmb_zhaoyin_nav` 数据停在 8 月初。`server/jobs/index.cjs` 改为按 `PYTHON_BIN` → `python3` → `python` 探测解释器。
+- **Playwright 浏览器版本不匹配** — 库升级后需要 `chromium_headless_shell-1208`，机器上只有 `1234`，抓取直接报错退出。已安装匹配版本。
+- **翻页抓取会静默卡死** — `fetch_cmb_personal_nav.py` 依赖点击 DOM「下一页」，缺少分页元素时在 `next_link.click()` 处无限等待（实测 `133045A` 卡住 10 分钟无输出、进程不退出）。新脚本 `update-cmb-nav-session.py` 改走官方 JSON 接口，不再触碰分页 DOM。
+- **持仓估值停留在旧净值** — `fund_records` 的 `current_nav` / `market_value` / `pnl` 缓存字段未随净值刷新。新增 `scripts/sync-cmb-holdings.cjs` 并在净值更新后自动串联执行。
+
+### Added
+- `scripts/update-cmb-nav-session.py` — 招行理财净值抓取。复用页面真实请求的鉴权头（`appId`/`timespan`/`signature`）查询官方 JSON 接口，只取数据不渲染 DOM。实测 92 个产品全部成功，耗时约 2 分钟，对比原方案 30 分钟仅完成 14 个。
+- `scripts/update-cmb-nav-api.py` — 纯 requests 版本（保留作为接口无签名校验环境下的备选）。
+- `scripts/sync-cmb-holdings.cjs` — 持仓估值同步，支持 `--dry-run`。
+- README「数据更新运维」补充招行模块维护说明，并记录 `python` 别名的运维陷阱。
+
+### Changed
+- `.gitignore` 增加 `scripts/update-cmb-nav-*.py` 例外，抓取脚本纳入版本管理（此前 `scripts/*.py` 被整体忽略，换机器会丢失运维能力）。
+- 定时任务「个人理财产品净值爬取」从调用旧翻页脚本改为新脚本 + 持仓同步串联。
+
+### Data
+- 招行理财 92 个产品净值全部更新至最新交易日（2026-11-10 ~ 11-12），`cmb_zhaoyin_nav` 写入 18,769 条，已达 22,131 条 / 245 个产品。
+- 33 条招行理财持仓估值同步完成，市值合计 ¥1,718,619.17。
+
+
 ## [1.4.1] — 2026-11-16
 
 ### Fixed

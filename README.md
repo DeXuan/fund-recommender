@@ -2,7 +2,7 @@
 
 <!-- 徽章全部为静态：仓库为私有，GitHub API / Actions badge 对匿名访问均不可读，动态徽章无法渲染 -->
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen?style=flat-square&logo=github)](https://github.com/DeXuan/fund-recommender/actions)
-[![Version](https://img.shields.io/badge/Version-1.4.1-blue?style=flat-square)](https://github.com/DeXuan/fund-recommender)
+[![Version](https://img.shields.io/badge/Version-1.4.2-blue?style=flat-square)](https://github.com/DeXuan/fund-recommender)
 [![License](https://img.shields.io/badge/License-ISC-purple?style=flat-square)](https://github.com/DeXuan/fund-recommender)
 [![Language](https://img.shields.io/badge/Language-TypeScript-blue?style=flat-square&logo=typescript&logoColor=white)](https://github.com/DeXuan/fund-recommender)
 [![Frameworks](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=white)](https://react.dev)
@@ -375,6 +375,25 @@ ALLOWED_ORIGINS=...,http://localhost,https://localhost
 | `node scripts/update-sector-data.cjs` | 行业板块资金流向 | 每交易日 |
 | `node scripts/update-qdii-funds.cjs` | QDII 净值（T+2 慢更新） | 每交易日晚 |
 | `node scripts/sync-eastmoney-funds.cjs` | 东方财富基金列表同步 | 每周 |
+| `python3 scripts/update-cmb-nav-session.py --days 60` | 招行理财产品净值（官方 JSON 接口） | 每周一 10:30（已内置定时） |
+| `node scripts/sync-cmb-holdings.cjs` | 招行理财持仓估值同步（净值落库后执行） | 紧随净值更新 |
+
+### 招行理财数据维护说明
+
+招行 cfweb 的接口要求 `appId` + `timespan` + `signature` 三个请求头，其中 `signature`
+是前端 `umi.js` 里的自定义加密算法，会随前端发版变化，**不要尝试在服务端复现**。
+`update-cmb-nav-session.py` 的做法是：用 Playwright 打开一次净值页，拦截页面自身发出的
+真实请求拿到鉴权头，再在页面上下文内以相同请求头查询全部产品——只取 JSON、不解析 DOM、
+不点分页按钮。
+
+历史上用的 `fetch_cmb_personal_nav.py` 依赖点击页面「下一页」链接，一旦某个产品的分页
+元素缺失就会在 `next_link.click()` 处静默卡死（曾卡住 10 分钟以上无输出）。新脚本单产品
+请求失败只影响该产品，不会阻塞整个流程。
+
+> **运维陷阱：** 服务器（Debian/Ubuntu）通常只有 `python3`，没有 `python` 别名。
+> 定时任务里若硬编码 `spawn('python', ...)` 会直接 `ENOENT` 静默失败——本项目的招行
+> 数据曾因此连续数月未更新且无任何告警。`server/jobs/index.cjs` 现已改为按
+> `PYTHON_BIN` → `python3` → `python` 顺序探测。
 
 数据现状核验：`node scripts/check-data-status.cjs`（各表最新日期一目了然）。
 当前生产快照：**6569 只基金 / 47.5 万条净值**，板块/估值数据 T 日更新。

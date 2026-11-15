@@ -3,9 +3,36 @@
  * 从 index.cjs 抽离所有 scheduleDaily 任务，保持入口文件精简
  */
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 const logger = require('../utils/logger.cjs');
 const { scheduleDaily } = require('../utils/scheduler.cjs');
+
+/**
+ * 解析可用的 Python 解释器。
+ * 生产服务器通常只有 python3（Debian/Ubuntu 默认不提供 python 别名），
+ * 而 Windows 开发机上往往只有 python。硬编码任一个都会让定时任务静默失败，
+ * 所以按 PYTHON_BIN → python3 → python 的顺序探测。
+ */
+const PYTHON_BIN = (() => {
+  if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
+  const candidates = process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'];
+  for (const bin of candidates) {
+    const dirs = (process.env.PATH || '').split(path.delimiter);
+    const exts = process.platform === 'win32' ? ['.exe', '.cmd', ''] : [''];
+    for (const dir of dirs) {
+      for (const ext of exts) {
+        if (!dir) continue;
+        try {
+          if (fs.existsSync(path.join(dir, bin + ext))) return bin;
+        } catch {
+          /* 忽略不可读目录 */
+        }
+      }
+    }
+  }
+  return candidates[0];
+})();
 
 /**
  * 注册所有每日定时任务
@@ -96,7 +123,7 @@ function registerJobs({ allFunds, runDailyDataUpdate, fetchYiFangDaFundData, fet
   jobs.push(scheduleDaily(() => {
     logger.info('[CMB] 开始爬取招行理财产品数据...');
     const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'fetch_cmb_nav.py');
-    const proc = spawn('python', [scriptPath], {
+    const proc = spawn(PYTHON_BIN, [scriptPath], {
       env: { ...process.env },
       cwd: path.join(__dirname, '..', '..'),
       stdio: 'pipe',
@@ -107,36 +134,35 @@ function registerJobs({ allFunds, runDailyDataUpdate, fetchYiFangDaFundData, fet
     proc.on('error', (err) => logger.error(`[CMB] 爬取启动失败: ${err.message}`));
   }, 10, 0, '招行理财产品爬取'));
 
-  // 每周一10:30执行个人理财产品净值爬取（weekly更新原有54只 + target更新25只目标产品）
+  // 每周一10:30执行个人理财产品净值爬取，并同步持仓估值
+  // 使用 update-cmb-nav-session.py：走招行官方 JSON 接口 + 复用页面鉴权头。
+  // 旧的 fetch_cmb_personal_nav.py 依赖点击 DOM「下一页」，遇到缺失分页元素会静默卡死。
   jobs.push(scheduleDaily(() => {
     const today = new Date();
     if (today.getDay() !== 1) return; // 仅周一执行
-    const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'fetch_cmb_personal_nav.py');
+    const root = path.join(__dirname, '..', '..');
+    const scriptPath = path.join(root, 'scripts', 'update-cmb-nav-session.py');
 
-    // 先运行 weekly 模式更新原有54只产品
-    logger.info('[CMB-NAV] 开始爬取个人理财产品净值（weekly）...');
-    const proc1 = spawn('python', [scriptPath, 'weekly'], {
+    logger.info('[CMB-NAV] 开始更新个人理财产品净值（近 60 天）...');
+    const proc = spawn(PYTHON_BIN, ['-u', scriptPath, '--days', '60'], {
       env: { ...process.env },
-      cwd: path.join(__dirname, '..', '..'),
+      cwd: root,
       stdio: 'pipe',
     });
-    proc1.stdout.on('data', (data) => logger.info(`[CMB-NAV-W] ${data.toString().trim()}`));
-    proc1.stderr.on('data', (data) => logger.error(`[CMB-NAV-W] ${data.toString().trim()}`));
-    proc1.on('close', (code) => {
-      logger.info(`[CMB-NAV-W] weekly完成，退出码: ${code}`);
-      logger.info('[CMB-NAV-T] 开始爬取目标产品净值（target）...');
-      const proc2 = spawn('python', [scriptPath, 'target'], {
-        env: { ...process.env },
-        cwd: path.join(__dirname, '..', '..'),
-        stdio: 'pipe',
-      });
-      proc2.stdout.on('data', (data) => logger.info(`[CMB-NAV-T] ${data.toString().trim()}`));
-      proc2.stderr.on('data', (data) => logger.error(`[CMB-NAV-T] ${data.toString().trim()}`));
-      proc2.on('close', (code2) => logger.info(`[CMB-NAV-T] target完成，退出码: ${code2}`));
-      proc2.on('error', (err) => logger.error(`[CMB-NAV-T] 启动失败: ${err.message}`));
+    proc.stdout.on('data', (data) => logger.info(`[CMB-NAV] ${data.toString().trim()}`));
+    proc.stderr.on('data', (data) => logger.error(`[CMB-NAV] ${data.toString().trim()}`));
+    proc.on('close', (code) => {
+      logger.info(`[CMB-NAV] 净值更新完成，退出码: ${code}`);
+      // 净值落库后同步持仓缓存字段（current_nav / market_value / pnl）
+      const syncPath = path.join(root, 'scripts', 'sync-cmb-holdings.cjs');
+      const syncProc = spawn('node', [syncPath], { env: { ...process.env }, cwd: root, stdio: 'pipe' });
+      syncProc.stdout.on('data', (d) => logger.info(`[CMB-SYNC] ${d.toString().trim()}`));
+      syncProc.stderr.on('data', (d) => logger.error(`[CMB-SYNC] ${d.toString().trim()}`));
+      syncProc.on('close', (c) => logger.info(`[CMB-SYNC] 持仓同步完成，退出码: ${c}`));
+      syncProc.on('error', (err) => logger.error(`[CMB-SYNC] 启动失败: ${err.message}`));
     });
-    proc1.on('error', (err) => logger.error(`[CMB-NAV-W] 启动失败: ${err.message}`));
-  }, 10, 30, '个人理财产品净值爬取'));
+    proc.on('error', (err) => logger.error(`[CMB-NAV] 启动失败: ${err.message}`));
+    }, 10, 30, '个人理财产品净值爬取'));
 
   // 每周六11:00执行招银理财净值数据爬取（最近5个交易日）
   jobs.push(scheduleDaily(() => {
@@ -144,7 +170,7 @@ function registerJobs({ allFunds, runDailyDataUpdate, fetchYiFangDaFundData, fet
     if (day !== 6) return; // 仅周六执行
     logger.info('[NAV] 开始爬取招银理财净值数据...');
     const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'fetch_zhaoyin_nav.py');
-    const proc = spawn('python', [scriptPath, 'weekly'], {
+    const proc = spawn(PYTHON_BIN, [scriptPath, 'weekly'], {
       env: { ...process.env },
       cwd: path.join(__dirname, '..', '..'),
       stdio: 'pipe',
