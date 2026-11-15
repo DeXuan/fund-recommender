@@ -325,6 +325,22 @@ APK 请求的 Origin 为 `http://localhost`（Capacitor WebView 默认），需�
 ALLOWED_ORIGINS=...,http://localhost,https://localhost
 ```
 
+## 数据更新运维（生产）
+
+看板数据由 `scripts/` 下的采集脚本维护（写入 PostgreSQL）。建议每个交易日收盘后（17:30+）按需执行：
+
+| 脚本 | 作用 | 频率建议 |
+|------|------|----------|
+| `node scripts/update-index-valuation.cjs` | 指数点位 + PE/PB 历史分位（估值中心） | 每交易日 15:30+ |
+| `node scripts/update-all-funds.cjs` | 全量基金净值/收益率/规模（支付宝 API，支持 `--dry-run`） | 每交易日 17:30+ |
+| `node scripts/update-sector-data.cjs` | 行业板块资金流向 | 每交易日 |
+| `node scripts/update-qdii-funds.cjs` | QDII 净值（T+2 慢更新） | 每交易日晚 |
+| `node scripts/sync-eastmoney-funds.cjs` | 东方财富基金列表同步 | 每周 |
+
+数据现状核验：`node scripts/check-data-status.cjs`（各表最新日期一目了然）。
+当前生产快照：**6569 只基金 / 47.5 万条净值**，板块/估值数据 T 日更新。
+
+## 部署
 ## 部署
 
 项目支持多种部署方式，详见 [DEPLOY.md](./docs/deploy/DEPLOY.md)。
