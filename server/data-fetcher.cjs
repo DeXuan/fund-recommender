@@ -529,7 +529,11 @@ async function fetchHS300FundDetails(allFunds) {
   logger.info(`[HS300] 开始更新 ${hs300Funds.length} 只沪深300基金详情...`);
   let updatedCount = 0;
 
-  const allFundsWithNav = await fundService.getAllFundsWithNav();
+  // getAllFundsWithNav 返回 { data: [...] } 包装对象（带分页信息），必须先解包。
+  // 2026-11-16 之前这里直接对返回值调 .filter()，导致每日任务 9:30 必炸，
+  // HS300 详情从 6 月起从未更新过。
+  const allFundsWithNavResult = await fundService.getAllFundsWithNav();
+  const allFundsWithNav = allFundsWithNavResult.data || allFundsWithNavResult || [];
   const hs300NavMap = {};
   allFundsWithNav.filter(f => f.industry === '沪深300').forEach(f => {
     hs300NavMap[f.code] = f;

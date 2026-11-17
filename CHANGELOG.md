@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [1.4.3] — 2026-11-17
+
+### Fixed
+- **HS300 基金详情自 6 月起从未更新（严重）** — `server/data-fetcher.cjs` 的 `fetchHS300FundDetails` 直接对 `fundService.getAllFundsWithNav()` 的返回值调 `.filter()`，但该函数返回的是 `{ data: [...], total, page, ... }` 分页包装对象，包装对象没有 `.filter`，每日 9:30 的「每日数据更新」任务在这一步必炸。改为先解包 `result.data`。此 bug 影响 9:30 全链路（HS300 详情 + 后续依赖步骤），修复后沪深300 基金详情可正常刷新。
+- **财联社新闻源失效** — 旧接口 `nodeapi/updateTelegraph` 下线返回 404，快讯自 11 月起只剩东方财富一个来源。改用 `v1/roll/get_roll_list`（参数按 key 排序 → sha1 → md5 生成 `sign`），实测恢复正常返回；字段结构（`id`/`ctime`/`title`/`brief`/`content`/`shareurl`/`subjects`）与旧接口完全兼容。
+- **日志错误详情被静默丢弃（128 处）** — winston 的 printf 只输出第一个参数，`logger.warn('xx失败:', e.message)` 这类调用打印出来的错误原因为空（财联社抓取失败的日志一直是空的就是这个原因）。`server/utils/logger.cjs` 在出口处包装 error/warn/info/debug/http 五个级别，把额外参数拼回 message，一次修复全部 128 处调用点。
+- **数据检查脚本日期显示提前一天** — `check-stale.cjs` / `check-data-status.cjs` 用 `toISOString()` 格式化 DATE 列，node-pg 把 DATE 解析为本地时区零点的 Date，UTC 转换后日期整体提前一天（本地 UTC+8 实测 11-13 显示成 11-12）。改为按本地年月日格式化。
+- **About 页版本号停留在 v1.4.0** — v1.4.1 / v1.4.2 发布时未同步，现补齐至 v1.4.3。
+
+### Changed
+- **基金净值更新任务 16:00 → 20:30** — 当日净值 18:00-22:00 才陆续公布，16:00 执行的任务永远只能拿到 T-1 的净值（周一 16:00 拿到的是上周五的）。改到 20:30 后绝大多数基金当日入库，个别晚公布的由次日任务补上。指数估值（15:30）与板块数据（16:05）收盘后即时可得，时间不变。
+
+### Data
+- 全量基金净值 / 指数估值 / 板块资金流向更新至最新交易日（6569 只基金，47.5 万条净值）。
+
 ## [1.4.2] — 2026-11-16
 
 ### Fixed

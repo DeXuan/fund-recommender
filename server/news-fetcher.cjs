@@ -76,20 +76,41 @@ function autoCategory(title, content) {
   return 'other';
 }
 
+// 财联社接口签名：参数按 key 排序拼 query string → sha1 → md5
+function clsSign(params) {
+  const crypto = require('crypto');
+  const qs = Object.keys(params)
+    .sort()
+    .map(k => `${k}=${encodeURIComponent(params[k])}`)
+    .join('&');
+  const sha1 = crypto.createHash('sha1').update(qs).digest('hex');
+  return crypto.createHash('md5').update(sha1).digest('hex');
+}
+
 // 从财联社抓取快讯
+// 旧接口 nodeapi/updateTelegraph 已下线（2026-11 起 404），
+// 改用 v1/roll/get_roll_list，需带 sign 参数，否则返回 403。
 async function fetchCLSNews() {
   try {
-    const response = await axios.get('https://www.cls.cn/nodeapi/updateTelegraph', {
-      params: {
-        app: 'CailianpressWeb',
-        os: 'web',
-        sv: '8.4.6',
-        rn: 30,
-      },
+    const params = {
+      app: 'CailianpressWeb',
+      category: '',
+      lastTime: Math.floor(Date.now() / 1000),
+      os: 'web',
+      refresh_type: 1,
+      rn: 30,
+      sv: '8.4.6',
+    };
+    // sign 必须与实际发出的 query string 完全一致，故手动拼接而非交给 axios 序列化
+    const qs = Object.keys(params)
+      .sort()
+      .map(k => `${k}=${encodeURIComponent(params[k])}`)
+      .join('&');
+    const response = await axios.get(`https://www.cls.cn/v1/roll/get_roll_list?${qs}&sign=${clsSign(params)}`, {
       timeout: 10000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://www.cls.cn/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36',
+        'Referer': 'https://www.cls.cn/telegraph',
       },
     });
 

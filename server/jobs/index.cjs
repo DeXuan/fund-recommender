@@ -77,9 +77,11 @@ function registerJobs({ allFunds, runDailyDataUpdate, fetchYiFangDaFundData, fet
     proc.on('close', (code) => logger.info(`[指数估值] 完成，退出码: ${code}`));
   }, 15, 30, '指数估值收盘更新'));
 
-  // 每日16:00执行基金数据全量更新（收盘后获取最新净值+收益率）
+  // 每日20:30执行基金数据全量更新（最新净值+收益率）。
+  // 此前 16:00 执行，但当日净值 18:00-22:00 才陆续公布，任务永远只能拿到 T-1 的净值；
+  // 改到 20:30 后绝大多数基金当日入库，个别晚公布的由次日任务补上。
   jobs.push(scheduleDaily(() => {
-    logger.info('[基金数据] 收盘后全量更新基金净值+收益率...');
+    logger.info('[基金数据] 更新基金净值+收益率（净值公布后执行）...');
     const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'update-fund-data.cjs');
     const proc = spawn('node', [scriptPath], {
       env: { ...process.env },
@@ -89,7 +91,7 @@ function registerJobs({ allFunds, runDailyDataUpdate, fetchYiFangDaFundData, fet
     proc.stdout.on('data', (data) => logger.info(`[基金数据] ${data.toString().trim()}`));
     proc.stderr.on('data', (data) => logger.error(`[基金数据] ${data.toString().trim()}`));
     proc.on('close', (code) => logger.info(`[基金数据] 完成，退出码: ${code}`));
-  }, 16, 0, '基金数据收盘更新'));
+  }, 20, 30, '基金数据净值更新'));
 
   // 每日16:05执行板块数据更新（收盘后获取行业板块涨跌幅）
   jobs.push(scheduleDaily(() => {
