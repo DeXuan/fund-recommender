@@ -405,6 +405,25 @@ sha1 → md5 生成 `sign` 参数，否则 403。签名逻辑在 `server/news-fe
 元素缺失就会在 `next_link.click()` 处静默卡死（曾卡住 10 分钟以上无输出）。新脚本单产品
 请求失败只影响该产品，不会阻塞整个流程。
 
+### 定时任务健康检查（jijin-healthcheck）
+
+`/usr/local/bin/jijin-healthcheck.sh`（cron 每日 11:40，`/etc/cron.d/jijin-healthcheck`）自动检查：
+
+1. 每日任务（9:30）近 48h 是否有「执行完成」记录 —— 抓 `spawn python ENOENT` 类静默失败
+2. 基金净值 / 招行理财 / 市场指数最新日期是否在 4 天内（节假日自动容忍）
+3. `fund-server-821` 进程是否 online
+4. 根分区使用率 > 85%
+5. pm2 out.log 是否 > 100MB（轮转失效）
+
+异常时落盘 `/var/log/jijin-healthcheck.alert`。如需推送，在 `.env` 配置：
+
+```env
+JIJIN_ALERT_WEBHOOK=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+JIJIN_ALERT_WEBHOOK_TYPE=wecom   # wecom | dingtalk | feishu | serverchan
+```
+
+或放置自定义投递脚本 `/usr/local/bin/jijin-send-alert.sh`（参数：标题 内容）。
+
 > **运维陷阱：** 服务器（Debian/Ubuntu）通常只有 `python3`，没有 `python` 别名。
 > 定时任务里若硬编码 `spawn('python', ...)` 会直接 `ENOENT` 静默失败——本项目的招行
 > 数据曾因此连续数月未更新且无任何告警。`server/jobs/index.cjs` 现已改为按

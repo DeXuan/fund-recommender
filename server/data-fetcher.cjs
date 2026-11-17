@@ -898,7 +898,31 @@ async function updatePortfolioPnl(allFunds) {
       if (f.nav && !navMap.has(f.code)) navMap.set(f.code, f.nav);
     });
 
-    // 第3优先级: 从API实时获取缺失的净值，并写回 fund_nav 表持久化
+    // 第3优先级: 招银理财等非公募产品（代码非6位纯数字）从 cmb_zhaoyin_nav 补充
+    // 这类代码 fund_nav/种子数据都没有，走 API 也必然失败；放在 API 之前可省无效调用
+    const cmbLikeCodes = heldCodes.filter(code => !/^\d{6}$/.test(code));
+    if (cmbLikeCodes.length > 0) {
+      const cmbNavResult = await pool.query(
+        `SELECT DISTINCT ON (product_code) product_code, unit_nav, nav_date
+         FROM cmb_zhaoyin_nav WHERE product_code = ANY($1)
+         ORDER BY product_code, nav_date DESC`,
+        [cmbLikeCodes]
+      );
+      const cmbCovered = [];
+      cmbNavResult.rows.forEach(row => {
+        const nav = parseFloat(row.unit_nav);
+        if (nav > 0) {
+          navMap.set(row.product_code, nav);
+          navDateMap.set(row.product_code, row.nav_date);
+          cmbCovered.push(row.product_code);
+        }
+      });
+      if (cmbCovered.length > 0) {
+        logger.info(`[持仓] cmb_zhaoyin_nav 补充 ${cmbCovered.length} 只招银理财净值: ${cmbCovered.join(',')}`);
+      }
+    }
+
+    // 第4优先级: 从API实时获取缺失的净值，并写回 fund_nav 表持久化
     const missingCodes = heldCodes.filter(code => !navMap.has(code));
     if (missingCodes.length > 0) {
       logger.info(`[持仓] 从API获取 ${missingCodes.length} 只基金净值: ${missingCodes.join(',')}`);

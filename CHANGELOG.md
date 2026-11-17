@@ -7,6 +7,27 @@
 ## [1.4.3] — 2026-11-17
 
 ### Fixed
+- **每日任务 9:30 必炸（严重，持续一个多月）** — `fetchHS300FundDetails` 里对 `getAllFundsWithNav()` 的返回值直接调 `.filter()`，但该函数返回 `{ data: [...] }` 包装对象，导致 TypeError。每日任务在前 3 步内中断，`hs300_fund_details` 从 6 月起零更新（183 只沪深300 详情停留在 2026-06-04）。
+- **持仓更新缺招银理财净值层（严重）** — `updatePortfolioPnl` 只有 fund_nav → 种子 → API 三层兜底，非 6 位数字的招银理财代码（11342P、PY040224 等 32 只）每层都命中不了，每天产生 50 条「无法获取净值」警告、持仓市值无法自动刷新。新增 cmb_zhaoyin_nav 层（放在 API 之前，还省了 33 次必然失败的 API 调用）。
+- **定时任务失败无告警（隐患）** — CMB 抓取曾因 `spawn python ENOENT` 静默失败数月，直到人工巡检才发现。新增 `scripts/jijin-healthcheck.sh` 每日 11:40 检查每日任务闭环 / 数据时效 / 进程 / 磁盘 / 日志大小，异常落盘 `/var/log/jijin-healthcheck.alert`，支持企业微信/钉钉/飞书/Server酱 webhook（配置 `JIJIN_ALERT_WEBHOOK` 即可）或自定义投递脚本。
+
+### Removed
+- `src/pages/Reports.tsx` — 已被 `components/portfolio/ReportTab.tsx` 取代（功能一致，调用相同 API），路由早已重定向到 `/portfolio`。
+- `src/components/GlassCard.tsx`、`src/components/PageLoader.tsx` — 无任何引用。
+
+### Operations
+- 安装 `pm2-logrotate`（10MB/保留 30 份 + gzip 压缩），`fund-server-821-out.log` 此前无轮转已涨至 30MB。
+- 确认数据库备份覆盖：jijin821 与 5174 平台共用 `soulquad` 库，每晚 02:40 `pg_dump -Fc` 备份已覆盖全部基金数据（无需新增备份任务）。
+
+### Verified
+- `fetchHS300FundDetails` 全量 183/183 更新成功（21s），`hs300_fund_details` 恢复 T 日更新。
+- `updatePortfolioPnl` 覆盖 83/83 只（此前 51/83），警告从 50 条降至 21 条（剩余为精度级校验，非净值缺失）。
+- 前端 128/128、后端 234/234 全部通过，构建成功。
+
+
+## [1.4.3] — 2026-11-17
+
+### Fixed
 - **HS300 基金详情自 6 月起从未更新（严重）** — `server/data-fetcher.cjs` 的 `fetchHS300FundDetails` 直接对 `fundService.getAllFundsWithNav()` 的返回值调 `.filter()`，但该函数返回的是 `{ data: [...], total, page, ... }` 分页包装对象，包装对象没有 `.filter`，每日 9:30 的「每日数据更新」任务在这一步必炸。改为先解包 `result.data`。此 bug 影响 9:30 全链路（HS300 详情 + 后续依赖步骤），修复后沪深300 基金详情可正常刷新。
 - **财联社新闻源失效** — 旧接口 `nodeapi/updateTelegraph` 下线返回 404，快讯自 11 月起只剩东方财富一个来源。改用 `v1/roll/get_roll_list`（参数按 key 排序 → sha1 → md5 生成 `sign`），实测恢复正常返回；字段结构（`id`/`ctime`/`title`/`brief`/`content`/`shareurl`/`subjects`）与旧接口完全兼容。
 - **日志错误详情被静默丢弃（128 处）** — winston 的 printf 只输出第一个参数，`logger.warn('xx失败:', e.message)` 这类调用打印出来的错误原因为空（财联社抓取失败的日志一直是空的就是这个原因）。`server/utils/logger.cjs` 在出口处包装 error/warn/info/debug/http 五个级别，把额外参数拼回 message，一次修复全部 128 处调用点。
