@@ -2,7 +2,7 @@
 
 <!-- 徽章全部为静态：仓库为私有，GitHub API / Actions badge 对匿名访问均不可读，动态徽章无法渲染 -->
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen?style=flat-square&logo=github)](https://github.com/DeXuan/fund-recommender/actions)
-[![Version](https://img.shields.io/badge/Version-1.4.2-blue?style=flat-square)](https://github.com/DeXuan/fund-recommender)
+[![Version](https://img.shields.io/badge/Version-1.4.3-blue?style=flat-square)](https://github.com/DeXuan/fund-recommender)
 [![License](https://img.shields.io/badge/License-ISC-purple?style=flat-square)](https://github.com/DeXuan/fund-recommender)
 [![Language](https://img.shields.io/badge/Language-TypeScript-blue?style=flat-square&logo=typescript&logoColor=white)](https://github.com/DeXuan/fund-recommender)
 [![Frameworks](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=white)](https://react.dev)
@@ -366,17 +366,32 @@ ALLOWED_ORIGINS=...,http://localhost,https://localhost
 
 ## 数据更新运维（生产）
 
-看板数据由 `scripts/` 下的采集脚本维护（写入 PostgreSQL）。建议每个交易日收盘后（17:30+）按需执行：
+看板数据由 `scripts/` 下的采集脚本维护（写入 PostgreSQL）。定时任务已在 `server/jobs/index.cjs`
+内置，服务启动即按排程自动执行；也可按需手动执行：
 
 | 脚本 | 作用 | 频率建议 |
 |------|------|----------|
 | `node scripts/update-index-valuation.cjs` | 指数点位 + PE/PB 历史分位（估值中心） | 每交易日 15:30+ |
-| `node scripts/update-all-funds.cjs` | 全量基金净值/收益率/规模（支付宝 API，支持 `--dry-run`） | 每交易日 17:30+ |
-| `node scripts/update-sector-data.cjs` | 行业板块资金流向 | 每交易日 |
-| `node scripts/update-qdii-funds.cjs` | QDII 净值（T+2 慢更新） | 每交易日晚 |
+| `node scripts/update-fund-data.cjs` | 全量基金净值/收益率（东方财富 API） | 每交易日 20:30 后（内置定时） |
+| `node scripts/update-sector-data.cjs` | 行业板块资金流向 | 每交易日 16:05（内置定时） |
+| `node scripts/update-qdii-funds.cjs` | QDII 净值（T+2 慢更新） | 每交易日 09:32（内置定时） |
 | `node scripts/sync-eastmoney-funds.cjs` | 东方财富基金列表同步 | 每周 |
 | `python3 scripts/update-cmb-nav-session.py --days 60` | 招行理财产品净值（官方 JSON 接口） | 每周一 10:30（已内置定时） |
 | `node scripts/sync-cmb-holdings.cjs` | 招行理财持仓估值同步（净值落库后执行） | 紧随净值更新 |
+
+### 净值更新时间的坑（重要）
+
+基金净值 18:00-22:00 才陆续公布。**定时任务必须放在净值公布之后执行**，否则每天拿到的
+都是 T-1（前一交易日）的净值——周一 16:00 跑只能拿到上周五的。本项目净值更新任务
+原设在 16:00，导致数据永远滞后一天，现已改为 **20:30**。指数估值（15:30）与板块数据
+（16:05）收盘后即时可得，时间不变。
+
+### 财联社新闻源维护说明
+
+新闻模块双源：东方财富快讯 + 财联社电报。财联社旧接口 `nodeapi/updateTelegraph` 已下线
+（返回 404），现用 `v1/roll/get_roll_list`，需在请求参数上按 key 排序拼 query string →
+sha1 → md5 生成 `sign` 参数，否则 403。签名逻辑在 `server/news-fetcher.cjs` 的
+`clsSign()` 内，接口发版若变更签名算法需同步更新。
 
 ### 招行理财数据维护说明
 
@@ -396,7 +411,7 @@ ALLOWED_ORIGINS=...,http://localhost,https://localhost
 > `PYTHON_BIN` → `python3` → `python` 顺序探测。
 
 数据现状核验：`node scripts/check-data-status.cjs`（各表最新日期一目了然）。
-当前生产快照：**6569 只基金 / 47.5 万条净值**，板块/估值数据 T 日更新。
+当前生产快照：**6569 只基金 / 48.8 万条净值**，板块/估值数据 T 日更新。
 
 ## 部署
 
@@ -454,7 +469,7 @@ bash /var/www/fix-permission.sh  # 修复 403 权限错误
 | 首屏 chunk | `grep modulepreload dist/index.html` | 仅 3 个（见「首屏性能约定」） |
 | 私钥权限 | `ls -ld keys/ && ls -l keys/*` | 目录 `700`，私钥文件 `600` |
 | CORS 白名单 | `.env` 的 `ALLOWED_ORIGINS` | 必须包含前端实际访问的域名（含端口），否则登录返回 500 |
-| 数据时效 | `node scripts/check-data-status.cjs` | 各表最新日期为最近交易日 |
+| 数据时效 | `node scripts/check-data-status.cjs` | 各表最新日期为最近交易日。**注意：净值更新任务 20:30 执行，16:00 前查必然是 T-1** |
 | 服务存活 | `pm2 list` | `fund-server-*` 均为 online |
 
 > **nginx 注意：** `location /web/` 块内一旦出现自己的 `add_header`，server 级的 `add_header`

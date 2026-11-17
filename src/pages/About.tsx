@@ -31,15 +31,50 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const { Title, Text } = Typography;
 
-const APP_VERSION = '1.4.0';
-const APP_BUILD = '20260822';
+const APP_VERSION = '1.4.3';
+const APP_BUILD = '20261117';
 
 const changelog = [
   {
-    version: 'v1.4.0',
-    date: '2026-08-22',
+    version: 'v1.4.3',
+    date: '2026-11-17',
     tag: 'latest' as const,
     color: 'blue',
+    items: [
+      '修复财联社新闻源失效（旧接口下线 404）—— 改用带签名的新接口，快讯恢复更新',
+      '修复 HS300 基金详情自 6 月起从未更新（每日任务 9:30 必炸）—— 分页包装对象未解包',
+      '修复日志错误详情被静默丢弃的问题（winston 多参数），失败原因不再为空',
+      '基金净值更新任务 16:00 → 20:30：净值 18 点后才公布，此前数据永远滞后一天',
+      '修复数据检查脚本日期显示提前一天的时区 bug',
+      '全量基金净值、指数估值、板块资金流向更新至最新交易日',
+    ],
+  },
+  {
+    version: 'v1.4.2',
+    date: '2026-11-16',
+    color: 'default',
+    items: [
+      '修复招行理财数据长期停更：定时任务 python 解释器探测（python3 优先）',
+      '招行理财净值抓取重写：官方 JSON 接口替代 DOM 翻页，92 产品 2 分钟完成',
+      '新增持仓估值同步脚本 sync-cmb-holdings.cjs，估值不再停留旧净值',
+      '抓取脚本纳入版本管理（此前 scripts/*.py 被 gitignore 整体忽略）',
+    ],
+  },
+  {
+    version: 'v1.4.1',
+    date: '2026-11-16',
+    color: 'default',
+    items: [
+      '首屏减重 1.26MB：ECharts 移出预加载链路 + markdown 手动分包移除',
+      '修复 Node 22+ 测试全线崩溃（localStorage 全局注入兜底）',
+      'i18n 存储读取加兜底，隐私模式下不再白屏',
+      '/web/ 安全响应头补回（nginx add_header 继承陷阱）',
+    ],
+  },
+  {
+    version: 'v1.4.0',
+    date: '2026-08-22',
+    color: 'default',
     items: [
       '对标养基宝 APP 第二轮优化：持仓预警线、组合回测、资产配置建议',
       '持仓预警线：止盈/止损设置 + 触发状态展示 + 接近预警',
